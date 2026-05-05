@@ -7,20 +7,22 @@ async function init() {
     mostrarLogin()
   } else {
     const rol = await getRol()
-    mostrarApp(rol)
+    mostrarApp(rol, session.user.email)
   }
 }
 
 function mostrarLogin() {
   document.getElementById('app').innerHTML = `
-    <div id="login-container">
-      <h1>dataDesk</h1>
-      <form id="login-form">
-        <input type="email" id="email" placeholder="Correo" required />
-        <input type="password" id="password" placeholder="Contraseña" required />
-        <button type="submit">Entrar</button>
-        <p id="error-msg"></p>
-      </form>
+    <div class="login-wrapper">
+      <div class="login-box">
+        <div class="login-logo">data<span>Desk</span></div>
+        <form id="login-form">
+          <input type="email" id="email" placeholder="Correo electrónico" required />
+          <input type="password" id="password" placeholder="Contraseña" required />
+          <button type="submit">Entrar</button>
+          <p id="error-msg"></p>
+        </form>
+      </div>
     </div>
   `
   document.getElementById('login-form').addEventListener('submit', async (e) => {
@@ -36,23 +38,5 @@ function mostrarLogin() {
   })
 }
 
-function mostrarApp(rol) {
-  document.getElementById('app').innerHTML = `
-    <div id="main-container">
-      <header>
-        <h1>dataDesk</h1>
-        <span>Rol: ${rol}</span>
-        <button id="logout-btn">Cerrar sesión</button>
-      </header>
-      <main>
-        <p>Bienvenido al aplicativo.</p>
-      </main>
-    </div>
-  `
-  document.getElementById('logout-btn').addEventListener('click', async () => {
-    await logout()
-    init()
-  })
-}
-
-init()
+function mostrarApp(rol, email) {
+  document.getElement
