@@ -1,7 +1,4 @@
-import { listarProductos } from '../../src/productos.js'
-import { getTenantId } from '../../src/tenant.js'
-
-export async function vistaProductos() {
+async function vistaProductos() {
   const content = document.getElementById('content')
   content.innerHTML = `<p>Cargando productos...</p>`
 
@@ -56,7 +53,6 @@ export async function vistaProductos() {
       </div>
     `
 
-    // Filtro en tiempo real
     document.getElementById('filtro-buscar').addEventListener('input', filtrar)
     document.getElementById('filtro-grupo').addEventListener('change', filtrar)
     document.getElementById('filtro-tipo').addEventListener('change', filtrar)
