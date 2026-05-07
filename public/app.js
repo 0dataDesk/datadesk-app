@@ -1,12 +1,14 @@
-async function init() {
-  const session = await getSession()
-  if (!session) {
+window._db.auth.onAuthStateChange(async (event, session) => {
+  if (event === 'INITIAL_SESSION') {
+    session
+      ? mostrarApp(session.user.user_metadata?.rol || null, session.user.email)
+      : mostrarLogin()
+  } else if (event === 'SIGNED_IN') {
+    mostrarApp(session.user.user_metadata?.rol || null, session.user.email)
+  } else if (event === 'SIGNED_OUT') {
     mostrarLogin()
-  } else {
-    const rol = await getRol()
-    mostrarApp(rol, session.user.email)
   }
-}
+})
 
 function mostrarLogin() {
   document.getElementById('app').innerHTML = `
@@ -28,7 +30,6 @@ function mostrarLogin() {
     const password = document.getElementById('password').value
     try {
       await login(email, password)
-      init()
     } catch (err) {
       document.getElementById('error-msg').textContent = 'Correo o contraseña incorrectos'
     }
@@ -62,7 +63,6 @@ function mostrarApp(rol, email) {
 
   document.getElementById('logout-btn').addEventListener('click', async () => {
     await logout()
-    init()
   })
 
   document.querySelectorAll('[data-view]').forEach(link => {
@@ -74,5 +74,3 @@ function mostrarApp(rol, email) {
     })
   })
 }
-
-init()
