@@ -1,18 +1,16 @@
-import { supabase } from './lib/supabase.js'
-
-export async function login(email, password) {
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+async function login(email, password) {
+  const { data, error } = await window._db.auth.signInWithPassword({ email, password })
   if (error) throw error
   return data
 }
 
-export async function logout() {
-  const { error } = await supabase.auth.signOut()
+async function logout() {
+  const { error } = await window._db.auth.signOut()
   if (error) throw error
 }
 
-export async function getSession() {
-  const { data, error } = await supabase.auth.getSession()
+async function getSession() {
+  const { data, error } = await window._db.auth.getSession()
   if (error) throw error
   return data.session
 }
