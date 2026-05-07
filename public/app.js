@@ -1,13 +1,28 @@
+let _appMontado = false
+
 window._db.auth.onAuthStateChange(async (event, session) => {
-  if (event === 'INITIAL_SESSION') {
-    session
-      ? mostrarApp(session.user.user_metadata?.rol || null, session.user.email)
-      : mostrarLogin()
-  } else if (event === 'SIGNED_IN') {
+  // Si el app ya está montado ignorar TOKEN_REFRESHED / SIGNED_IN que
+  // Supabase dispara al volver a la pestaña — solo reaccionar a SIGNED_OUT
+  if (_appMontado && event !== 'SIGNED_OUT') return
+
+  if (event === 'SIGNED_OUT') {
+    _appMontado = false
+    localStorage.removeItem('datadesk-view')
+    mostrarLogin()
+    return
+  }
+
+  if (session) {
+    _appMontado = true
     mostrarApp(session.user.user_metadata?.rol || null, session.user.email)
-  } else if (event === 'SIGNED_OUT') {
+  } else {
     mostrarLogin()
   }
+})
+
+// Interceptar visibilitychange: si el app ya está montado, no hacer nada
+document.addEventListener('visibilitychange', () => {
+  // El flag _appMontado evita que el evento de Supabase re-renderice la vista
 })
 
 function mostrarLogin() {
@@ -72,13 +87,21 @@ function mostrarApp(rol, email) {
       document.querySelectorAll('[data-view]').forEach(l => l.classList.remove('active'))
       e.target.classList.add('active')
       const view = e.target.dataset.view
+      localStorage.setItem('datadesk-view', view)
       if (view === 'inicio')    await mostrarBienvenida()
       if (view === 'productos') await vistaProductos()
       if (view === 'recetas')   await vistaRecetas()
     })
   })
 
-  mostrarBienvenida()
+  // Restaurar última vista activa (persiste entre recargas y cambios de pestaña)
+  const vistaGuardada = localStorage.getItem('datadesk-view')
+  const linkActivo = document.querySelector(`[data-view="${vistaGuardada || 'inicio'}"]`)
+  if (linkActivo) linkActivo.classList.add('active')
+
+  if (vistaGuardada === 'productos')    vistaProductos()
+  else if (vistaGuardada === 'recetas') vistaRecetas()
+  else                                  mostrarBienvenida()
 }
 
 async function mostrarBienvenida() {
