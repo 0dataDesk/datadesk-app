@@ -1,7 +1,4 @@
-import { listarRecetas, buscarReceta, listarIngredientes, listarProcedimientos } from '../../src/recetas.js'
-import { getTenantId } from '../../src/tenant.js'
-
-export async function vistaRecetas() {
+async function vistaRecetas() {
   const content = document.getElementById('content')
   content.innerHTML = `<p>Cargando recetas...</p>`
 
@@ -48,7 +45,6 @@ export async function vistaRecetas() {
       </div>
     `
 
-    // Filtro en tiempo real
     document.getElementById('filtro-buscar').addEventListener('input', filtrar)
     document.getElementById('filtro-categoria').addEventListener('change', filtrar)
 
@@ -63,11 +59,9 @@ export async function vistaRecetas() {
       })
     }
 
-    // Seleccionar receta
     document.querySelectorAll('.fila-receta').forEach(fila => {
       fila.addEventListener('click', async () => {
-        const id_receta = fila.dataset.id
-        await mostrarDetalle(id_receta)
+        await mostrarDetalle(fila.dataset.id)
       })
     })
 
