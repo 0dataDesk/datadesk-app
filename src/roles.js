@@ -1,19 +1,17 @@
-import { supabase } from './lib/supabase.js'
-
-export async function getRol() {
-  const { data: { user } } = await supabase.auth.getUser()
+async function getRol() {
+  const { data: { user } } = await window._db.auth.getUser()
   if (!user) return null
   return user.user_metadata?.rol || null
 }
 
-export async function esAdmin() {
+async function esAdmin() {
   return await getRol() === 'admin'
 }
 
-export async function esEditor() {
+async function esEditor() {
   return await getRol() === 'editor'
 }
 
-export async function esOperador() {
+async function esOperador() {
   return await getRol() === 'operador'
 }
