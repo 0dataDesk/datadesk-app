@@ -1,7 +1,5 @@
-import { supabase } from './lib/supabase.js'
-
-export async function listarProductos(tenant_id) {
-  const { data, error } = await supabase
+async function listarProductos(tenant_id) {
+  const { data, error } = await window._db
     .from('productos')
     .select('*')
     .eq('activo', true)
@@ -10,8 +8,8 @@ export async function listarProductos(tenant_id) {
   return data
 }
 
-export async function buscarProducto(id_producto) {
-  const { data, error } = await supabase
+async function buscarProducto(id_producto) {
+  const { data, error } = await window._db
     .from('productos')
     .select('*')
     .eq('id_producto', id_producto)
@@ -20,8 +18,8 @@ export async function buscarProducto(id_producto) {
   return data
 }
 
-export async function crearProducto(producto) {
-  const { data, error } = await supabase
+async function crearProducto(producto) {
+  const { data, error } = await window._db
     .from('productos')
     .insert([producto])
     .select()
@@ -30,8 +28,8 @@ export async function crearProducto(producto) {
   return data
 }
 
-export async function actualizarProducto(id_producto, cambios) {
-  const { data, error } = await supabase
+async function actualizarProducto(id_producto, cambios) {
+  const { data, error } = await window._db
     .from('productos')
     .update(cambios)
     .eq('id_producto', id_producto)
@@ -41,8 +39,8 @@ export async function actualizarProducto(id_producto, cambios) {
   return data
 }
 
-export async function desactivarProducto(id_producto) {
-  const { data, error } = await supabase
+async function desactivarProducto(id_producto) {
+  const { data, error } = await window._db
     .from('productos')
     .update({ activo: false })
     .eq('id_producto', id_producto)
