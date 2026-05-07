@@ -1,8 +1,3 @@
-import { login, logout, getSession } from '../src/auth.js'
-import { getRol } from '../src/roles.js'
-import { vistaProductos } from './views/productos.js'
-import { vistaRecetas } from './views/recetas.js'
-
 async function init() {
   const session = await getSession()
   if (!session) {
