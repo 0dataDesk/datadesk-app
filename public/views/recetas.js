@@ -102,10 +102,10 @@ async function vistaRecetas() {
 
     // ── Platillo → carga receta ──────────────────────────────────────────
     fPlatillo.addEventListener('change', () => {
-      const id = parseInt(fPlatillo.value)
+      const val = fPlatillo.value
       document.getElementById('receta-detalle-wrap').innerHTML = ''
-      if (!id) return
-      const receta = window._recetas.find(r => r.id_receta === id)
+      if (!val) return
+      const receta = window._recetas.find(r => String(r.id_receta) === String(val))
       if (receta) cargarDetalleReceta(receta, puedeEditar, esAdmin)
     })
 
@@ -334,7 +334,8 @@ async function cargarDetalleReceta(receta, puedeEditar, esAdmin) {
     })
 
   } catch (err) {
-    wrap.innerHTML = `<p style="margin-top:24px">Error: ${err.message}</p>`
+    wrap.innerHTML = `<p style="margin-top:24px;color:var(--color-highlight)">Error al cargar receta: ${err.message}</p>`
+    console.error(err)
   }
 }
 
