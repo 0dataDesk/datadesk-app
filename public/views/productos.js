@@ -1,160 +1,218 @@
 async function vistaProductos() {
   const content = document.getElementById('content')
-  content.innerHTML = `<p style="color:var(--color-text-muted)">Cargando insumos...</p>`
+  content.innerHTML = `<p style="color:var(--color-text-muted)">Cargando...</p>`
 
   try {
-    const tenant_id = await getTenantId()
+    const tenant_id  = await getTenantId()
+    const rol        = window._rol || 'operador'
+    const esAdmin    = rol === 'admin'
 
-    const [{ data: productos, error: errP }, { data: ingredientes, error: errI }] = await Promise.all([
-      window._db.from('productos').select('*').eq('tenant_id', tenant_id),
-      window._db.from('receta_ingredientes').select('id_producto')
+    const [
+      { data: productos,    error: errP },
+      { data: ingredientes, error: errI }
+    ] = await Promise.all([
+      window._db.from('productos').select('*').eq('tenant_id', tenant_id).order('producto'),
+      window._db.from('receta_ingredientes').select('id_producto, id_receta, catalogo_recetas(nombre_platillo)')
     ])
 
     if (errP) throw errP
-    if (errI) throw errI
 
-    // Contar recetas por producto
-    const recetasPorProducto = {}
+    window._productos = productos || []
+
+    // Recetas por producto
+    const recetasPor = {}
     ;(ingredientes || []).forEach(i => {
-      if (i.id_producto) {
-        recetasPorProducto[i.id_producto] = (recetasPorProducto[i.id_producto] || 0) + 1
-      }
+      if (!i.id_producto) return
+      if (!recetasPor[i.id_producto]) recetasPor[i.id_producto] = []
+      const nombre = i.catalogo_recetas?.nombre_platillo
+      if (nombre && !recetasPor[i.id_producto].includes(nombre))
+        recetasPor[i.id_producto].push(nombre)
     })
+    window._recetasPorProducto = recetasPor
 
-    // Contadores de status
-    const total      = productos.length
-    const aprobados  = productos.filter(p => p.status === 'aprobado').length
-    const pendientes = productos.filter(p => !p.status || p.status === 'pendiente').length
-    const archivados = productos.filter(p => p.status === 'archivado').length
-
-    // Desglose por grupo
-    const porGrupo = {}
-    productos.forEach(p => {
-      const g = p.grupo || 'Sin grupo'
-      porGrupo[g] = (porGrupo[g] || 0) + 1
-    })
-
-    const grupos     = [...new Set(productos.map(p => p.grupo).filter(Boolean))].sort()
-    const categorias = [...new Set(productos.map(p => p.categoria).filter(Boolean))].sort()
-    const fuentes    = [...new Set(productos.map(p => p.fuente).filter(Boolean))].sort()
+    // Valores únicos para los filtros
+    const grupos    = [...new Set(window._productos.map(p => p.grupo).filter(Boolean))].sort()
+    const cats0     = [...new Set(window._productos.map(p => p.categoria).filter(Boolean))].sort()
+    const prods0    = [...window._productos].sort((a, b) => a.producto.localeCompare(b.producto))
 
     content.innerHTML = `
-      <div class="vista-header"><h2>Insumos</h2></div>
+      <div class="vista-header">
+        <h2>Revisión de Insumos</h2>
+      </div>
 
-      <!-- Contadores -->
-      <div class="dashboard-grid">
-        <div class="dashboard-card">
-          <div class="card-valor">${total}</div>
-          <div class="card-label">Total</div>
+      <div class="filtros-cascada">
+        <div class="filtro-cascada-item">
+          <label class="filtro-label">Grupo</label>
+          <select id="f-grupo" class="filtro-select">
+            <option value="">Todos los grupos</option>
+            ${grupos.map(g => `<option value="${g}">${g}</option>`).join('')}
+          </select>
         </div>
-        <div class="dashboard-card aprobado">
-          <div class="card-valor">${aprobados}</div>
-          <div class="card-label">Aprobados</div>
+        <div class="filtro-cascada-item">
+          <label class="filtro-label">Categoría</label>
+          <select id="f-categoria" class="filtro-select">
+            <option value="">Todas las categorías</option>
+            ${cats0.map(c => `<option value="${c}">${c}</option>`).join('')}
+          </select>
         </div>
-        <div class="dashboard-card pendiente">
-          <div class="card-valor">${pendientes}</div>
-          <div class="card-label">Pendientes</div>
-        </div>
-        <div class="dashboard-card archivado">
-          <div class="card-valor">${archivados}</div>
-          <div class="card-label">Archivados</div>
+        <div class="filtro-cascada-item">
+          <label class="filtro-label">Insumo</label>
+          <select id="f-insumo" class="filtro-select">
+            <option value="">Selecciona un insumo...</option>
+            ${prods0.map(p => `<option value="${p.id_producto}">${p.producto}</option>`).join('')}
+          </select>
         </div>
       </div>
 
-      <!-- Desglose por grupo -->
-      <h3 class="seccion-titulo">Por grupo</h3>
-      <div class="grupo-grid">
-        ${Object.entries(porGrupo)
-            .sort((a, b) => b[1] - a[1])
-            .map(([g, n]) => `
-              <div class="grupo-item">
-                <span class="grupo-nombre">${g}</span>
-                <span class="grupo-count">${n}</span>
-              </div>
-            `).join('')}
-      </div>
-
-      <!-- Filtros + Tabla -->
-      <div class="filtros" style="margin-bottom:16px">
-        <select id="filtro-grupo">
-          <option value="">Todos los grupos</option>
-          ${grupos.map(g => `<option value="${g}">${g}</option>`).join('')}
-        </select>
-        <select id="filtro-categoria">
-          <option value="">Todas las categorías</option>
-          ${categorias.map(c => `<option value="${c}">${c}</option>`).join('')}
-        </select>
-        <select id="filtro-fuente">
-          <option value="">Todas las fuentes</option>
-          ${fuentes.map(f => `<option value="${f}">${f}</option>`).join('')}
-        </select>
-        <select id="filtro-status">
-          <option value="">Todos los status</option>
-          <option value="pendiente">Pendiente</option>
-          <option value="aprobado">Aprobado</option>
-          <option value="archivado">Archivado</option>
-        </select>
-        <input type="text" id="filtro-buscar" placeholder="Buscar insumo..." />
-      </div>
-
-      <div class="tabla-wrapper">
-        <table class="tabla">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Insumo</th>
-              <th>Tipo</th>
-              <th>Grupo</th>
-              <th>Categoría</th>
-              <th>Fuente</th>
-              <th>Unidad</th>
-              <th>Recetas</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody id="tbody-productos"></tbody>
-        </table>
-      </div>
+      <div id="insumo-detalle-wrap"></div>
     `
 
-    const renderTabla = () => {
-      const grupo     = document.getElementById('filtro-grupo').value
-      const categoria = document.getElementById('filtro-categoria').value
-      const fuente    = document.getElementById('filtro-fuente').value
-      const status    = document.getElementById('filtro-status').value
-      const buscar    = document.getElementById('filtro-buscar').value.toLowerCase()
+    const fGrupo    = document.getElementById('f-grupo')
+    const fCategoria = document.getElementById('f-categoria')
+    const fInsumo   = document.getElementById('f-insumo')
 
-      const filtrados = productos.filter(p =>
-        (!grupo     || p.grupo     === grupo) &&
-        (!categoria || p.categoria === categoria) &&
-        (!fuente    || p.fuente    === fuente) &&
-        (!status    || (p.status || 'pendiente') === status) &&
-        (!buscar    || p.producto.toLowerCase().includes(buscar))
-      )
+    const actualizarFiltros = () => {
+      const grupo     = fGrupo.value
+      const categoria = fCategoria.value
 
-      document.getElementById('tbody-productos').innerHTML = filtrados.map(p => `
-        <tr>
-          <td>${p.id_producto}</td>
-          <td>${p.producto}</td>
-          <td>${p.tipo           || ''}</td>
-          <td>${p.grupo          || ''}</td>
-          <td>${p.categoria      || ''}</td>
-          <td>${p.fuente         || ''}</td>
-          <td>${p.unidad_medida  || ''}</td>
-          <td>${recetasPorProducto[p.id_producto] || 0}</td>
-          <td><span class="badge-status ${p.status || 'pendiente'}">${p.status || 'pendiente'}</span></td>
-        </tr>
-      `).join('')
+      // Categorías según grupo
+      const catsDisp = [...new Set(
+        window._productos
+          .filter(p => !grupo || p.grupo === grupo)
+          .map(p => p.categoria).filter(Boolean)
+      )].sort()
+
+      const catActual = fCategoria.value
+      fCategoria.innerHTML =
+        `<option value="">Todas las categorías</option>` +
+        catsDisp.map(c => `<option value="${c}"${c === catActual ? ' selected' : ''}>${c}</option>`).join('')
+
+      // Insumos según grupo + categoría
+      const prodsDisp = window._productos
+        .filter(p =>
+          (!grupo    || p.grupo    === grupo) &&
+          (!categoria || p.categoria === categoria)
+        )
+        .sort((a, b) => a.producto.localeCompare(b.producto))
+
+      fInsumo.innerHTML =
+        `<option value="">Selecciona un insumo...</option>` +
+        prodsDisp.map(p => `<option value="${p.id_producto}">${p.producto}</option>`).join('')
+
+      document.getElementById('insumo-detalle-wrap').innerHTML = ''
     }
 
-    ;['filtro-grupo', 'filtro-categoria', 'filtro-fuente', 'filtro-status'].forEach(id => {
-      document.getElementById(id).addEventListener('change', renderTabla)
-    })
-    document.getElementById('filtro-buscar').addEventListener('input', renderTabla)
+    fGrupo.addEventListener('change',    () => actualizarFiltros())
+    fCategoria.addEventListener('change', () => actualizarFiltros())
 
-    renderTabla()
+    fInsumo.addEventListener('change', () => {
+      const val = fInsumo.value
+      document.getElementById('insumo-detalle-wrap').innerHTML = ''
+      if (!val) return
+      const producto = window._productos.find(p => String(p.id_producto) === String(val))
+      if (producto) mostrarDetalleInsumo(producto, esAdmin)
+    })
 
   } catch (err) {
-    content.innerHTML = `<p>Error al cargar insumos: ${err.message}</p>`
+    content.innerHTML = `<p style="color:var(--color-highlight)">Error: ${err.message}</p>`
   }
+}
+
+function mostrarDetalleInsumo(producto, esAdmin) {
+  const wrap = document.getElementById('insumo-detalle-wrap')
+  const recetas = window._recetasPorProducto[producto.id_producto] || []
+
+  wrap.innerHTML = `
+    <div class="receta-detalle-card">
+
+      <div class="detalle-header">
+        <div>
+          <h3>${producto.producto}</h3>
+          <p class="detalle-categoria">${[producto.grupo, producto.categoria].filter(Boolean).join(' · ')}</p>
+        </div>
+        <div class="detalle-acciones">
+          <span class="badge-status ${producto.status || 'pendiente'}">${producto.status || 'pendiente'}</span>
+          ${esAdmin ? `
+            <div class="acciones-receta" style="margin-top:8px">
+              <button class="btn-accion btn-aprobar" id="btn-aprobar-ins">Aprobar</button>
+              <button class="btn-accion btn-archivar" id="btn-archivar-ins">Archivar</button>
+            </div>` : ''}
+        </div>
+      </div>
+
+      <h4>Datos del insumo</h4>
+      <div class="insumo-datos-grid">
+        ${fila('Tipo',     producto.tipo)}
+        ${fila('Fuente',   producto.fuente)}
+        ${fila('Unidad',   producto.unidad_medida)}
+        ${fila('Grupo',    producto.grupo)}
+        ${fila('Categoría', producto.categoria)}
+      </div>
+
+      <h4>Recetas que lo usan</h4>
+      ${recetas.length
+        ? `<ul class="recetas-lista-ins">
+            ${recetas.map(r => `<li>${r}</li>`).join('')}
+           </ul>`
+        : `<p class="solicitudes-hint">Este insumo no aparece en ninguna receta registrada.</p>`
+      }
+
+      <h4>Solicitudes y comentarios</h4>
+      <p class="solicitudes-hint">
+        Usá este espacio para pedir cambios sobre este insumo: corrección de nombre, unidad, grupo, etc.
+      </p>
+      <textarea id="notas-insumo" class="edit-textarea" rows="4"
+        placeholder="Ej: Cambiar unidad a kg. Mover al grupo Lácteos. Revisar fuente..."
+      >${producto.notas || ''}</textarea>
+      <button class="btn-accion btn-guardar-sec" id="btn-guardar-notas-ins" style="margin-top:10px">
+        Guardar solicitud
+      </button>
+
+    </div>
+  `
+
+  // Admin: aprobar / archivar
+  if (esAdmin) {
+    document.getElementById('btn-aprobar-ins')?.addEventListener('click', () =>
+      cambiarStatusInsumo(producto, 'aprobado'))
+    document.getElementById('btn-archivar-ins')?.addEventListener('click', () =>
+      cambiarStatusInsumo(producto, 'archivado'))
+  }
+
+  // Guardar notas
+  document.getElementById('btn-guardar-notas-ins')?.addEventListener('click', async () => {
+    const notas = document.getElementById('notas-insumo')?.value || ''
+    const { error } = await window._db.from('productos')
+      .update({ notas })
+      .eq('id_producto', producto.id_producto)
+    if (!error) {
+      producto.notas = notas
+      mostrarToast('Solicitud guardada')
+    } else {
+      mostrarToast('Error al guardar')
+      console.error(error)
+    }
+  })
+}
+
+function fila(label, valor) {
+  if (!valor) return ''
+  return `<div class="insumo-dato-fila">
+    <span class="insumo-dato-label">${label}</span>
+    <span class="insumo-dato-valor">${valor}</span>
+  </div>`
+}
+
+async function cambiarStatusInsumo(producto, nuevoStatus) {
+  const { error } = await window._db.from('productos')
+    .update({ status: nuevoStatus })
+    .eq('id_producto', producto.id_producto)
+  if (error) { mostrarToast('Error: ' + error.message); return }
+
+  producto.status = nuevoStatus
+  const p = window._productos?.find(p => p.id_producto === producto.id_producto)
+  if (p) p.status = nuevoStatus
+
+  mostrarToast(`Insumo ${nuevoStatus}`)
+  mostrarDetalleInsumo(producto, true)
 }
