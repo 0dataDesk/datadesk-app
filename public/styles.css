@@ -652,11 +652,56 @@ body {
 
 /* ── MOBILE LAYOUT ── */
 @media (max-width: 699px) {
+  /* Sidebar → cinta horizontal bajo el header */
+  .body {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+    min-height: auto;
+    padding: 0;
+    border-right: none;
+    border-bottom: 2px solid var(--color-border);
+    display: flex;
+    box-shadow: 0 2px 6px rgba(43,26,15,0.06);
+  }
+
+  .sidebar ul {
+    display: flex;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .sidebar ul::-webkit-scrollbar { display: none; }
+
+  .sidebar ul li {
+    flex: 1;
+    min-width: max-content;
+  }
+
+  .sidebar ul li a {
+    padding: 13px 18px;
+    text-align: center;
+    font-size: 13px;
+    border-left: none;
+    border-bottom: 3px solid transparent;
+    white-space: nowrap;
+  }
+
+  .sidebar ul li a:hover,
+  .sidebar ul li a.active {
+    background: var(--color-secondary);
+    border-left-color: transparent;
+    border-bottom-color: var(--color-accent);
+  }
+
+  /* Resto del layout móvil */
   .filtros-cascada { flex-direction: column; gap: 14px; padding: 16px; }
   .filtro-cascada-item { min-width: 0; }
   .receta-detalle-card { padding: 20px; }
   .content { padding: 20px 16px; }
   .vista-header { flex-direction: column; align-items: flex-start; }
   .tabla-editable td { padding: 6px 8px; }
-  .sidebar { width: 180px; }
 }
