@@ -29,7 +29,8 @@ function mostrarLogin() {
   document.getElementById('app').innerHTML = `
     <div class="login-wrapper">
       <div class="login-box">
-        <div class="login-logo">data<span>Desk</span></div>
+        <div class="login-logo">Tita<span>.</span></div>
+        <p class="login-tagline">panadería argentina</p>
         <form id="login-form">
           <input type="email" id="email" placeholder="Correo electrónico" required />
           <input type="password" id="password" placeholder="Contraseña" required />
@@ -57,7 +58,7 @@ function mostrarApp(rol, email) {
   document.getElementById('app').innerHTML = `
     <div class="layout">
       <header class="header">
-        <div class="header-logo">data<span>Desk</span></div>
+        <div class="header-logo">Tita<span>.</span><small>panadería argentina</small></div>
         <div class="header-user">
           <span class="header-email">${email}</span>
           <span class="header-rol">${rol}</span>
