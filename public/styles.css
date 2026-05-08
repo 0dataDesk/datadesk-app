@@ -392,3 +392,120 @@ body {
 }
 .grupo-item .grupo-nombre { font-size: 13px; color: var(--color-text-muted); }
 .grupo-item .grupo-count  { font-size: 22px; font-weight: 700; }
+
+/* ── EDITOR INPUTS ── */
+.edit-input {
+  background: var(--color-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  color: var(--color-text);
+  font-family: var(--font-main);
+  font-size: 13px;
+  padding: 4px 8px;
+  width: 100%;
+  outline: none;
+}
+.edit-input:focus { border-color: var(--color-highlight); }
+.edit-wide { min-width: 120px; }
+
+.edit-select {
+  background: var(--color-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  color: var(--color-text);
+  font-family: var(--font-main);
+  font-size: 13px;
+  padding: 4px 8px;
+  outline: none;
+  cursor: pointer;
+  max-width: 160px;
+}
+.edit-select:focus { border-color: var(--color-highlight); }
+
+.edit-textarea {
+  background: var(--color-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  color: var(--color-text);
+  font-family: var(--font-main);
+  font-size: 13px;
+  padding: 8px;
+  width: 100%;
+  resize: vertical;
+  outline: none;
+}
+.edit-textarea:focus { border-color: var(--color-highlight); }
+
+/* ── EDIT CATEGORIA ROW ── */
+.edit-cat-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+/* ── DETALLE ACCIONES ── */
+.detalle-acciones {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+/* ── PASO EDITABLE ROW ── */
+.paso-editable-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  width: 100%;
+}
+.procedimiento-editable { padding-left: 20px; }
+.procedimiento-editable li { margin-bottom: 10px; }
+
+/* ── SAVE / INACTIVAR BUTTONS ── */
+.btn-guardar-sec {
+  background: var(--color-accent);
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+.btn-inactivar {
+  background: rgba(233,69,96,0.1);
+  color: var(--color-highlight);
+  border-color: rgba(233,69,96,0.2);
+  padding: 4px 8px;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+/* ── MOBILE RECETA SELECT ── */
+.receta-mobile-select {
+  display: none;
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  color: var(--color-text);
+  font-family: var(--font-main);
+  font-size: 14px;
+  outline: none;
+  margin-bottom: 16px;
+}
+.receta-mobile-select:focus { border-color: var(--color-highlight); }
+
+/* ── MOBILE LAYOUT ── */
+@media (max-width: 699px) {
+  .recetas-layout {
+    grid-template-columns: 1fr;
+  }
+  .receta-mobile-select { display: block; }
+  .receta-desktop-table { display: none; }
+  .content { padding: 16px; }
+  .vista-header { flex-direction: column; align-items: flex-start; }
+  .filtros { flex-direction: column; }
+  .filtros input, .filtros select { width: 100%; }
+  .detalle-receta { padding: 16px; }
+  .tabla-editable td { padding: 6px 8px; }
+}
