@@ -650,6 +650,25 @@ body {
   white-space: pre-wrap;
 }
 
+/* ── INSUMOS TABLA EDITABLE ── */
+.insumos-tabla { table-layout: fixed; }
+.insumos-tabla th:first-child,
+.insumos-tabla td:first-child { width: 100%; }
+.insumos-tabla .col-unidad,
+.insumos-tabla td:last-child  { width: 150px; }
+
+.insumo-nombre-input {
+  font-size: 15px;
+  padding: 7px 10px;
+  width: 100%;
+}
+.insumo-unidad-select,
+.insumo-unidad-input {
+  width: 100%;
+  font-size: 13px;
+  padding: 7px 8px;
+}
+
 /* ── INSUMO DETAIL ── */
 .insumo-datos-grid {
   display: flex;
