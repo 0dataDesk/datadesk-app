@@ -21,7 +21,10 @@ async function vistaRecetas() {
     window._recetas  = recetas  || []
     window._unidades = unidades || []
 
-    const origenes = [...new Set(window._recetas.map(r => r.origen).filter(Boolean))].sort()
+    // Valores únicos para los tres filtros
+    const fuentes  = [...new Set(window._recetas.map(r => r.fuente).filter(Boolean))].sort()
+    const cats0    = [...new Set(window._recetas.map(r => r.categoria).filter(Boolean))].sort()
+    const plats0   = [...window._recetas].sort((a, b) => a.nombre_platillo.localeCompare(b.nombre_platillo))
 
     content.innerHTML = `
       <div class="vista-header">
@@ -30,22 +33,24 @@ async function vistaRecetas() {
 
       <div class="filtros-cascada">
         <div class="filtro-cascada-item">
-          <label class="filtro-label">Origen</label>
-          <select id="f-origen" class="filtro-select">
-            <option value="">Todos los orígenes</option>
-            ${origenes.map(o => `<option value="${o}">${o}</option>`).join('')}
+          <label class="filtro-label">Fuente</label>
+          <select id="f-fuente" class="filtro-select">
+            <option value="">Todas las fuentes</option>
+            ${fuentes.map(f => `<option value="${f}">${f}</option>`).join('')}
           </select>
         </div>
         <div class="filtro-cascada-item">
           <label class="filtro-label">Categoría</label>
-          <select id="f-categoria" class="filtro-select" disabled>
-            <option value="">— primero selecciona origen —</option>
+          <select id="f-categoria" class="filtro-select">
+            <option value="">Todas las categorías</option>
+            ${cats0.map(c => `<option value="${c}">${c}</option>`).join('')}
           </select>
         </div>
         <div class="filtro-cascada-item">
           <label class="filtro-label">Platillo</label>
-          <select id="f-platillo" class="filtro-select" disabled>
-            <option value="">— primero selecciona categoría —</option>
+          <select id="f-platillo" class="filtro-select">
+            <option value="">Selecciona un platillo...</option>
+            ${plats0.map(r => `<option value="${r.id_receta}">${r.nombre_platillo}</option>`).join('')}
           </select>
         </div>
       </div>
@@ -53,53 +58,47 @@ async function vistaRecetas() {
       <div id="receta-detalle-wrap"></div>
     `
 
-    const fOrigen    = document.getElementById('f-origen')
+    const fFuente   = document.getElementById('f-fuente')
     const fCategoria = document.getElementById('f-categoria')
     const fPlatillo  = document.getElementById('f-platillo')
 
-    // ── Origen → rellena Categoría ──────────────────────────────────────
-    fOrigen.addEventListener('change', () => {
-      const origen = fOrigen.value
-
-      const cats = [...new Set(
-        window._recetas
-          .filter(r => !origen || r.origen === origen)
-          .map(r => r.categoria)
-          .filter(Boolean)
-      )].sort()
-
-      fCategoria.innerHTML =
-        `<option value="">Todas las categorías</option>` +
-        cats.map(c => `<option value="${c}">${c}</option>`).join('')
-      fCategoria.disabled = false
-
-      fPlatillo.innerHTML = `<option value="">— primero selecciona categoría —</option>`
-      fPlatillo.disabled = true
-
-      document.getElementById('receta-detalle-wrap').innerHTML = ''
-    })
-
-    // ── Categoría → rellena Platillo ─────────────────────────────────────
-    fCategoria.addEventListener('change', () => {
-      const origen    = fOrigen.value
+    // Recalcula categorias y platillos según selección actual
+    const actualizarFiltros = (resetPlatillo = true) => {
+      const fuente    = fFuente.value
       const categoria = fCategoria.value
 
-      const platillos = window._recetas
+      // Categorías disponibles según fuente
+      const catsDisp = [...new Set(
+        window._recetas
+          .filter(r => !fuente || r.fuente === fuente)
+          .map(r => r.categoria).filter(Boolean)
+      )].sort()
+
+      const catActual = fCategoria.value
+      fCategoria.innerHTML =
+        `<option value="">Todas las categorías</option>` +
+        catsDisp.map(c => `<option value="${c}"${c === catActual ? ' selected' : ''}>${c}</option>`).join('')
+
+      // Platillos disponibles según fuente + categoría
+      const platsDisp = window._recetas
         .filter(r =>
-          (!origen    || r.origen    === origen) &&
+          (!fuente    || r.fuente    === fuente) &&
           (!categoria || r.categoria === categoria)
         )
         .sort((a, b) => a.nombre_platillo.localeCompare(b.nombre_platillo))
 
       fPlatillo.innerHTML =
         `<option value="">Selecciona un platillo...</option>` +
-        platillos.map(r =>
-          `<option value="${r.id_receta}">${r.nombre_platillo}</option>`
-        ).join('')
-      fPlatillo.disabled = false
+        platsDisp.map(r => `<option value="${r.id_receta}">${r.nombre_platillo}</option>`).join('')
 
-      document.getElementById('receta-detalle-wrap').innerHTML = ''
-    })
+      if (resetPlatillo) document.getElementById('receta-detalle-wrap').innerHTML = ''
+    }
+
+    // ── Fuente cambia → recalcula categorías y platillos ─────────────────
+    fFuente.addEventListener('change', () => actualizarFiltros())
+
+    // ── Categoría cambia → recalcula platillos ───────────────────────────
+    fCategoria.addEventListener('change', () => actualizarFiltros())
 
     // ── Platillo → carga receta ──────────────────────────────────────────
     fPlatillo.addEventListener('change', () => {
