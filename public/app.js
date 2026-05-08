@@ -52,6 +52,8 @@ function mostrarLogin() {
 }
 
 function mostrarApp(rol, email) {
+  window._rol = rol || 'operador'
+
   document.getElementById('app').innerHTML = `
     <div class="layout">
       <header class="header">
@@ -66,8 +68,8 @@ function mostrarApp(rol, email) {
         <nav class="sidebar">
           <ul>
             <li><a href="#" data-view="inicio">Inicio</a></li>
-            <li><a href="#" data-view="productos">Productos</a></li>
-            <li><a href="#" data-view="recetas">Recetas</a></li>
+            <li><a href="#" data-view="productos">Insumos</a></li>
+            <li><a href="#" data-view="recetas">Revisión de Recetas</a></li>
           </ul>
         </nav>
         <main class="content" id="content">
