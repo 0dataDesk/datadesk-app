@@ -1,151 +1,124 @@
 async function vistaRecetas() {
   const content = document.getElementById('content')
-  content.innerHTML = `<p style="color:var(--color-text-muted)">Cargando recetas...</p>`
+  content.innerHTML = `<p style="color:var(--color-text-muted)">Cargando...</p>`
 
   try {
     const tenant_id = await getTenantId()
-    const rol = window._rol || 'operador'
+    const rol        = window._rol || 'operador'
     const puedeEditar = rol === 'editor' || rol === 'admin'
-    const esAdmin = rol === 'admin'
+    const esAdmin     = rol === 'admin'
 
     const [
-      { data: recetas, error: errR },
-      { data: unidades, error: errU },
-      { data: categorias, error: errC }
+      { data: recetas,  error: errR },
+      { data: unidades, error: errU }
     ] = await Promise.all([
       window._db.from('catalogo_recetas').select('*').eq('tenant_id', tenant_id).order('nombre_platillo'),
-      window._db.from('catalogo_unidades').select('*').order('nombre'),
-      window._db.from('catalogo_categorias').select('*').order('nombre')
+      window._db.from('catalogo_unidades').select('*').order('nombre')
     ])
 
     if (errR) throw errR
 
-    window._recetas    = recetas    || []
-    window._unidades   = unidades   || []
-    window._categorias = categorias || []
-    window._recetaSeleccionada = null
+    window._recetas  = recetas  || []
+    window._unidades = unidades || []
 
-    const cats = [...new Set(window._recetas.map(r => r.categoria).filter(Boolean))].sort()
+    const origenes = [...new Set(window._recetas.map(r => r.origen).filter(Boolean))].sort()
 
     content.innerHTML = `
       <div class="vista-header">
         <h2>Revisión de Recetas</h2>
-        <div class="filtros">
-          <input type="text" id="filtro-nombre" placeholder="Buscar receta..." />
-          <select id="filtro-status-r">
-            <option value="">Todos los status</option>
-            <option value="pendiente">Pendiente</option>
-            <option value="aprobado">Aprobado</option>
-            <option value="archivado">Archivado</option>
+      </div>
+
+      <div class="filtros-cascada">
+        <div class="filtro-cascada-item">
+          <label class="filtro-label">Origen</label>
+          <select id="f-origen" class="filtro-select">
+            <option value="">Todos los orígenes</option>
+            ${origenes.map(o => `<option value="${o}">${o}</option>`).join('')}
           </select>
-          <select id="filtro-cat">
-            <option value="">Todas las categorías</option>
-            ${cats.map(c => `<option value="${c}">${c}</option>`).join('')}
+        </div>
+        <div class="filtro-cascada-item">
+          <label class="filtro-label">Categoría</label>
+          <select id="f-categoria" class="filtro-select" disabled>
+            <option value="">— primero selecciona origen —</option>
+          </select>
+        </div>
+        <div class="filtro-cascada-item">
+          <label class="filtro-label">Platillo</label>
+          <select id="f-platillo" class="filtro-select" disabled>
+            <option value="">— primero selecciona categoría —</option>
           </select>
         </div>
       </div>
 
-      <div class="recetas-layout" id="recetas-layout">
-        <div class="recetas-lista-panel">
-          <select id="receta-select-mobile" class="receta-mobile-select">
-            <option value="">Selecciona una receta...</option>
-          </select>
-          <div class="tabla-wrapper receta-desktop-table">
-            <table class="tabla">
-              <thead><tr><th>Receta</th><th>Categoría</th><th>Status</th></tr></thead>
-              <tbody id="tbody-recetas"></tbody>
-            </table>
-          </div>
-        </div>
-
-        <div class="detalle-receta" id="detalle-receta">
-          <p style="color:var(--color-text-muted);font-size:13px">Selecciona una receta para ver el detalle.</p>
-        </div>
-      </div>
+      <div id="receta-detalle-wrap"></div>
     `
 
-    const renderLista = () => {
-      const buscar  = document.getElementById('filtro-nombre').value.toLowerCase()
-      const statusF = document.getElementById('filtro-status-r').value
-      const catF    = document.getElementById('filtro-cat').value
+    const fOrigen    = document.getElementById('f-origen')
+    const fCategoria = document.getElementById('f-categoria')
+    const fPlatillo  = document.getElementById('f-platillo')
 
-      const filtradas = window._recetas.filter(r =>
-        (!buscar  || r.nombre_platillo.toLowerCase().includes(buscar)) &&
-        (!statusF || (r.status || 'pendiente') === statusF) &&
-        (!catF    || r.categoria === catF)
-      )
+    // ── Origen → rellena Categoría ──────────────────────────────────────
+    fOrigen.addEventListener('change', () => {
+      const origen = fOrigen.value
 
-      // Desktop table
-      const tbody = document.getElementById('tbody-recetas')
-      if (tbody) {
-        tbody.innerHTML = filtradas.map(r => `
-          <tr class="fila-receta${window._recetaSeleccionada?.id_receta === r.id_receta ? ' selected' : ''}"
-              data-id="${r.id_receta}">
-            <td>${r.nombre_platillo}</td>
-            <td>${r.categoria || ''}</td>
-            <td><span class="badge-status ${r.status || 'pendiente'}">${r.status || 'pendiente'}</span></td>
-          </tr>
-        `).join('')
+      const cats = [...new Set(
+        window._recetas
+          .filter(r => !origen || r.origen === origen)
+          .map(r => r.categoria)
+          .filter(Boolean)
+      )].sort()
 
-        tbody.querySelectorAll('.fila-receta').forEach(tr => {
-          tr.addEventListener('click', () => {
-            const id = parseInt(tr.dataset.id)
-            const receta = window._recetas.find(r => r.id_receta === id)
-            if (receta) seleccionarReceta(receta, puedeEditar, esAdmin)
-          })
-        })
-      }
+      fCategoria.innerHTML =
+        `<option value="">Todas las categorías</option>` +
+        cats.map(c => `<option value="${c}">${c}</option>`).join('')
+      fCategoria.disabled = false
 
-      // Mobile select
-      const sel = document.getElementById('receta-select-mobile')
-      if (sel) {
-        const prev = sel.value
-        sel.innerHTML = `<option value="">Selecciona una receta...</option>` +
-          filtradas.map(r =>
-            `<option value="${r.id_receta}"${window._recetaSeleccionada?.id_receta === r.id_receta ? ' selected' : ''}>${r.nombre_platillo} · ${r.status || 'pendiente'}</option>`
-          ).join('')
-        if (prev) sel.value = prev
-      }
-    }
+      fPlatillo.innerHTML = `<option value="">— primero selecciona categoría —</option>`
+      fPlatillo.disabled = true
 
-    document.getElementById('filtro-nombre').addEventListener('input', renderLista)
-    document.getElementById('filtro-status-r').addEventListener('change', renderLista)
-    document.getElementById('filtro-cat').addEventListener('change', renderLista)
-
-    document.getElementById('receta-select-mobile').addEventListener('change', e => {
-      const id = parseInt(e.target.value)
-      if (!id) return
-      const receta = window._recetas.find(r => r.id_receta === id)
-      if (receta) seleccionarReceta(receta, puedeEditar, esAdmin)
+      document.getElementById('receta-detalle-wrap').innerHTML = ''
     })
 
-    // Responsive: toggle mobile vs desktop list
-    const ajustarLayout = () => {
-      const mobile = window.innerWidth < 700
-      const mEl = document.getElementById('receta-select-mobile')
-      const dEl = document.querySelector('.receta-desktop-table')
-      if (mEl) mEl.style.display = mobile ? 'block' : 'none'
-      if (dEl) dEl.style.display = mobile ? 'none'  : 'block'
-    }
-    window.addEventListener('resize', ajustarLayout)
-    ajustarLayout()
+    // ── Categoría → rellena Platillo ─────────────────────────────────────
+    fCategoria.addEventListener('change', () => {
+      const origen    = fOrigen.value
+      const categoria = fCategoria.value
 
-    renderLista()
+      const platillos = window._recetas
+        .filter(r =>
+          (!origen    || r.origen    === origen) &&
+          (!categoria || r.categoria === categoria)
+        )
+        .sort((a, b) => a.nombre_platillo.localeCompare(b.nombre_platillo))
+
+      fPlatillo.innerHTML =
+        `<option value="">Selecciona un platillo...</option>` +
+        platillos.map(r =>
+          `<option value="${r.id_receta}">${r.nombre_platillo}</option>`
+        ).join('')
+      fPlatillo.disabled = false
+
+      document.getElementById('receta-detalle-wrap').innerHTML = ''
+    })
+
+    // ── Platillo → carga receta ──────────────────────────────────────────
+    fPlatillo.addEventListener('change', () => {
+      const id = parseInt(fPlatillo.value)
+      document.getElementById('receta-detalle-wrap').innerHTML = ''
+      if (!id) return
+      const receta = window._recetas.find(r => r.id_receta === id)
+      if (receta) cargarDetalleReceta(receta, puedeEditar, esAdmin)
+    })
 
   } catch (err) {
     content.innerHTML = `<p>Error al cargar recetas: ${err.message}</p>`
   }
 }
 
-async function seleccionarReceta(receta, puedeEditar, esAdmin) {
-  window._recetaSeleccionada = receta
-
-  // Highlight row
-  document.querySelectorAll('.fila-receta').forEach(tr => tr.classList.remove('selected'))
-  document.querySelector(`.fila-receta[data-id="${receta.id_receta}"]`)?.classList.add('selected')
-
-  const detalle = document.getElementById('detalle-receta')
-  detalle.innerHTML = `<p style="color:var(--color-text-muted);font-size:13px">Cargando...</p>`
+// ── Detalle de receta ────────────────────────────────────────────────────────
+async function cargarDetalleReceta(receta, puedeEditar, esAdmin) {
+  const wrap = document.getElementById('receta-detalle-wrap')
+  wrap.innerHTML = `<p style="color:var(--color-text-muted);margin-top:24px">Cargando receta...</p>`
 
   try {
     const [
@@ -168,43 +141,47 @@ async function seleccionarReceta(receta, puedeEditar, esAdmin) {
     const ings  = (ingredientes || []).filter(i => i.activo !== false)
     const steps = (pasos        || []).filter(p => p.activo !== false)
 
-    // Build unidades options
     const uOpts = (window._unidades || [])
       .map(u => { const v = u.nombre || u.unidad || u.id; return `<option value="${v}">${v}</option>` })
       .join('')
 
-    // Build categorias options
-    const cOpts = (window._categorias || [])
-      .map(c => {
-        const v = c.nombre || c.categoria || c.id
-        return `<option value="${v}"${receta.categoria === v ? ' selected' : ''}>${v}</option>`
-      }).join('')
-
-    // Ingredients HTML
+    // ── Ingredientes ────────────────────────────────────────────────────
     const htmlIngredientes = puedeEditar
       ? `<div class="tabla-wrapper">
           <table class="tabla tabla-editable">
-            <thead><tr><th>Ingrediente</th><th>Cantidad</th><th>Unidad</th><th>Notas</th><th></th></tr></thead>
+            <thead>
+              <tr><th>Ingrediente</th><th>Cantidad</th><th>Unidad</th><th>Nota</th><th></th></tr>
+            </thead>
             <tbody>
               ${ings.map(i => `
                 <tr data-ing-id="${i.id}">
                   <td>${i.producto || ''}</td>
-                  <td><input class="edit-input" type="number" step="any" value="${i.cantidad != null ? i.cantidad : ''}" data-field="cantidad" /></td>
+                  <td><input class="edit-input edit-num" type="number" step="any"
+                        value="${i.cantidad != null ? i.cantidad : ''}"
+                        data-field="cantidad" /></td>
                   <td><select class="edit-select" data-field="unidad">
-                    <option value="${i.unidad || ''}">${i.unidad || '—'}</option>
-                    ${uOpts}
-                  </select></td>
-                  <td><input class="edit-input edit-wide" type="text" value="${(i.notas_ingrediente || '').replace(/"/g, '&quot;')}" data-field="notas_ingrediente" placeholder="Notas..." /></td>
-                  <td><button class="btn-accion btn-inactivar" data-table="receta_ingredientes" data-id="${i.id}">✕</button></td>
+                        <option value="${i.unidad || ''}">${i.unidad || '—'}</option>
+                        ${uOpts}
+                      </select></td>
+                  <td><input class="edit-input edit-wide" type="text"
+                        value="${(i.notas_ingrediente || '').replace(/"/g, '&quot;')}"
+                        data-field="notas_ingrediente" placeholder="Nota..." /></td>
+                  <td><button class="btn-accion btn-inactivar"
+                        data-table="receta_ingredientes" data-id="${i.id}"
+                        title="Inactivar ingrediente">✕</button></td>
                 </tr>
               `).join('')}
             </tbody>
           </table>
         </div>
-        <button class="btn-accion btn-guardar-sec" id="btn-guardar-ing" style="margin-top:8px">Guardar ingredientes</button>`
+        <button class="btn-accion btn-guardar-sec" id="btn-guardar-ing" style="margin-top:10px">
+          Guardar ingredientes
+        </button>`
       : `<div class="tabla-wrapper">
           <table class="tabla">
-            <thead><tr><th>Ingrediente</th><th>Cantidad</th><th>Unidad</th><th>Notas</th></tr></thead>
+            <thead>
+              <tr><th>Ingrediente</th><th>Cantidad</th><th>Unidad</th><th>Nota</th></tr>
+            </thead>
             <tbody>
               ${ings.map(i => `<tr>
                 <td>${i.producto || ''}</td>
@@ -216,63 +193,74 @@ async function seleccionarReceta(receta, puedeEditar, esAdmin) {
           </table>
         </div>`
 
-    // Procedure HTML
+    // ── Procedimiento ───────────────────────────────────────────────────
     const htmlPasos = puedeEditar
       ? `<ol class="procedimiento procedimiento-editable">
           ${steps.map(p => `
             <li data-paso-id="${p.id}">
               <div class="paso-editable-row">
-                <textarea class="edit-textarea edit-paso" data-field="proceso" rows="2">${limpiarPaso(p.proceso)}</textarea>
-                <button class="btn-accion btn-inactivar" data-table="receta_procedimientos" data-id="${p.id}">✕</button>
+                <textarea class="edit-textarea edit-paso" data-field="proceso"
+                          rows="2">${limpiarPaso(p.proceso)}</textarea>
+                <button class="btn-accion btn-inactivar"
+                        data-table="receta_procedimientos" data-id="${p.id}"
+                        title="Inactivar paso">✕</button>
               </div>
             </li>
           `).join('')}
         </ol>
-        <button class="btn-accion btn-guardar-sec" id="btn-guardar-pas" style="margin-top:8px">Guardar pasos</button>`
+        <button class="btn-accion btn-guardar-sec" id="btn-guardar-pas" style="margin-top:10px">
+          Guardar pasos
+        </button>`
       : `<ol class="procedimiento">
           ${steps.map(p => `<li>${limpiarPaso(p.proceso)}</li>`).join('')}
         </ol>`
 
-    // Notas de revision HTML
-    const htmlNotas = puedeEditar
-      ? `<textarea id="notas-revision" class="edit-textarea" rows="3" placeholder="Escribe notas de revisión...">${receta.notas_revision || ''}</textarea>
-         <button class="btn-accion btn-guardar-sec" id="btn-guardar-notas" style="margin-top:8px">Guardar notas</button>`
-      : `<p style="font-size:13px;color:var(--color-text-muted)">${receta.notas_revision || '—'}</p>`
+    // ── Render ──────────────────────────────────────────────────────────
+    wrap.innerHTML = `
+      <div class="receta-detalle-card">
 
-    detalle.innerHTML = `
-      <div class="detalle-header">
-        <div>
-          <h3>${receta.nombre_platillo}</h3>
-          ${puedeEditar
-            ? `<div class="edit-cat-row">
-                <label>Categoría:</label>
-                <select class="edit-select" id="edit-categoria">
-                  <option value="">Sin categoría</option>
-                  ${cOpts}
-                </select>
-               </div>`
-            : `<p class="detalle-categoria">${receta.categoria || ''}</p>`}
+        <div class="detalle-header">
+          <div>
+            <h3>${receta.nombre_platillo}</h3>
+            <p class="detalle-categoria">${receta.categoria || ''}</p>
+          </div>
+          <div class="detalle-acciones">
+            <span class="badge-status ${receta.status || 'pendiente'}">${receta.status || 'pendiente'}</span>
+            ${esAdmin ? `
+              <div class="acciones-receta" style="margin-top:8px">
+                <button class="btn-accion btn-aprobar" id="btn-aprobar">Aprobar</button>
+                <button class="btn-accion btn-archivar" id="btn-archivar">Archivar</button>
+              </div>` : ''}
+          </div>
         </div>
-        <div class="detalle-acciones">
-          <span class="badge-status ${receta.status || 'pendiente'}">${receta.status || 'pendiente'}</span>
-          ${esAdmin ? `<div class="acciones-receta" style="margin-top:8px">
-            <button class="btn-accion btn-aprobar" id="btn-aprobar">Aprobar</button>
-            <button class="btn-accion btn-archivar" id="btn-archivar">Archivar</button>
-          </div>` : ''}
-        </div>
+
+        <h4>Ingredientes</h4>
+        <div id="section-ingredientes">${htmlIngredientes}</div>
+
+        <h4>Procedimiento</h4>
+        <div id="section-pasos">${htmlPasos}</div>
+
+        <h4>Solicitudes y comentarios</h4>
+        <p class="solicitudes-hint">
+          Usa este espacio para pedir cambios a la receta: agregar o eliminar ingredientes,
+          modificar pasos, correcciones, etc.
+        </p>
+        ${puedeEditar
+          ? `<textarea id="notas-revision" class="edit-textarea" rows="4"
+                placeholder="Ej: Agregar 50g de mantequilla al paso 2. Eliminar la cebolla. Aumentar temperatura a 180°C..."
+              >${receta.notas_revision || ''}</textarea>
+             <button class="btn-accion btn-guardar-sec" id="btn-guardar-notas" style="margin-top:10px">
+               Guardar solicitud
+             </button>`
+          : `<div class="solicitudes-texto">${receta.notas_revision || '<em style="color:var(--color-text-muted)">Sin solicitudes registradas.</em>'}</div>`
+        }
+
       </div>
-
-      <h4>Ingredientes</h4>
-      <div id="section-ingredientes">${htmlIngredientes}</div>
-
-      <h4>Procedimiento</h4>
-      <div id="section-pasos">${htmlPasos}</div>
-
-      <h4>Notas de revisión</h4>
-      <div id="section-notas">${htmlNotas}</div>
     `
 
-    // Admin: approve / archive
+    // ── Eventos ──────────────────────────────────────────────────────────
+
+    // Admin: aprobar / archivar
     if (esAdmin) {
       document.getElementById('btn-aprobar')?.addEventListener('click', () =>
         cambiarStatusReceta(receta, 'aprobado', puedeEditar, esAdmin))
@@ -280,16 +268,16 @@ async function seleccionarReceta(receta, puedeEditar, esAdmin) {
         cambiarStatusReceta(receta, 'archivado', puedeEditar, esAdmin))
     }
 
-    // Save ingredients
+    // Guardar ingredientes
     document.getElementById('btn-guardar-ing')?.addEventListener('click', async () => {
-      const rows = detalle.querySelectorAll('#section-ingredientes tr[data-ing-id]')
+      const rows = wrap.querySelectorAll('#section-ingredientes tr[data-ing-id]')
       let ok = true
       for (const row of rows) {
-        const id     = row.dataset.ingId
+        const id      = row.dataset.ingId
         const cantRaw = row.querySelector('[data-field="cantidad"]')?.value
         const cantidad = cantRaw !== '' && cantRaw != null ? parseFloat(cantRaw) : null
-        const unidad  = row.querySelector('[data-field="unidad"]')?.value || null
-        const notas   = row.querySelector('[data-field="notas_ingrediente"]')?.value || null
+        const unidad   = row.querySelector('[data-field="unidad"]')?.value || null
+        const notas    = row.querySelector('[data-field="notas_ingrediente"]')?.value || null
         const { error } = await window._db.from('receta_ingredientes')
           .update({ cantidad, unidad, notas_ingrediente: notas })
           .eq('id', id)
@@ -298,9 +286,9 @@ async function seleccionarReceta(receta, puedeEditar, esAdmin) {
       mostrarToast(ok ? 'Ingredientes guardados' : 'Error al guardar algunos ingredientes')
     })
 
-    // Save pasos
+    // Guardar pasos
     document.getElementById('btn-guardar-pas')?.addEventListener('click', async () => {
-      const items = detalle.querySelectorAll('#section-pasos li[data-paso-id]')
+      const items = wrap.querySelectorAll('#section-pasos li[data-paso-id]')
       let ok = true
       for (const li of items) {
         const id   = li.dataset.pasoId
@@ -313,7 +301,7 @@ async function seleccionarReceta(receta, puedeEditar, esAdmin) {
       mostrarToast(ok ? 'Pasos guardados' : 'Error al guardar algunos pasos')
     })
 
-    // Save notas
+    // Guardar solicitud / notas
     document.getElementById('btn-guardar-notas')?.addEventListener('click', async () => {
       const notas = document.getElementById('notas-revision')?.value || ''
       const { error } = await window._db.from('catalogo_recetas')
@@ -321,46 +309,37 @@ async function seleccionarReceta(receta, puedeEditar, esAdmin) {
         .eq('id_receta', receta.id_receta)
       if (!error) {
         receta.notas_revision = notas
-        mostrarToast('Notas guardadas')
+        mostrarToast('Solicitud guardada')
       } else {
-        mostrarToast('Error al guardar notas')
+        mostrarToast('Error al guardar')
         console.error(error)
       }
     })
 
-    // Save categoria
-    document.getElementById('edit-categoria')?.addEventListener('change', async e => {
-      const cat = e.target.value || null
-      const { error } = await window._db.from('catalogo_recetas')
-        .update({ categoria: cat })
-        .eq('id_receta', receta.id_receta)
-      if (!error) {
-        receta.categoria = cat
-        const r = window._recetas.find(r => r.id_receta === receta.id_receta)
-        if (r) r.categoria = cat
-        mostrarToast('Categoría guardada')
-      }
-    })
-
-    // Inactivar buttons
-    detalle.querySelectorAll('.btn-inactivar').forEach(btn => {
+    // Inactivar ingrediente / paso
+    wrap.querySelectorAll('.btn-inactivar').forEach(btn => {
       btn.addEventListener('click', async () => {
         const tabla = btn.dataset.table
         const id    = btn.dataset.id
         const { error } = await window._db.from(tabla).update({ activo: false }).eq('id', id)
         if (!error) {
           const parent = btn.closest('tr') || btn.closest('li')
-          if (parent) { parent.style.opacity = '0.35'; parent.style.pointerEvents = 'none' }
+          if (parent) { parent.style.opacity = '0.3'; parent.style.pointerEvents = 'none' }
           btn.disabled = true
           mostrarToast('Elemento inactivado')
+        } else {
+          mostrarToast('Error al inactivar')
+          console.error(error)
         }
       })
     })
 
   } catch (err) {
-    detalle.innerHTML = `<p>Error: ${err.message}</p>`
+    wrap.innerHTML = `<p style="margin-top:24px">Error: ${err.message}</p>`
   }
 }
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 function limpiarPaso(texto) {
   if (!texto) return ''
@@ -371,18 +350,15 @@ async function cambiarStatusReceta(receta, nuevoStatus, puedeEditar, esAdmin) {
   const { error } = await window._db.from('catalogo_recetas')
     .update({ status: nuevoStatus })
     .eq('id_receta', receta.id_receta)
-
   if (error) { mostrarToast('Error: ' + error.message); return }
 
   receta.status = nuevoStatus
-  const r = window._recetas.find(r => r.id_receta === receta.id_receta)
+  const r = window._recetas?.find(r => r.id_receta === receta.id_receta)
   if (r) r.status = nuevoStatus
 
-  // Refresh list
-  document.getElementById('filtro-nombre')?.dispatchEvent(new Event('input'))
-
-  // Re-render detail with updated status
-  seleccionarReceta(receta, puedeEditar, esAdmin)
+  mostrarToast(`Receta ${nuevoStatus}`)
+  // Re-render detail to update badge
+  cargarDetalleReceta(receta, puedeEditar, esAdmin)
 }
 
 function mostrarToast(msg) {
