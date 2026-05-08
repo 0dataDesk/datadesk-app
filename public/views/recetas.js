@@ -13,7 +13,7 @@ async function vistaRecetas() {
       { data: unidades, error: errU },
       { data: categorias, error: errC }
     ] = await Promise.all([
-      window._db.from('catalogo_recetas').select('*').eq('tenant_id', tenant_id).order('nombre'),
+      window._db.from('catalogo_recetas').select('*').eq('tenant_id', tenant_id).order('nombre_platillo'),
       window._db.from('catalogo_unidades').select('*').order('nombre'),
       window._db.from('catalogo_categorias').select('*').order('nombre')
     ])
@@ -70,7 +70,7 @@ async function vistaRecetas() {
       const catF    = document.getElementById('filtro-cat').value
 
       const filtradas = window._recetas.filter(r =>
-        (!buscar  || r.nombre.toLowerCase().includes(buscar)) &&
+        (!buscar  || r.nombre_platillo.toLowerCase().includes(buscar)) &&
         (!statusF || (r.status || 'pendiente') === statusF) &&
         (!catF    || r.categoria === catF)
       )
@@ -81,7 +81,7 @@ async function vistaRecetas() {
         tbody.innerHTML = filtradas.map(r => `
           <tr class="fila-receta${window._recetaSeleccionada?.id_receta === r.id_receta ? ' selected' : ''}"
               data-id="${r.id_receta}">
-            <td>${r.nombre}</td>
+            <td>${r.nombre_platillo}</td>
             <td>${r.categoria || ''}</td>
             <td><span class="badge-status ${r.status || 'pendiente'}">${r.status || 'pendiente'}</span></td>
           </tr>
@@ -102,7 +102,7 @@ async function vistaRecetas() {
         const prev = sel.value
         sel.innerHTML = `<option value="">Selecciona una receta...</option>` +
           filtradas.map(r =>
-            `<option value="${r.id_receta}"${window._recetaSeleccionada?.id_receta === r.id_receta ? ' selected' : ''}>${r.nombre} · ${r.status || 'pendiente'}</option>`
+            `<option value="${r.id_receta}"${window._recetaSeleccionada?.id_receta === r.id_receta ? ' selected' : ''}>${r.nombre_platillo} · ${r.status || 'pendiente'}</option>`
           ).join('')
         if (prev) sel.value = prev
       }
@@ -153,13 +153,13 @@ async function seleccionarReceta(receta, puedeEditar, esAdmin) {
       { data: pasos,        error: errP }
     ] = await Promise.all([
       window._db.from('receta_ingredientes')
-        .select('*, productos(producto)')
+        .select('*')
         .eq('id_receta', receta.id_receta)
         .order('id'),
       window._db.from('receta_procedimientos')
         .select('*')
         .eq('id_receta', receta.id_receta)
-        .order('orden')
+        .order('paso_num')
     ])
 
     if (errI) throw errI
@@ -188,7 +188,7 @@ async function seleccionarReceta(receta, puedeEditar, esAdmin) {
             <tbody>
               ${ings.map(i => `
                 <tr data-ing-id="${i.id}">
-                  <td>${i.productos?.producto || i.id_producto || ''}</td>
+                  <td>${i.producto || ''}</td>
                   <td><input class="edit-input" type="number" step="any" value="${i.cantidad != null ? i.cantidad : ''}" data-field="cantidad" /></td>
                   <td><select class="edit-select" data-field="unidad">
                     <option value="${i.unidad || ''}">${i.unidad || '—'}</option>
@@ -207,7 +207,7 @@ async function seleccionarReceta(receta, puedeEditar, esAdmin) {
             <thead><tr><th>Ingrediente</th><th>Cantidad</th><th>Unidad</th><th>Notas</th></tr></thead>
             <tbody>
               ${ings.map(i => `<tr>
-                <td>${i.productos?.producto || i.id_producto || ''}</td>
+                <td>${i.producto || ''}</td>
                 <td>${i.cantidad != null ? i.cantidad : ''}</td>
                 <td>${i.unidad || ''}</td>
                 <td>${i.notas_ingrediente || ''}</td>
@@ -222,7 +222,7 @@ async function seleccionarReceta(receta, puedeEditar, esAdmin) {
           ${steps.map(p => `
             <li data-paso-id="${p.id}">
               <div class="paso-editable-row">
-                <textarea class="edit-textarea edit-paso" data-field="descripcion" rows="2">${limpiarPaso(p.descripcion)}</textarea>
+                <textarea class="edit-textarea edit-paso" data-field="proceso" rows="2">${limpiarPaso(p.proceso)}</textarea>
                 <button class="btn-accion btn-inactivar" data-table="receta_procedimientos" data-id="${p.id}">✕</button>
               </div>
             </li>
@@ -230,7 +230,7 @@ async function seleccionarReceta(receta, puedeEditar, esAdmin) {
         </ol>
         <button class="btn-accion btn-guardar-sec" id="btn-guardar-pas" style="margin-top:8px">Guardar pasos</button>`
       : `<ol class="procedimiento">
-          ${steps.map(p => `<li>${limpiarPaso(p.descripcion)}</li>`).join('')}
+          ${steps.map(p => `<li>${limpiarPaso(p.proceso)}</li>`).join('')}
         </ol>`
 
     // Notas de revision HTML
@@ -242,7 +242,7 @@ async function seleccionarReceta(receta, puedeEditar, esAdmin) {
     detalle.innerHTML = `
       <div class="detalle-header">
         <div>
-          <h3>${receta.nombre}</h3>
+          <h3>${receta.nombre_platillo}</h3>
           ${puedeEditar
             ? `<div class="edit-cat-row">
                 <label>Categoría:</label>
@@ -304,9 +304,9 @@ async function seleccionarReceta(receta, puedeEditar, esAdmin) {
       let ok = true
       for (const li of items) {
         const id   = li.dataset.pasoId
-        const desc = li.querySelector('[data-field="descripcion"]')?.value || ''
+        const desc = li.querySelector('[data-field="proceso"]')?.value || ''
         const { error } = await window._db.from('receta_procedimientos')
-          .update({ descripcion: desc })
+          .update({ proceso: desc })
           .eq('id', id)
         if (error) { ok = false; console.error(error) }
       }
