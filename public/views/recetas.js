@@ -140,9 +140,10 @@ async function cargarDetalleReceta(receta, puedeEditar, esAdmin) {
     const ings  = (ingredientes || []).filter(i => i.activo !== false)
     const steps = (pasos        || []).filter(p => p.activo !== false)
 
-    const uOpts = (window._unidades || [])
-      .map(u => { const v = u.nombre || u.unidad || u.id; return `<option value="${v}">${v}</option>` })
-      .join('')
+    const uOptsFor = (valorActual) =>
+      (window._unidades || [])
+        .map(u => { const v = u.nombre || u.unidad || u.id; return `<option value="${v}"${v === valorActual ? ' selected' : ''}>${v}</option>` })
+        .join('')
 
     // ── Ingredientes ────────────────────────────────────────────────────
     const htmlIngredientes = puedeEditar
@@ -159,8 +160,8 @@ async function cargarDetalleReceta(receta, puedeEditar, esAdmin) {
                         value="${i.cantidad != null ? i.cantidad : ''}"
                         data-field="cantidad" /></td>
                   <td><select class="edit-select" data-field="unidad">
-                        <option value="${i.unidad || ''}">${i.unidad || '—'}</option>
-                        ${uOpts}
+                        <option value="">— unidad —</option>
+                        ${uOptsFor(i.unidad || '')}
                       </select></td>
                   <td><input class="edit-input edit-wide" type="text"
                         value="${(i.notas_ingrediente || '').replace(/"/g, '&quot;')}"
