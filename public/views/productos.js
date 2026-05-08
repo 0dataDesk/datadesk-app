@@ -3,37 +3,29 @@ async function vistaProductos() {
   content.innerHTML = `<p style="color:var(--color-text-muted)">Cargando...</p>`
 
   try {
-    const tenant_id  = await getTenantId()
-    const rol        = window._rol || 'operador'
-    const esAdmin    = rol === 'admin'
+    const tenant_id = await getTenantId()
+    const rol       = window._rol || 'operador'
+    const puedeEditar = rol === 'editor' || rol === 'admin'
 
     const [
-      { data: productos,    error: errP },
-      { data: ingredientes, error: errI }
+      { data: productos, error: errP },
+      { data: unidades,  error: errU }
     ] = await Promise.all([
       window._db.from('productos').select('*').eq('tenant_id', tenant_id).order('producto'),
-      window._db.from('receta_ingredientes').select('id_producto, id_receta, catalogo_recetas(nombre_platillo)')
+      window._db.from('catalogo_unidades').select('*').order('nombre')
     ])
 
     if (errP) throw errP
 
     window._productos = productos || []
+    window._unidades  = unidades  || []
 
-    // Recetas por producto
-    const recetasPor = {}
-    ;(ingredientes || []).forEach(i => {
-      if (!i.id_producto) return
-      if (!recetasPor[i.id_producto]) recetasPor[i.id_producto] = []
-      const nombre = i.catalogo_recetas?.nombre_platillo
-      if (nombre && !recetasPor[i.id_producto].includes(nombre))
-        recetasPor[i.id_producto].push(nombre)
-    })
-    window._recetasPorProducto = recetasPor
+    const fuentes = [...new Set(window._productos.map(p => p.fuente).filter(Boolean))].sort()
 
-    // Valores únicos para los filtros
-    const grupos    = [...new Set(window._productos.map(p => p.grupo).filter(Boolean))].sort()
-    const cats0     = [...new Set(window._productos.map(p => p.categoria).filter(Boolean))].sort()
-    const prods0    = [...window._productos].sort((a, b) => a.producto.localeCompare(b.producto))
+    const uOptsFor = (valorActual) =>
+      (window._unidades)
+        .map(u => { const v = u.nombre || u.unidad || u.id; return `<option value="${v}"${v === valorActual ? ' selected' : ''}>${v}</option>` })
+        .join('')
 
     content.innerHTML = `
       <div class="vista-header">
@@ -42,177 +34,103 @@ async function vistaProductos() {
 
       <div class="filtros-cascada">
         <div class="filtro-cascada-item">
-          <label class="filtro-label">Grupo</label>
-          <select id="f-grupo" class="filtro-select">
-            <option value="">Todos los grupos</option>
-            ${grupos.map(g => `<option value="${g}">${g}</option>`).join('')}
-          </select>
-        </div>
-        <div class="filtro-cascada-item">
-          <label class="filtro-label">Categoría</label>
-          <select id="f-categoria" class="filtro-select">
-            <option value="">Todas las categorías</option>
-            ${cats0.map(c => `<option value="${c}">${c}</option>`).join('')}
-          </select>
-        </div>
-        <div class="filtro-cascada-item">
-          <label class="filtro-label">Insumo</label>
-          <select id="f-insumo" class="filtro-select">
-            <option value="">Selecciona un insumo...</option>
-            ${prods0.map(p => `<option value="${p.id_producto}">${p.producto}</option>`).join('')}
+          <label class="filtro-label">Fuente</label>
+          <select id="f-fuente" class="filtro-select">
+            <option value="">Todas las fuentes</option>
+            ${fuentes.map(f => `<option value="${f}">${f}</option>`).join('')}
           </select>
         </div>
       </div>
 
-      <div id="insumo-detalle-wrap"></div>
+      <div id="insumos-lista-wrap"></div>
     `
 
-    const fGrupo    = document.getElementById('f-grupo')
-    const fCategoria = document.getElementById('f-categoria')
-    const fInsumo   = document.getElementById('f-insumo')
+    const renderLista = () => {
+      const fuente = document.getElementById('f-fuente').value
+      const wrap   = document.getElementById('insumos-lista-wrap')
 
-    const actualizarFiltros = () => {
-      const grupo     = fGrupo.value
-      const categoria = fCategoria.value
+      const filtrados = window._productos.filter(p => !fuente || p.fuente === fuente)
 
-      // Categorías según grupo
-      const catsDisp = [...new Set(
-        window._productos
-          .filter(p => !grupo || p.grupo === grupo)
-          .map(p => p.categoria).filter(Boolean)
-      )].sort()
+      if (!filtrados.length) {
+        wrap.innerHTML = `<p style="color:var(--color-text-muted);font-size:13px">No hay insumos para mostrar.</p>`
+        return
+      }
 
-      const catActual = fCategoria.value
-      fCategoria.innerHTML =
-        `<option value="">Todas las categorías</option>` +
-        catsDisp.map(c => `<option value="${c}"${c === catActual ? ' selected' : ''}>${c}</option>`).join('')
+      if (!puedeEditar) {
+        wrap.innerHTML = `
+          <div class="tabla-wrapper">
+            <table class="tabla">
+              <thead>
+                <tr><th>Insumo</th><th>Unidad</th><th>Grupo</th><th>Categoría</th><th>Status</th></tr>
+              </thead>
+              <tbody>
+                ${filtrados.map(p => `<tr>
+                  <td>${p.producto}</td>
+                  <td>${p.unidad_medida || ''}</td>
+                  <td>${p.grupo || ''}</td>
+                  <td>${p.categoria || ''}</td>
+                  <td><span class="badge-status ${p.status || 'pendiente'}">${p.status || 'pendiente'}</span></td>
+                </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>`
+        return
+      }
 
-      // Insumos según grupo + categoría
-      const prodsDisp = window._productos
-        .filter(p =>
-          (!grupo    || p.grupo    === grupo) &&
-          (!categoria || p.categoria === categoria)
-        )
-        .sort((a, b) => a.producto.localeCompare(b.producto))
+      wrap.innerHTML = `
+        <div class="tabla-wrapper">
+          <table class="tabla tabla-editable">
+            <thead>
+              <tr><th>Insumo</th><th>Unidad</th><th>Grupo</th><th>Categoría</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              ${filtrados.map(p => `
+                <tr data-prod-id="${p.id_producto}">
+                  <td><input class="edit-input" type="text"
+                        value="${p.producto.replace(/"/g, '&quot;')}"
+                        data-field="producto" /></td>
+                  <td><select class="edit-select" data-field="unidad_medida">
+                        <option value="">— unidad —</option>
+                        ${uOptsFor(p.unidad_medida || '')}
+                      </select></td>
+                  <td>${p.grupo || ''}</td>
+                  <td>${p.categoria || ''}</td>
+                  <td><span class="badge-status ${p.status || 'pendiente'}">${p.status || 'pendiente'}</span></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+        <button class="btn-accion btn-guardar-sec" id="btn-guardar-insumos" style="margin-top:12px">
+          Guardar cambios
+        </button>
+      `
 
-      fInsumo.innerHTML =
-        `<option value="">Selecciona un insumo...</option>` +
-        prodsDisp.map(p => `<option value="${p.id_producto}">${p.producto}</option>`).join('')
-
-      document.getElementById('insumo-detalle-wrap').innerHTML = ''
+      document.getElementById('btn-guardar-insumos').addEventListener('click', async () => {
+        const rows = wrap.querySelectorAll('tr[data-prod-id]')
+        let ok = true
+        for (const row of rows) {
+          const id          = row.dataset.prodId
+          const producto    = row.querySelector('[data-field="producto"]')?.value || ''
+          const unidad_medida = row.querySelector('[data-field="unidad_medida"]')?.value || null
+          const { error } = await window._db.from('productos')
+            .update({ producto, unidad_medida })
+            .eq('id_producto', id)
+          if (error) { ok = false; console.error(error) }
+          else {
+            // Actualizar en memoria
+            const p = window._productos.find(p => String(p.id_producto) === String(id))
+            if (p) { p.producto = producto; p.unidad_medida = unidad_medida }
+          }
+        }
+        mostrarToast(ok ? 'Insumos guardados' : 'Error al guardar algunos insumos')
+      })
     }
 
-    fGrupo.addEventListener('change',    () => actualizarFiltros())
-    fCategoria.addEventListener('change', () => actualizarFiltros())
-
-    fInsumo.addEventListener('change', () => {
-      const val = fInsumo.value
-      document.getElementById('insumo-detalle-wrap').innerHTML = ''
-      if (!val) return
-      const producto = window._productos.find(p => String(p.id_producto) === String(val))
-      if (producto) mostrarDetalleInsumo(producto, esAdmin)
-    })
+    document.getElementById('f-fuente').addEventListener('change', renderLista)
+    renderLista()
 
   } catch (err) {
     content.innerHTML = `<p style="color:var(--color-highlight)">Error: ${err.message}</p>`
   }
-}
-
-function mostrarDetalleInsumo(producto, esAdmin) {
-  const wrap = document.getElementById('insumo-detalle-wrap')
-  const recetas = window._recetasPorProducto[producto.id_producto] || []
-
-  wrap.innerHTML = `
-    <div class="receta-detalle-card">
-
-      <div class="detalle-header">
-        <div>
-          <h3>${producto.producto}</h3>
-          <p class="detalle-categoria">${[producto.grupo, producto.categoria].filter(Boolean).join(' · ')}</p>
-        </div>
-        <div class="detalle-acciones">
-          <span class="badge-status ${producto.status || 'pendiente'}">${producto.status || 'pendiente'}</span>
-          ${esAdmin ? `
-            <div class="acciones-receta" style="margin-top:8px">
-              <button class="btn-accion btn-aprobar" id="btn-aprobar-ins">Aprobar</button>
-              <button class="btn-accion btn-archivar" id="btn-archivar-ins">Archivar</button>
-            </div>` : ''}
-        </div>
-      </div>
-
-      <h4>Datos del insumo</h4>
-      <div class="insumo-datos-grid">
-        ${fila('Tipo',     producto.tipo)}
-        ${fila('Fuente',   producto.fuente)}
-        ${fila('Unidad',   producto.unidad_medida)}
-        ${fila('Grupo',    producto.grupo)}
-        ${fila('Categoría', producto.categoria)}
-      </div>
-
-      <h4>Recetas que lo usan</h4>
-      ${recetas.length
-        ? `<ul class="recetas-lista-ins">
-            ${recetas.map(r => `<li>${r}</li>`).join('')}
-           </ul>`
-        : `<p class="solicitudes-hint">Este insumo no aparece en ninguna receta registrada.</p>`
-      }
-
-      <h4>Solicitudes y comentarios</h4>
-      <p class="solicitudes-hint">
-        Usá este espacio para pedir cambios sobre este insumo: corrección de nombre, unidad, grupo, etc.
-      </p>
-      <textarea id="notas-insumo" class="edit-textarea" rows="4"
-        placeholder="Ej: Cambiar unidad a kg. Mover al grupo Lácteos. Revisar fuente..."
-      >${producto.notas || ''}</textarea>
-      <button class="btn-accion btn-guardar-sec" id="btn-guardar-notas-ins" style="margin-top:10px">
-        Guardar solicitud
-      </button>
-
-    </div>
-  `
-
-  // Admin: aprobar / archivar
-  if (esAdmin) {
-    document.getElementById('btn-aprobar-ins')?.addEventListener('click', () =>
-      cambiarStatusInsumo(producto, 'aprobado'))
-    document.getElementById('btn-archivar-ins')?.addEventListener('click', () =>
-      cambiarStatusInsumo(producto, 'archivado'))
-  }
-
-  // Guardar notas
-  document.getElementById('btn-guardar-notas-ins')?.addEventListener('click', async () => {
-    const notas = document.getElementById('notas-insumo')?.value || ''
-    const { error } = await window._db.from('productos')
-      .update({ notas })
-      .eq('id_producto', producto.id_producto)
-    if (!error) {
-      producto.notas = notas
-      mostrarToast('Solicitud guardada')
-    } else {
-      mostrarToast('Error al guardar')
-      console.error(error)
-    }
-  })
-}
-
-function fila(label, valor) {
-  if (!valor) return ''
-  return `<div class="insumo-dato-fila">
-    <span class="insumo-dato-label">${label}</span>
-    <span class="insumo-dato-valor">${valor}</span>
-  </div>`
-}
-
-async function cambiarStatusInsumo(producto, nuevoStatus) {
-  const { error } = await window._db.from('productos')
-    .update({ status: nuevoStatus })
-    .eq('id_producto', producto.id_producto)
-  if (error) { mostrarToast('Error: ' + error.message); return }
-
-  producto.status = nuevoStatus
-  const p = window._productos?.find(p => p.id_producto === producto.id_producto)
-  if (p) p.status = nuevoStatus
-
-  mostrarToast(`Insumo ${nuevoStatus}`)
-  mostrarDetalleInsumo(producto, true)
 }
