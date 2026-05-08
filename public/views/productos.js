@@ -16,16 +16,20 @@ async function vistaProductos() {
     ])
 
     if (errP) throw errP
+    if (errU) console.warn('catalogo_unidades:', errU.message)
 
     window._productos = productos || []
     window._unidades  = unidades  || []
 
-    const fuentes = [...new Set(window._productos.map(p => p.fuente).filter(Boolean))].sort()
+    const fuentes    = [...new Set(window._productos.map(p => p.fuente).filter(Boolean))].sort()
+    const hayUnidades = window._unidades.length > 0
 
-    const uOptsFor = (valorActual) =>
-      (window._unidades)
+    const uOptsFor = (valorActual) => {
+      if (!hayUnidades) return `<option value="${valorActual}">${valorActual || '—'}</option>`
+      return window._unidades
         .map(u => { const v = u.nombre || u.unidad || u.id; return `<option value="${v}"${v === valorActual ? ' selected' : ''}>${v}</option>` })
         .join('')
+    }
 
     content.innerHTML = `
       <div class="vista-header">
@@ -56,55 +60,46 @@ async function vistaProductos() {
         return
       }
 
-      if (!puedeEditar) {
-        wrap.innerHTML = `
-          <div class="tabla-wrapper">
-            <table class="tabla">
-              <thead>
-                <tr><th>Insumo</th><th>Unidad</th><th>Grupo</th><th>Categoría</th><th>Status</th></tr>
-              </thead>
-              <tbody>
-                ${filtrados.map(p => `<tr>
-                  <td>${p.producto}</td>
-                  <td>${p.unidad_medida || ''}</td>
-                  <td>${p.grupo || ''}</td>
-                  <td>${p.categoria || ''}</td>
-                  <td><span class="badge-status ${p.status || 'pendiente'}">${p.status || 'pendiente'}</span></td>
-                </tr>`).join('')}
-              </tbody>
-            </table>
-          </div>`
-        return
-      }
+      const colUnidad = hayUnidades ? `<th class="col-unidad">Unidad</th>` : `<th class="col-unidad">Unidad</th>`
 
       wrap.innerHTML = `
         <div class="tabla-wrapper">
-          <table class="tabla tabla-editable">
+          <table class="tabla insumos-tabla">
             <thead>
-              <tr><th>Insumo</th><th>Unidad</th><th>Grupo</th><th>Categoría</th><th>Status</th></tr>
+              <tr>
+                <th>Insumo</th>
+                <th class="col-unidad">Unidad</th>
+              </tr>
             </thead>
             <tbody>
               ${filtrados.map(p => `
                 <tr data-prod-id="${p.id_producto}">
-                  <td><input class="edit-input" type="text"
-                        value="${p.producto.replace(/"/g, '&quot;')}"
-                        data-field="producto" /></td>
-                  <td><select class="edit-select" data-field="unidad_medida">
-                        <option value="">— unidad —</option>
-                        ${uOptsFor(p.unidad_medida || '')}
-                      </select></td>
-                  <td>${p.grupo || ''}</td>
-                  <td>${p.categoria || ''}</td>
-                  <td><span class="badge-status ${p.status || 'pendiente'}">${p.status || 'pendiente'}</span></td>
+                  <td>${puedeEditar
+                    ? `<input class="edit-input insumo-nombre-input" type="text"
+                            value="${p.producto.replace(/"/g, '&quot;')}"
+                            data-field="producto" />`
+                    : p.producto}
+                  </td>
+                  <td>${puedeEditar
+                    ? (hayUnidades
+                        ? `<select class="edit-select insumo-unidad-select" data-field="unidad_medida">
+                             <option value="">—</option>
+                             ${uOptsFor(p.unidad_medida || '')}
+                           </select>`
+                        : `<input class="edit-input insumo-unidad-input" type="text"
+                                value="${(p.unidad_medida || '').replace(/"/g, '&quot;')}"
+                                data-field="unidad_medida" placeholder="unidad" />`)
+                    : (p.unidad_medida || '')}
+                  </td>
                 </tr>
               `).join('')}
             </tbody>
           </table>
         </div>
-        <button class="btn-accion btn-guardar-sec" id="btn-guardar-insumos" style="margin-top:12px">
-          Guardar cambios
-        </button>
+        ${puedeEditar ? `<button class="btn-accion btn-guardar-sec" id="btn-guardar-insumos" style="margin-top:12px">Guardar cambios</button>` : ''}
       `
+
+      if (!puedeEditar) return
 
       document.getElementById('btn-guardar-insumos').addEventListener('click', async () => {
         const rows = wrap.querySelectorAll('tr[data-prod-id]')
