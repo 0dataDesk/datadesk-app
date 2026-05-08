@@ -1,6 +1,6 @@
 async function vistaProductos() {
   const content = document.getElementById('content')
-  content.innerHTML = `<p style="color:var(--color-text-muted)">Cargando productos...</p>`
+  content.innerHTML = `<p style="color:var(--color-text-muted)">Cargando insumos...</p>`
 
   try {
     const tenant_id = await getTenantId()
@@ -39,7 +39,7 @@ async function vistaProductos() {
     const fuentes    = [...new Set(productos.map(p => p.fuente).filter(Boolean))].sort()
 
     content.innerHTML = `
-      <div class="vista-header"><h2>Productos</h2></div>
+      <div class="vista-header"><h2>Insumos</h2></div>
 
       <!-- Contadores -->
       <div class="dashboard-grid">
@@ -94,7 +94,7 @@ async function vistaProductos() {
           <option value="aprobado">Aprobado</option>
           <option value="archivado">Archivado</option>
         </select>
-        <input type="text" id="filtro-buscar" placeholder="Buscar producto..." />
+        <input type="text" id="filtro-buscar" placeholder="Buscar insumo..." />
       </div>
 
       <div class="tabla-wrapper">
@@ -102,7 +102,7 @@ async function vistaProductos() {
           <thead>
             <tr>
               <th>ID</th>
-              <th>Producto</th>
+              <th>Insumo</th>
               <th>Tipo</th>
               <th>Grupo</th>
               <th>Categoría</th>
@@ -155,6 +155,6 @@ async function vistaProductos() {
     renderTabla()
 
   } catch (err) {
-    content.innerHTML = `<p>Error al cargar productos: ${err.message}</p>`
+    content.innerHTML = `<p>Error al cargar insumos: ${err.message}</p>`
   }
 }
