@@ -479,33 +479,91 @@ body {
   flex-shrink: 0;
 }
 
-/* ── MOBILE RECETA SELECT ── */
-.receta-mobile-select {
-  display: none;
-  width: 100%;
-  padding: 10px 12px;
+/* ── FILTROS CASCADA ── */
+.filtros-cascada {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 32px;
+  padding: 20px 24px;
   background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.filtro-cascada-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 180px;
+}
+
+.filtro-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.filtro-select {
+  padding: 10px 12px;
+  background: var(--color-secondary);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   color: var(--color-text);
   font-family: var(--font-main);
   font-size: 14px;
   outline: none;
-  margin-bottom: 16px;
+  cursor: pointer;
+  transition: border-color 0.2s;
 }
-.receta-mobile-select:focus { border-color: var(--color-highlight); }
+.filtro-select:focus  { border-color: var(--color-highlight); }
+.filtro-select:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ── RECETA DETALLE CARD ── */
+.receta-detalle-card {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 28px;
+}
+
+.receta-detalle-card h4 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 24px 0 12px;
+  color: var(--color-highlight);
+}
+
+/* ── SOLICITUDES ── */
+.solicitudes-hint {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-bottom: 10px;
+  line-height: 1.6;
+}
+.solicitudes-texto {
+  font-size: 13px;
+  color: var(--color-text);
+  background: var(--color-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+/* ── EDIT NUM INPUT ── */
+.edit-num { max-width: 90px; }
 
 /* ── MOBILE LAYOUT ── */
 @media (max-width: 699px) {
-  .recetas-layout {
-    grid-template-columns: 1fr;
-  }
-  .receta-mobile-select { display: block; }
-  .receta-desktop-table { display: none; }
+  .filtros-cascada { flex-direction: column; gap: 14px; padding: 16px; }
+  .filtro-cascada-item { min-width: 0; }
+  .receta-detalle-card { padding: 16px; }
   .content { padding: 16px; }
   .vista-header { flex-direction: column; align-items: flex-start; }
-  .filtros { flex-direction: column; }
-  .filtros input, .filtros select { width: 100%; }
-  .detalle-receta { padding: 16px; }
   .tabla-editable td { padding: 6px 8px; }
 }
