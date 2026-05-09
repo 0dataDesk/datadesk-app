@@ -651,11 +651,11 @@ body {
 }
 
 /* ── INSUMOS TABLA EDITABLE ── */
-.insumos-tabla { table-layout: fixed; }
+.insumos-tabla { table-layout: fixed; width: 100%; }
 .insumos-tabla th:first-child,
-.insumos-tabla td:first-child { width: 100%; }
-.insumos-tabla .col-unidad,
-.insumos-tabla td:last-child  { width: 150px; }
+.insumos-tabla td:first-child { width: auto; }
+.insumos-tabla .col-unidad    { width: 110px; }
+.insumos-tabla .col-guardar   { width: 28px; padding-left: 4px; padding-right: 4px; }
 
 .insumo-nombre-input {
   font-size: 15px;
@@ -668,13 +668,12 @@ body {
   font-size: 13px;
   padding: 7px 8px;
 }
-.col-guardar { width: 36px; }
 .btn-guardar-fila {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   border: 1px solid rgba(76,153,80,0.3);
   background: rgba(76,153,80,0.1);
