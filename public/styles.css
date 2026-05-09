@@ -668,6 +668,25 @@ body {
   font-size: 13px;
   padding: 7px 8px;
 }
+.col-guardar { width: 36px; }
+.btn-guardar-fila {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid rgba(76,153,80,0.3);
+  background: rgba(76,153,80,0.1);
+  color: #3A8C3E;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: var(--font-main);
+}
+.btn-guardar-fila:hover   { background: rgba(76,153,80,0.2); }
+.btn-guardar-fila:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-guardar-fila.guardado { background: #3A8C3E; color: #fff; border-color: #3A8C3E; }
 
 /* ── INSUMO DETAIL ── */
 .insumo-datos-grid {
