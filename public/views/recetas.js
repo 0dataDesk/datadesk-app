@@ -125,7 +125,7 @@ async function cargarDetalleReceta(receta, puedeEditar, esAdmin) {
       { data: pasos,        error: errP }
     ] = await Promise.all([
       window._db.from('receta_ingredientes')
-        .select('*')
+        .select('*, productos!id_producto(producto)')
         .eq('id_receta', receta.id_receta)
         .order('id'),
       window._db.from('receta_procedimientos')
@@ -137,8 +137,8 @@ async function cargarDetalleReceta(receta, puedeEditar, esAdmin) {
     if (errI) throw errI
     if (errP) throw errP
 
-    const ings  = (ingredientes || []).filter(i => i.activo !== false)
-    const steps = (pasos        || []).filter(p => p.activo !== false)
+    const ings  = ingredientes || []
+    const steps = pasos        || []
 
     const uOptsFor = (valorActual) =>
       (window._unidades || [])
@@ -150,13 +150,13 @@ async function cargarDetalleReceta(receta, puedeEditar, esAdmin) {
       ? `<div class="tabla-wrapper">
           <table class="tabla tabla-editable">
             <thead>
-              <tr><th>Ingrediente</th><th>Cantidad</th><th>Unidad</th><th>Nota</th><th></th></tr>
+              <tr><th>Ingrediente</th><th>Cantidad</th><th>Unidad</th><th>Nota</th></tr>
             </thead>
             <tbody>
               ${ings.map(i => `
                 <tr data-ing-id="${i.id}">
-                  <td>${i.producto || ''}</td>
-                  <td><input class="edit-input edit-num" type="number" step="any"
+                  <td>${i.productos?.producto || i.producto || ''}</td>
+                  <td><input class="edit-input edit-num" type="text"
                         value="${i.cantidad != null ? i.cantidad : ''}"
                         data-field="cantidad" /></td>
                   <td><select class="edit-select" data-field="unidad">
@@ -166,9 +166,6 @@ async function cargarDetalleReceta(receta, puedeEditar, esAdmin) {
                   <td><input class="edit-input edit-wide" type="text"
                         value="${(i.notas_ingrediente || '').replace(/"/g, '&quot;')}"
                         data-field="notas_ingrediente" placeholder="Nota..." /></td>
-                  <td><button class="btn-accion btn-inactivar"
-                        data-table="receta_ingredientes" data-id="${i.id}"
-                        title="Inactivar ingrediente">✕</button></td>
                 </tr>
               `).join('')}
             </tbody>
@@ -201,9 +198,6 @@ async function cargarDetalleReceta(receta, puedeEditar, esAdmin) {
               <div class="paso-editable-row">
                 <textarea class="edit-textarea edit-paso" data-field="proceso"
                           rows="2">${limpiarPaso(p.proceso)}</textarea>
-                <button class="btn-accion btn-inactivar"
-                        data-table="receta_procedimientos" data-id="${p.id}"
-                        title="Inactivar paso">✕</button>
               </div>
             </li>
           `).join('')}
@@ -274,8 +268,8 @@ async function cargarDetalleReceta(receta, puedeEditar, esAdmin) {
       let ok = true
       for (const row of rows) {
         const id      = row.dataset.ingId
-        const cantRaw = row.querySelector('[data-field="cantidad"]')?.value
-        const cantidad = cantRaw !== '' && cantRaw != null ? parseFloat(cantRaw) : null
+        const cantRaw  = row.querySelector('[data-field="cantidad"]')?.value
+        const cantidad = cantRaw?.trim() || null
         const unidad   = row.querySelector('[data-field="unidad"]')?.value || null
         const notas    = row.querySelector('[data-field="notas_ingrediente"]')?.value || null
         const { error } = await window._db.from('receta_ingredientes')
@@ -316,23 +310,6 @@ async function cargarDetalleReceta(receta, puedeEditar, esAdmin) {
       }
     })
 
-    // Inactivar ingrediente / paso
-    wrap.querySelectorAll('.btn-inactivar').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const tabla = btn.dataset.table
-        const id    = btn.dataset.id
-        const { error } = await window._db.from(tabla).update({ activo: false }).eq('id', id)
-        if (!error) {
-          const parent = btn.closest('tr') || btn.closest('li')
-          if (parent) { parent.style.opacity = '0.3'; parent.style.pointerEvents = 'none' }
-          btn.disabled = true
-          mostrarToast('Elemento inactivado')
-        } else {
-          mostrarToast('Error al inactivar')
-          console.error(error)
-        }
-      })
-    })
 
   } catch (err) {
     wrap.innerHTML = `<p style="margin-top:24px;color:var(--color-highlight)">Error al cargar receta: ${err.message}</p>`
