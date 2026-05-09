@@ -1,8 +1,6 @@
 let _appMontado = false
 
 window._db.auth.onAuthStateChange(async (event, session) => {
-  // Si el app ya está montado ignorar TOKEN_REFRESHED / SIGNED_IN que
-  // Supabase dispara al volver a la pestaña — solo reaccionar a SIGNED_OUT
   if (_appMontado && event !== 'SIGNED_OUT') return
 
   if (event === 'SIGNED_OUT') {
@@ -15,16 +13,17 @@ window._db.auth.onAuthStateChange(async (event, session) => {
 
   if (session) {
     _appMontado = true
-    await mostrarApp(session.user.user_metadata?.rol || null, session.user.email)
+    await mostrarApp(
+      session.user.user_metadata?.rol || null,
+      session.user.email,
+      session.user.user_metadata?.tenant_id || null
+    )
   } else {
     await mostrarLogin()
   }
 })
 
-// Interceptar visibilitychange: si el app ya está montado, no hacer nada
-document.addEventListener('visibilitychange', () => {
-  // El flag _appMontado evita que el evento de Supabase re-renderice la vista
-})
+document.addEventListener('visibilitychange', () => {})
 
 async function mostrarLogin() {
   const cfg = await getTenantConfig()
@@ -56,8 +55,8 @@ async function mostrarLogin() {
   })
 }
 
-async function mostrarApp(rol, email) {
-  const cfg = await getTenantConfig()
+async function mostrarApp(rol, email, tenant_id = null) {
+  const cfg = await getTenantConfig(tenant_id)
   document.documentElement.style.setProperty('--color-primary', cfg.color_primario)
   document.title = cfg.nombre
 
@@ -105,7 +104,6 @@ async function mostrarApp(rol, email) {
     })
   })
 
-  // Restaurar última vista activa (persiste entre recargas y cambios de pestaña)
   const vistaGuardada = localStorage.getItem('datadesk-view')
   const linkActivo = document.querySelector(`[data-view="${vistaGuardada || 'inicio'}"]`)
   if (linkActivo) linkActivo.classList.add('active')
@@ -133,14 +131,14 @@ async function mostrarBienvenida() {
     const contarStatus = (arr, s) => arr.filter(x => (x.status || 'pendiente') === s).length
 
     const r = {
-      total:     recetas.length,
-      aprobadas: contarStatus(recetas, 'aprobado'),
+      total:      recetas.length,
+      aprobadas:  contarStatus(recetas, 'aprobado'),
       pendientes: contarStatus(recetas, 'pendiente'),
       archivadas: contarStatus(recetas, 'archivado')
     }
     const p = {
-      total:     productos.length,
-      aprobados: contarStatus(productos, 'aprobado'),
+      total:      productos.length,
+      aprobados:  contarStatus(productos, 'aprobado'),
       pendientes: contarStatus(productos, 'pendiente'),
       archivados: contarStatus(productos, 'archivado')
     }
