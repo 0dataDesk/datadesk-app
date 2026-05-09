@@ -665,16 +665,17 @@ body {
 }
 
 /* ── INSUMOS TABLA EDITABLE ── */
-.insumos-tabla { table-layout: fixed; width: 100%; }
+.insumos-tabla { table-layout: auto; width: 100%; }
 .insumos-tabla th:first-child,
-.insumos-tabla td:first-child { width: auto; }
+.insumos-tabla td:first-child { width: 55%; }
 .insumos-tabla .col-unidad    { width: 110px; }
-.insumos-tabla .col-guardar   { width: 28px; padding-left: 4px; padding-right: 4px; }
+.insumos-tabla .col-guardar   { width: 40px; padding-left: 8px; padding-right: 8px; }
 
 .insumo-nombre-input {
   font-size: 15px;
   padding: 7px 10px;
   width: 100%;
+  max-width: 340px;
 }
 .insumo-unidad-select,
 .insumo-unidad-input {
