@@ -1,13 +1,13 @@
 async function getTenantId() {
   const { data: { user } } = await window._db.auth.getUser()
-  if (!user) throw new Error('No hay sesión activa')
+  if (!user) throw new Error('No hay sesion activa')
   return user.user_metadata?.tenant_id || null
 }
 
 async function validarTenant(tenant_id) {
   if (!tenant_id) throw new Error('tenant_id requerido')
   const { data: { user } } = await window._db.auth.getUser()
-  if (!user) throw new Error('No hay sesión activa')
+  if (!user) throw new Error('No hay sesion activa')
   const userTenant = user.user_metadata?.tenant_id
   if (userTenant !== tenant_id) throw new Error('Acceso denegado')
   return true
@@ -16,12 +16,12 @@ async function validarTenant(tenant_id) {
 async function getTenantConfig() {
   if (window._tenantConfig) return window._tenantConfig
 
-  // 1. Intentar obtener tenant_id de la sesión activa
+  // 1. Intentar obtener tenant_id de la sesion activa
   let tenant_id = null
   try {
     tenant_id = await getTenantId()
   } catch {
-    // Sin sesión — leer de la URL
+    // Sin sesion -- leer de la URL
     const params = new URLSearchParams(window.location.search)
     tenant_id = params.get('tenant')
   }
