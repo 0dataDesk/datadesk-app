@@ -7,16 +7,17 @@ window._db.auth.onAuthStateChange(async (event, session) => {
 
   if (event === 'SIGNED_OUT') {
     _appMontado = false
+    window._tenantConfig = null
     localStorage.removeItem('datadesk-view')
-    mostrarLogin()
+    await mostrarLogin()
     return
   }
 
   if (session) {
     _appMontado = true
-    mostrarApp(session.user.user_metadata?.rol || null, session.user.email)
+    await mostrarApp(session.user.user_metadata?.rol || null, session.user.email)
   } else {
-    mostrarLogin()
+    await mostrarLogin()
   }
 })
 
@@ -25,12 +26,15 @@ document.addEventListener('visibilitychange', () => {
   // El flag _appMontado evita que el evento de Supabase re-renderice la vista
 })
 
-function mostrarLogin() {
+async function mostrarLogin() {
+  const cfg = await getTenantConfig()
+  document.documentElement.style.setProperty('--color-primary', cfg.color_primario)
+
   document.getElementById('app').innerHTML = `
     <div class="login-wrapper">
       <div class="login-box">
-        <div class="login-logo">Tita<span>.</span></div>
-        <p class="login-tagline">panadería argentina</p>
+        <div class="login-logo">${cfg.nombre}<span>.</span></div>
+        <p class="login-tagline">${cfg.tagline}</p>
         <form id="login-form">
           <input type="email" id="email" placeholder="Correo electrónico" required />
           <input type="password" id="password" placeholder="Contraseña" required />
@@ -52,13 +56,17 @@ function mostrarLogin() {
   })
 }
 
-function mostrarApp(rol, email) {
+async function mostrarApp(rol, email) {
+  const cfg = await getTenantConfig()
+  document.documentElement.style.setProperty('--color-primary', cfg.color_primario)
+  document.title = cfg.nombre
+
   window._rol = rol || 'operador'
 
   document.getElementById('app').innerHTML = `
     <div class="layout">
       <header class="header">
-        <div class="header-logo">Tita<span>.</span><small>panadería argentina</small></div>
+        <div class="header-logo">${cfg.nombre}<span>.</span><small>${cfg.tagline}</small></div>
         <div class="header-user">
           <span class="header-email">${email}</span>
           <span class="header-rol">${rol}</span>
