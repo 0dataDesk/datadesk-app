@@ -15,18 +15,31 @@ async function validarTenant(tenant_id) {
 
 async function getTenantConfig() {
   if (window._tenantConfig) return window._tenantConfig
+
+  // 1. Intentar obtener tenant_id de la sesión activa
+  let tenant_id = null
   try {
-    const tenant_id = await getTenantId()
-    if (!tenant_id) throw new Error('sin tenant_id')
-    const { data, error } = await window._db
-      .from('tenants')
-      .select('nombre, tagline, color_primario')
-      .eq('tenant_id', tenant_id)
-      .single()
-    if (error || !data) throw error || new Error('sin datos')
-    window._tenantConfig = data
-    return data
+    tenant_id = await getTenantId()
   } catch {
-    return { nombre: 'Tita', tagline: 'panadería argentina', color_primario: '#2B1A0F' }
+    // Sin sesión — leer de la URL
+    const params = new URLSearchParams(window.location.search)
+    tenant_id = params.get('tenant')
   }
+
+  if (!tenant_id) {
+    return { nombre: 'dataDesk', tagline: '', color_primario: '#1e3a5f' }
+  }
+
+  const { data, error } = await window._db
+    .from('tenants')
+    .select('nombre, tagline, color_primario')
+    .eq('tenant_id', tenant_id)
+    .single()
+
+  if (error || !data) {
+    return { nombre: 'dataDesk', tagline: '', color_primario: '#1e3a5f' }
+  }
+
+  window._tenantConfig = data
+  return data
 }
