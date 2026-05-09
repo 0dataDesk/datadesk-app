@@ -194,39 +194,53 @@ body {
   flex: 1;
 }
 
-/* ── SIDEBAR ── */
-.sidebar {
-  width: 210px;
-  background: var(--color-card);
-  border-right: 1px solid var(--color-border);
-  padding: 28px 0;
-  min-height: calc(100vh - 60px);
-  box-shadow: 2px 0 8px rgba(43,26,15,0.04);
+/* ── SIDEBAR → siempre nav horizontal ── */
+.body {
+  flex-direction: column;
 }
 
-.sidebar ul { list-style: none; }
+.sidebar {
+  width: 100%;
+  min-height: auto;
+  padding: 0;
+  background: var(--color-card);
+  border-right: none;
+  border-bottom: 1px solid var(--color-border);
+  box-shadow: 0 2px 6px rgba(43,26,15,0.05);
+  display: flex;
+}
+
+.sidebar ul {
+  display: flex;
+  list-style: none;
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.sidebar ul::-webkit-scrollbar { display: none; }
 
 .sidebar ul li a {
   display: block;
-  padding: 11px 24px;
+  padding: 14px 28px;
   color: var(--color-text-muted);
   text-decoration: none;
   font-size: 13px;
   font-weight: 500;
   transition: all 0.18s;
-  border-left: 3px solid transparent;
+  white-space: nowrap;
+  border-bottom: 3px solid transparent;
 }
 
 .sidebar ul li a:hover {
   color: var(--color-primary);
   background: var(--color-secondary);
-  border-left-color: var(--color-border);
 }
 
 .sidebar ul li a.active {
   color: var(--color-primary);
   background: var(--color-secondary);
-  border-left-color: var(--color-accent);
+  border-bottom-color: var(--color-accent);
   font-weight: 600;
 }
 
@@ -731,52 +745,7 @@ body {
 
 /* ── MOBILE LAYOUT ── */
 @media (max-width: 699px) {
-  /* Sidebar → cinta horizontal bajo el header */
-  .body {
-    flex-direction: column;
-  }
-
-  .sidebar {
-    width: 100%;
-    min-height: auto;
-    padding: 0;
-    border-right: none;
-    border-bottom: 2px solid var(--color-border);
-    display: flex;
-    box-shadow: 0 2px 6px rgba(43,26,15,0.06);
-  }
-
-  .sidebar ul {
-    display: flex;
-    width: 100%;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-  }
-  .sidebar ul::-webkit-scrollbar { display: none; }
-
-  .sidebar ul li {
-    flex: 1;
-    min-width: max-content;
-  }
-
-  .sidebar ul li a {
-    padding: 13px 18px;
-    text-align: center;
-    font-size: 13px;
-    border-left: none;
-    border-bottom: 3px solid transparent;
-    white-space: nowrap;
-  }
-
-  .sidebar ul li a:hover,
-  .sidebar ul li a.active {
-    background: var(--color-secondary);
-    border-left-color: transparent;
-    border-bottom-color: var(--color-accent);
-  }
-
-  /* Resto del layout móvil */
+  .sidebar ul li a { padding: 13px 18px; }
   .filtros-cascada { flex-direction: column; gap: 14px; padding: 16px; }
   .filtro-cascada-item { min-width: 0; }
   .receta-detalle-card { padding: 20px; }
