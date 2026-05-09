@@ -69,6 +69,7 @@ async function vistaProductos() {
               <tr>
                 <th>Insumo</th>
                 <th class="col-unidad">Unidad</th>
+                ${puedeEditar ? '<th class="col-guardar"></th>' : ''}
               </tr>
             </thead>
             <tbody>
@@ -91,34 +92,42 @@ async function vistaProductos() {
                                 data-field="unidad_medida" placeholder="unidad" />`)
                     : (p.unidad_medida || '')}
                   </td>
+                  ${puedeEditar ? `<td><button class="btn-guardar-fila" data-id="${p.id_producto}" title="Guardar">✓</button></td>` : ''}
                 </tr>
               `).join('')}
             </tbody>
           </table>
-        </div>
-        ${puedeEditar ? `<button class="btn-accion btn-guardar-sec" id="btn-guardar-insumos" style="margin-top:12px">Guardar cambios</button>` : ''}
-      `
+        </div>`
 
       if (!puedeEditar) return
 
-      document.getElementById('btn-guardar-insumos').addEventListener('click', async () => {
-        const rows = wrap.querySelectorAll('tr[data-prod-id]')
-        let ok = true
-        for (const row of rows) {
-          const id          = row.dataset.prodId
-          const producto    = row.querySelector('[data-field="producto"]')?.value || ''
+      wrap.querySelectorAll('.btn-guardar-fila').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const id  = btn.dataset.id
+          const row = btn.closest('tr')
+          const producto      = row.querySelector('[data-field="producto"]')?.value || ''
           const unidad_medida = row.querySelector('[data-field="unidad_medida"]')?.value || null
+
+          btn.textContent = '…'
+          btn.disabled = true
+
           const { error } = await window._db.from('productos')
             .update({ producto, unidad_medida })
             .eq('id_producto', id)
-          if (error) { ok = false; console.error(error) }
-          else {
-            // Actualizar en memoria
+
+          if (!error) {
             const p = window._productos.find(p => String(p.id_producto) === String(id))
             if (p) { p.producto = producto; p.unidad_medida = unidad_medida }
+            btn.textContent = '✓'
+            btn.classList.add('guardado')
+            setTimeout(() => { btn.textContent = '✓'; btn.disabled = false; btn.classList.remove('guardado') }, 1500)
+          } else {
+            btn.textContent = '✕'
+            btn.disabled = false
+            console.error(error)
+            mostrarToast('Error al guardar')
           }
-        }
-        mostrarToast(ok ? 'Insumos guardados' : 'Error al guardar algunos insumos')
+        })
       })
     }
 
