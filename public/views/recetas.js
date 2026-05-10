@@ -125,7 +125,7 @@ async function cargarDetalleReceta(receta, puedeEditar, esAdmin) {
       { data: pasos,        error: errP }
     ] = await Promise.all([
       window._db.from('receta_ingredientes')
-        .select('*, productos!id_producto(producto)')
+        .select('*')
         .eq('id_receta', receta.id_receta)
         .order('id'),
       window._db.from('receta_procedimientos')
