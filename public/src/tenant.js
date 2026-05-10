@@ -27,15 +27,19 @@ async function getTenantConfig(tenant_id_conocido = null) {
     }
   }
 
-  if (!tenant_id) return { nombre: 'dataDesk', tagline: '', color_primario: '#1e3a5f' }
+  if (!tenant_id) {
+    return { nombre: 'dataDesk', tagline: '', color_primario: '#1e3a5f', insumos_modo: 'revision', recetas_modo: 'revision' }
+  }
 
   const { data, error } = await window._db
     .from('tenants')
-    .select('nombre, tagline, color_primario')
+    .select('nombre, tagline, color_primario, insumos_modo, recetas_modo')
     .eq('tenant_id', tenant_id)
     .single()
 
-  if (error || !data) return { nombre: 'dataDesk', tagline: '', color_primario: '#1e3a5f' }
+  if (error || !data) {
+    return { nombre: 'dataDesk', tagline: '', color_primario: '#1e3a5f', insumos_modo: 'revision', recetas_modo: 'revision' }
+  }
 
   window._tenantConfig = data
   return data
