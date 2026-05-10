@@ -4,8 +4,9 @@ async function vistaProductos() {
 
   try {
     const tenant_id = await getTenantId()
-    const rol       = window._rol || 'operador'
+    const rol        = window._rol || 'operador'
     const puedeEditar = rol === 'editor' || rol === 'admin'
+    const modo       = window._tenantConfig?.insumos_modo || 'revision'
 
     const [
       { data: productos, error: errP },
@@ -21,6 +22,59 @@ async function vistaProductos() {
     window._productos = productos || []
     window._unidades  = unidades  || []
 
+    // ── Modo consulta (Furia) ─────────────────────────────────────────────
+    if (modo === 'consulta') {
+      const cats = [...new Set(window._productos.map(p => p.categoria).filter(Boolean))].sort()
+
+      content.innerHTML = `
+        <div class="vista-header">
+          <h2>Insumos</h2>
+        </div>
+
+        <div class="filtros-cascada">
+          <div class="filtro-cascada-item">
+            <label class="filtro-label">Categoría</label>
+            <select id="f-categoria" class="filtro-select">
+              <option value="">Todas las categorías</option>
+              ${cats.map(c => `<option value="${c}">${c}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+
+        <div id="insumos-grid-wrap"></div>
+      `
+
+      const renderGrid = () => {
+        const cat  = document.getElementById('f-categoria').value
+        const wrap = document.getElementById('insumos-grid-wrap')
+        const filtrados = window._productos.filter(p => !cat || p.categoria === cat)
+
+        if (!filtrados.length) {
+          wrap.innerHTML = `<p style="color:var(--color-text-muted);font-size:13px">No hay insumos para mostrar.</p>`
+          return
+        }
+
+        wrap.innerHTML = `
+          <div class="insumos-grid">
+            ${filtrados.map(p => `
+              <div class="insumo-card">
+                <div class="insumo-card-nombre">${p.producto}</div>
+                <div class="insumo-card-meta">
+                  ${p.unidad_medida ? `<span class="insumo-card-unidad">${p.unidad_medida}</span>` : ''}
+                  ${p.categoria     ? `<span class="insumo-card-badge">${p.categoria}</span>`      : ''}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `
+      }
+
+      document.getElementById('f-categoria').addEventListener('change', renderGrid)
+      renderGrid()
+      return
+    }
+
+    // ── Modo revisión (Tita) ──────────────────────────────────────────────
     const fuentes    = [...new Set(window._productos.map(p => p.fuente).filter(Boolean))].sort()
     const hayUnidades = window._unidades.length > 0
 
@@ -59,8 +113,6 @@ async function vistaProductos() {
         wrap.innerHTML = `<p style="color:var(--color-text-muted);font-size:13px">No hay insumos para mostrar.</p>`
         return
       }
-
-      const colUnidad = hayUnidades ? `<th class="col-unidad">Unidad</th>` : `<th class="col-unidad">Unidad</th>`
 
       wrap.innerHTML = `
         <div class="tabla-wrapper">
