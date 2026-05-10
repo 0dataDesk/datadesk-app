@@ -13,7 +13,7 @@ async function vistaRecetas() {
       { data: unidades, error: errU }
     ] = await Promise.all([
       window._db.from('catalogo_recetas').select('*').eq('tenant_id', tenant_id).order('nombre_platillo'),
-      window._db.from('catalogo_unidades').select('*').order('nombre')
+      window._db.from('catalogo_unidades').select('*').eq('tenant_id', tenant_id).order('nombre')
     ])
 
     if (errR) throw errR
@@ -21,10 +21,9 @@ async function vistaRecetas() {
     window._recetas  = recetas  || []
     window._unidades = unidades || []
 
-    // Valores únicos para los tres filtros
-    const fuentes  = [...new Set(window._recetas.map(r => r.fuente).filter(Boolean))].sort()
-    const cats0    = [...new Set(window._recetas.map(r => r.categoria).filter(Boolean))].sort()
-    const plats0   = [...window._recetas].sort((a, b) => a.nombre_platillo.localeCompare(b.nombre_platillo))
+    const fuentes = [...new Set(window._recetas.map(r => r.fuente).filter(Boolean))].sort()
+    const cats0   = [...new Set(window._recetas.map(r => r.categoria).filter(Boolean))].sort()
+    const plats0  = [...window._recetas].sort((a, b) => a.nombre_platillo.localeCompare(b.nombre_platillo))
 
     content.innerHTML = `
       <div class="vista-header">
@@ -58,16 +57,14 @@ async function vistaRecetas() {
       <div id="receta-detalle-wrap"></div>
     `
 
-    const fFuente   = document.getElementById('f-fuente')
+    const fFuente    = document.getElementById('f-fuente')
     const fCategoria = document.getElementById('f-categoria')
     const fPlatillo  = document.getElementById('f-platillo')
 
-    // Recalcula categorias y platillos según selección actual
     const actualizarFiltros = (resetPlatillo = true) => {
       const fuente    = fFuente.value
       const categoria = fCategoria.value
 
-      // Categorías disponibles según fuente
       const catsDisp = [...new Set(
         window._recetas
           .filter(r => !fuente || r.fuente === fuente)
@@ -79,7 +76,6 @@ async function vistaRecetas() {
         `<option value="">Todas las categorías</option>` +
         catsDisp.map(c => `<option value="${c}"${c === catActual ? ' selected' : ''}>${c}</option>`).join('')
 
-      // Platillos disponibles según fuente + categoría
       const platsDisp = window._recetas
         .filter(r =>
           (!fuente    || r.fuente    === fuente) &&
@@ -94,13 +90,9 @@ async function vistaRecetas() {
       if (resetPlatillo) document.getElementById('receta-detalle-wrap').innerHTML = ''
     }
 
-    // ── Fuente cambia → recalcula categorías y platillos ─────────────────
     fFuente.addEventListener('change', () => actualizarFiltros())
-
-    // ── Categoría cambia → recalcula platillos ───────────────────────────
     fCategoria.addEventListener('change', () => actualizarFiltros())
 
-    // ── Platillo → carga receta ──────────────────────────────────────────
     fPlatillo.addEventListener('change', () => {
       const val = fPlatillo.value
       document.getElementById('receta-detalle-wrap').innerHTML = ''
@@ -137,8 +129,14 @@ async function cargarDetalleReceta(receta, puedeEditar, esAdmin) {
     if (errI) throw errI
     if (errP) throw errP
 
-    const ings  = ingredientes || []
-    const steps = pasos        || []
+    // Activos primero, inactivos al final
+    const sortActivo = (arr) => [
+      ...arr.filter(x => x.activo !== false),
+      ...arr.filter(x => x.activo === false)
+    ]
+
+    const ings  = sortActivo(ingredientes || [])
+    const steps = sortActivo(pasos        || [])
 
     const uOptsFor = (valorActual) =>
       (window._unidades || [])
@@ -148,39 +146,51 @@ async function cargarDetalleReceta(receta, puedeEditar, esAdmin) {
     // ── Ingredientes ────────────────────────────────────────────────────
     const htmlIngredientes = puedeEditar
       ? `<div class="tabla-wrapper">
-          <table class="tabla tabla-editable">
+          <table class="tabla tabla-editable ingredientes-tabla">
             <thead>
-              <tr><th>Ingrediente</th><th>Cantidad</th><th>Unidad</th><th>Nota</th></tr>
+              <tr>
+                <th>Ingrediente</th>
+                <th>Cantidad</th>
+                <th>Unidad</th>
+                <th>Nota</th>
+                <th class="col-acciones"></th>
+              </tr>
             </thead>
             <tbody>
-              ${ings.map(i => `
-                <tr data-ing-id="${i.id}">
-                  <td>${i.productos?.producto || i.producto || ''}</td>
+              ${ings.map(i => {
+                const inactivo = i.activo === false
+                return `
+                <tr data-ing-id="${i.id}" class="${inactivo ? 'fila-inactiva' : ''}">
+                  <td>${i.producto || ''}</td>
                   <td><input class="edit-input edit-num" type="text"
                         value="${i.cantidad != null ? i.cantidad : ''}"
-                        data-field="cantidad" /></td>
-                  <td><select class="edit-select" data-field="unidad">
+                        data-field="cantidad" ${inactivo ? 'disabled' : ''} /></td>
+                  <td><select class="edit-select" data-field="unidad" ${inactivo ? 'disabled' : ''}>
                         <option value="">— unidad —</option>
                         ${uOptsFor(i.unidad || '')}
                       </select></td>
                   <td><input class="edit-input edit-wide" type="text"
                         value="${(i.notas_ingrediente || '').replace(/"/g, '&quot;')}"
-                        data-field="notas_ingrediente" placeholder="Nota..." /></td>
-                </tr>
-              `).join('')}
+                        data-field="notas_ingrediente" placeholder="Nota..." ${inactivo ? 'disabled' : ''} /></td>
+                  <td class="acciones-fila">
+                    ${inactivo
+                      ? `<button class="btn-fila btn-restaurar" data-ing-id="${i.id}" title="Restaurar">↺</button>`
+                      : `<button class="btn-fila btn-guardar-ing" data-ing-id="${i.id}" title="Guardar">✓</button>
+                         <button class="btn-fila btn-inactivar-ing" data-ing-id="${i.id}" title="Inactivar">✕</button>`
+                    }
+                  </td>
+                </tr>`
+              }).join('')}
             </tbody>
           </table>
-        </div>
-        <button class="btn-accion btn-guardar-sec" id="btn-guardar-ing" style="margin-top:10px">
-          Guardar ingredientes
-        </button>`
+        </div>`
       : `<div class="tabla-wrapper">
           <table class="tabla">
             <thead>
               <tr><th>Ingrediente</th><th>Cantidad</th><th>Unidad</th><th>Nota</th></tr>
             </thead>
             <tbody>
-              ${ings.map(i => `<tr>
+              ${ings.filter(i => i.activo !== false).map(i => `<tr>
                 <td>${i.producto || ''}</td>
                 <td>${i.cantidad != null ? i.cantidad : ''}</td>
                 <td>${i.unidad || ''}</td>
@@ -193,20 +203,26 @@ async function cargarDetalleReceta(receta, puedeEditar, esAdmin) {
     // ── Procedimiento ───────────────────────────────────────────────────
     const htmlPasos = puedeEditar
       ? `<ol class="procedimiento procedimiento-editable">
-          ${steps.map(p => `
-            <li data-paso-id="${p.id}">
+          ${steps.map(p => {
+            const inactivo = p.activo === false
+            return `
+            <li data-paso-id="${p.id}" class="${inactivo ? 'fila-inactiva' : ''}">
               <div class="paso-editable-row">
                 <textarea class="edit-textarea edit-paso" data-field="proceso"
-                          rows="2">${limpiarPaso(p.proceso)}</textarea>
+                          rows="2" ${inactivo ? 'disabled' : ''}>${limpiarPaso(p.proceso)}</textarea>
+                <div class="acciones-paso">
+                  ${inactivo
+                    ? `<button class="btn-fila btn-restaurar" data-paso-id="${p.id}" title="Restaurar">↺</button>`
+                    : `<button class="btn-fila btn-guardar-paso" data-paso-id="${p.id}" title="Guardar">✓</button>
+                       <button class="btn-fila btn-inactivar-paso" data-paso-id="${p.id}" title="Inactivar">✕</button>`
+                  }
+                </div>
               </div>
-            </li>
-          `).join('')}
-        </ol>
-        <button class="btn-accion btn-guardar-sec" id="btn-guardar-pas" style="margin-top:10px">
-          Guardar pasos
-        </button>`
+            </li>`
+          }).join('')}
+        </ol>`
       : `<ol class="procedimiento">
-          ${steps.map(p => `<li>${limpiarPaso(p.proceso)}</li>`).join('')}
+          ${steps.filter(p => p.activo !== false).map(p => `<li>${limpiarPaso(p.proceso)}</li>`).join('')}
         </ol>`
 
     // ── Render ──────────────────────────────────────────────────────────
@@ -254,7 +270,6 @@ async function cargarDetalleReceta(receta, puedeEditar, esAdmin) {
 
     // ── Eventos ──────────────────────────────────────────────────────────
 
-    // Admin: aprobar / archivar
     if (esAdmin) {
       document.getElementById('btn-aprobar')?.addEventListener('click', () =>
         cambiarStatusReceta(receta, 'aprobado', puedeEditar, esAdmin))
@@ -262,37 +277,89 @@ async function cargarDetalleReceta(receta, puedeEditar, esAdmin) {
         cambiarStatusReceta(receta, 'archivado', puedeEditar, esAdmin))
     }
 
-    // Guardar ingredientes
-    document.getElementById('btn-guardar-ing')?.addEventListener('click', async () => {
-      const rows = wrap.querySelectorAll('#section-ingredientes tr[data-ing-id]')
-      let ok = true
-      for (const row of rows) {
-        const id      = row.dataset.ingId
-        const cantRaw  = row.querySelector('[data-field="cantidad"]')?.value
-        const cantidad = cantRaw?.trim() || null
+    // Guardar ingrediente por fila
+    wrap.querySelectorAll('.btn-guardar-ing').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id  = btn.dataset.ingId
+        const row = btn.closest('tr')
+        const cantidad = row.querySelector('[data-field="cantidad"]')?.value?.trim() || null
         const unidad   = row.querySelector('[data-field="unidad"]')?.value || null
         const notas    = row.querySelector('[data-field="notas_ingrediente"]')?.value || null
+        btn.textContent = '…'; btn.disabled = true
         const { error } = await window._db.from('receta_ingredientes')
           .update({ cantidad, unidad, notas_ingrediente: notas })
           .eq('id', id)
-        if (error) { ok = false; console.error(error) }
-      }
-      mostrarToast(ok ? 'Ingredientes guardados' : 'Error al guardar algunos ingredientes')
+        if (!error) {
+          btn.textContent = '✓'; btn.classList.add('guardado')
+          setTimeout(() => { btn.textContent = '✓'; btn.disabled = false; btn.classList.remove('guardado') }, 1500)
+        } else {
+          btn.textContent = '✕'; btn.disabled = false
+          mostrarToast('Error al guardar ingrediente')
+        }
+      })
     })
 
-    // Guardar pasos
-    document.getElementById('btn-guardar-pas')?.addEventListener('click', async () => {
-      const items = wrap.querySelectorAll('#section-pasos li[data-paso-id]')
-      let ok = true
-      for (const li of items) {
-        const id   = li.dataset.pasoId
+    // Inactivar ingrediente por fila
+    wrap.querySelectorAll('.btn-inactivar-ing').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.ingId
+        const { error } = await window._db.from('receta_ingredientes')
+          .update({ activo: false }).eq('id', id)
+        if (!error) cargarDetalleReceta(receta, puedeEditar, esAdmin)
+        else mostrarToast('Error al inactivar ingrediente')
+      })
+    })
+
+    // Restaurar ingrediente
+    wrap.querySelectorAll('.btn-restaurar[data-ing-id]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.ingId
+        const { error } = await window._db.from('receta_ingredientes')
+          .update({ activo: true }).eq('id', id)
+        if (!error) cargarDetalleReceta(receta, puedeEditar, esAdmin)
+        else mostrarToast('Error al restaurar ingrediente')
+      })
+    })
+
+    // Guardar paso por fila
+    wrap.querySelectorAll('.btn-guardar-paso').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id   = btn.dataset.pasoId
+        const li   = btn.closest('li')
         const desc = li.querySelector('[data-field="proceso"]')?.value || ''
+        btn.textContent = '…'; btn.disabled = true
         const { error } = await window._db.from('receta_procedimientos')
-          .update({ proceso: desc })
-          .eq('id', id)
-        if (error) { ok = false; console.error(error) }
-      }
-      mostrarToast(ok ? 'Pasos guardados' : 'Error al guardar algunos pasos')
+          .update({ proceso: desc }).eq('id', id)
+        if (!error) {
+          btn.textContent = '✓'; btn.classList.add('guardado')
+          setTimeout(() => { btn.textContent = '✓'; btn.disabled = false; btn.classList.remove('guardado') }, 1500)
+        } else {
+          btn.textContent = '✕'; btn.disabled = false
+          mostrarToast('Error al guardar paso')
+        }
+      })
+    })
+
+    // Inactivar paso
+    wrap.querySelectorAll('.btn-inactivar-paso').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.pasoId
+        const { error } = await window._db.from('receta_procedimientos')
+          .update({ activo: false }).eq('id', id)
+        if (!error) cargarDetalleReceta(receta, puedeEditar, esAdmin)
+        else mostrarToast('Error al inactivar paso')
+      })
+    })
+
+    // Restaurar paso
+    wrap.querySelectorAll('.btn-restaurar[data-paso-id]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.pasoId
+        const { error } = await window._db.from('receta_procedimientos')
+          .update({ activo: true }).eq('id', id)
+        if (!error) cargarDetalleReceta(receta, puedeEditar, esAdmin)
+        else mostrarToast('Error al restaurar paso')
+      })
     })
 
     // Guardar solicitud / notas
@@ -309,7 +376,6 @@ async function cargarDetalleReceta(receta, puedeEditar, esAdmin) {
         console.error(error)
       }
     })
-
 
   } catch (err) {
     wrap.innerHTML = `<p style="margin-top:24px;color:var(--color-highlight)">Error al cargar receta: ${err.message}</p>`
@@ -335,7 +401,6 @@ async function cambiarStatusReceta(receta, nuevoStatus, puedeEditar, esAdmin) {
   if (r) r.status = nuevoStatus
 
   mostrarToast(`Receta ${nuevoStatus}`)
-  // Re-render detail to update badge
   cargarDetalleReceta(receta, puedeEditar, esAdmin)
 }
 
