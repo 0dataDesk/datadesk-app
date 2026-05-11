@@ -79,6 +79,7 @@ async function mostrarApp(rol, email, tenant_id = null) {
             <li><a href="#" data-view="productos">Insumos</a></li>
             <li><a href="#" data-view="recetas">Revisión de Recetas</a></li>
             <li><a href="#" data-view="precios">Precios</a></li>
+            <li><a href="#" data-view="costeo">Costeo</a></li>
           </ul>
         </nav>
         <main class="content" id="content">
@@ -104,6 +105,7 @@ async function mostrarApp(rol, email, tenant_id = null) {
       if (view === 'productos') await vistaProductos()
       if (view === 'recetas')   await vistaRecetas()
       if (view === 'precios')   await vistaPrecios()
+      if (view === 'costeo')    await vistaCosteo()
     })
   })
 
@@ -114,6 +116,7 @@ async function mostrarApp(rol, email, tenant_id = null) {
   if (vistaGuardada === 'productos')    vistaProductos()
   else if (vistaGuardada === 'recetas') vistaRecetas()
   else if (vistaGuardada === 'precios') vistaPrecios()
+  else if (vistaGuardada === 'costeo')  vistaCosteo()
   else                                  mostrarBienvenida()
 }
 
