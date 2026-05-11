@@ -6,7 +6,6 @@ async function vistaProductos() {
     const tenant_id = await getTenantId()
     const rol        = window._rol || 'operador'
     const puedeEditar = rol === 'editor' || rol === 'admin'
-    const modo       = window._tenantConfig?.insumos_modo || 'revision'
 
     const [
       { data: productos, error: errP },
@@ -22,61 +21,11 @@ async function vistaProductos() {
     window._productos = productos || []
     window._unidades  = unidades  || []
 
-    // ── Modo consulta (Furia) ─────────────────────────────────────────────
-    if (modo === 'consulta') {
-      const cats = [...new Set(window._productos.map(p => p.categoria).filter(Boolean))].sort()
-
-      content.innerHTML = `
-        <div class="vista-header">
-          <h2>Insumos</h2>
-        </div>
-
-        <div class="filtros-cascada">
-          <div class="filtro-cascada-item">
-            <label class="filtro-label">Categoría</label>
-            <select id="f-categoria" class="filtro-select">
-              <option value="">Todas las categorías</option>
-              ${cats.map(c => `<option value="${c}">${c}</option>`).join('')}
-            </select>
-          </div>
-        </div>
-
-        <div id="insumos-grid-wrap"></div>
-      `
-
-      const renderGrid = () => {
-        const cat  = document.getElementById('f-categoria').value
-        const wrap = document.getElementById('insumos-grid-wrap')
-        const filtrados = window._productos.filter(p => !cat || p.categoria === cat)
-
-        if (!filtrados.length) {
-          wrap.innerHTML = `<p style="color:var(--color-text-muted);font-size:13px">No hay insumos para mostrar.</p>`
-          return
-        }
-
-        wrap.innerHTML = `
-          <div class="insumos-grid">
-            ${filtrados.map(p => `
-              <div class="insumo-card">
-                <div class="insumo-card-nombre">${p.producto}</div>
-                <div class="insumo-card-meta">
-                  ${p.unidad_medida ? `<span class="insumo-card-unidad">${p.unidad_medida}</span>` : ''}
-                  ${p.categoria     ? `<span class="insumo-card-badge">${p.categoria}</span>`      : ''}
-                </div>
-              </div>
-            `).join('')}
-          </div>
-        `
-      }
-
-      document.getElementById('f-categoria').addEventListener('change', renderGrid)
-      renderGrid()
-      return
-    }
-
-    // ── Modo revisión (Tita) ──────────────────────────────────────────────
-    const fuentes    = [...new Set(window._productos.map(p => p.fuente).filter(Boolean))].sort()
     const hayUnidades = window._unidades.length > 0
+
+    // Valores únicos para los filtros
+    const grupos  = [...new Set(window._productos.map(p => p.grupo).filter(Boolean))].sort()
+    const cats    = [...new Set(window._productos.map(p => p.categoria).filter(Boolean))].sort()
 
     const uOptsFor = (valorActual) => {
       if (!hayUnidades) return `<option value="${valorActual}">${valorActual || '—'}</option>`
@@ -90,24 +39,44 @@ async function vistaProductos() {
         <h2>Revisión de Insumos</h2>
       </div>
 
-      <div class="filtros-cascada">
-        <div class="filtro-cascada-item">
-          <label class="filtro-label">Fuente</label>
-          <select id="f-fuente" class="filtro-select">
-            <option value="">Todas las fuentes</option>
-            ${fuentes.map(f => `<option value="${f}">${f}</option>`).join('')}
-          </select>
-        </div>
+      <div class="filtros-bar">
+        <input type="text" id="insumos-search" placeholder="Buscar insumo..." class="filtro-search" />
+        <select id="filtro-grupo" class="filtro-select">
+          <option value="">Todos los grupos</option>
+          ${grupos.map(g => `<option value="${g}">${g}</option>`).join('')}
+        </select>
+        <select id="filtro-categoria" class="filtro-select">
+          <option value="">Todas las categorías</option>
+          ${cats.map(c => `<option value="${c}">${c}</option>`).join('')}
+        </select>
+        <select id="filtro-status" class="filtro-select">
+          <option value="">Todos los status</option>
+          <option value="pendiente">Pendiente</option>
+          <option value="aprobado">Aprobado</option>
+          <option value="archivado">Archivado</option>
+        </select>
       </div>
 
       <div id="insumos-lista-wrap"></div>
     `
 
-    const renderLista = () => {
-      const fuente = document.getElementById('f-fuente').value
-      const wrap   = document.getElementById('insumos-lista-wrap')
+    const aplicarFiltros = () => {
+      const texto  = document.getElementById('insumos-search')?.value.toLowerCase() || ''
+      const grupo  = document.getElementById('filtro-grupo')?.value || ''
+      const cat    = document.getElementById('filtro-categoria')?.value || ''
+      const status = document.getElementById('filtro-status')?.value || ''
 
-      const filtrados = window._productos.filter(p => !fuente || p.fuente === fuente)
+      return window._productos.filter(p => {
+        const matchTexto  = !texto  || p.producto?.toLowerCase().includes(texto)
+        const matchGrupo  = !grupo  || p.grupo === grupo
+        const matchCat    = !cat    || p.categoria === cat
+        const matchStatus = !status || (p.status || 'pendiente') === status
+        return matchTexto && matchGrupo && matchCat && matchStatus
+      })
+    }
+
+    const renderTabla = (filtrados) => {
+      const wrap = document.getElementById('insumos-lista-wrap')
 
       if (!filtrados.length) {
         wrap.innerHTML = `<p style="color:var(--color-text-muted);font-size:13px">No hay insumos para mostrar.</p>`
@@ -183,8 +152,14 @@ async function vistaProductos() {
       })
     }
 
-    document.getElementById('f-fuente').addEventListener('change', renderLista)
-    renderLista()
+    const onFiltro = () => renderTabla(aplicarFiltros())
+
+    document.getElementById('insumos-search').addEventListener('input', onFiltro)
+    document.getElementById('filtro-grupo').addEventListener('change', onFiltro)
+    document.getElementById('filtro-categoria').addEventListener('change', onFiltro)
+    document.getElementById('filtro-status').addEventListener('change', onFiltro)
+
+    renderTabla(aplicarFiltros())
 
   } catch (err) {
     content.innerHTML = `<p style="color:var(--color-highlight)">Error: ${err.message}</p>`
