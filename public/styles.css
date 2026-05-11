@@ -744,6 +744,60 @@ body {
   color: var(--color-text);
 }
 
+/* ── FILTROS BAR (compartido) ── */
+.filtros-bar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  align-items: center;
+}
+.filtro-search {
+  flex: 1;
+  min-width: 180px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 13px;
+}
+.filtro-search:focus { border-color: var(--color-accent); outline: none; }
+
+/* ── VISTA COSTEO ── */
+.costeo-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  margin-top: 16px;
+  overflow: hidden;
+}
+.costeo-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  background: var(--color-bg);
+  border-top: 2px solid var(--color-primary);
+  font-size: 15px;
+}
+.costeo-total strong {
+  font-size: 20px;
+  color: var(--color-primary);
+}
+.costeo-aviso {
+  padding: 10px 16px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  background: var(--color-bg);
+  border-top: 1px solid var(--color-border);
+  margin: 0;
+}
+.flag-unidad {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
 /* ── VISTA PRECIOS ── */
 .precio-card {
   background: var(--color-surface);
@@ -970,6 +1024,10 @@ body {
   .paso-editable-row { flex-direction: column; }
   .acciones-paso { flex-direction: row; justify-content: flex-end; }
   .edit-paso { width: 100%; }
+
+  /* Filtros bar: columna */
+  .filtros-bar { flex-direction: column; }
+  .filtro-search, .filtro-select { width: 100%; min-width: unset; }
 
   /* Precios: header apilado, tabla → bloques */
   .precio-card-header { flex-direction: column; gap: 4px; }
