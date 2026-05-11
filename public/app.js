@@ -78,6 +78,7 @@ async function mostrarApp(rol, email, tenant_id = null) {
             <li><a href="#" data-view="inicio">Inicio</a></li>
             <li><a href="#" data-view="productos">Insumos</a></li>
             <li><a href="#" data-view="recetas">Revisión de Recetas</a></li>
+            <li><a href="#" data-view="precios">Precios</a></li>
           </ul>
         </nav>
         <main class="content" id="content">
@@ -89,7 +90,7 @@ async function mostrarApp(rol, email, tenant_id = null) {
 
   document.getElementById('logout-btn').addEventListener('click', async () => {
     try { await logout() } catch {}
-    window.location.href = window.location.pathname
+    window.location.reload()
   })
 
   document.querySelectorAll('[data-view]').forEach(link => {
@@ -102,6 +103,7 @@ async function mostrarApp(rol, email, tenant_id = null) {
       if (view === 'inicio')    await mostrarBienvenida()
       if (view === 'productos') await vistaProductos()
       if (view === 'recetas')   await vistaRecetas()
+      if (view === 'precios')   await vistaPrecios()
     })
   })
 
@@ -111,6 +113,7 @@ async function mostrarApp(rol, email, tenant_id = null) {
 
   if (vistaGuardada === 'productos')    vistaProductos()
   else if (vistaGuardada === 'recetas') vistaRecetas()
+  else if (vistaGuardada === 'precios') vistaPrecios()
   else                                  mostrarBienvenida()
 }
 
