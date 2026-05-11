@@ -28,29 +28,70 @@ async function vistaCosteo() {
 
     if (errP) throw errP
 
-    // Índice: id_producto → precio más bajo
-    const precioMejor = {}
+    // 3. Nombres de proveedores
+    const { data: proveedores } = await window._db
+      .from('proveedores')
+      .select('id_proveedor, nombre')
+      .eq('tenant_id', tenant_id)
+      .eq('activo', true)
+
+    const nombreProv = {}
+    ;(proveedores || []).forEach(p => { nombreProv[p.id_proveedor] = p.nombre })
+
+    // Índice completo: id_producto → array de opciones de precio
+    const preciosPorProducto = {}
     ;(todosPrecios || []).forEach(p => {
-      if (!precioMejor[p.id_producto] || p.precio_por_unidad_base < precioMejor[p.id_producto].precio_por_unidad_base) {
-        precioMejor[p.id_producto] = p
-      }
+      if (!preciosPorProducto[p.id_producto]) preciosPorProducto[p.id_producto] = []
+      preciosPorProducto[p.id_producto].push(p)
     })
 
-    // 3. Render inicial — selector de receta
+    // Precio mínimo por producto (para el cálculo del total)
+    const precioMejor = {}
+    Object.keys(preciosPorProducto).forEach(id => {
+      precioMejor[id] = preciosPorProducto[id].reduce((a, b) =>
+        a.precio_por_unidad_base < b.precio_por_unidad_base ? a : b
+      )
+    })
+
+    // 4. Render inicial — filtros en cascada
+    const todasLasRecetas = recetas || []
+    const categorias = [...new Set(todasLasRecetas.map(r => r.categoria).filter(Boolean))].sort()
+
     content.innerHTML = `
       <div class="vista-header"><h2>Costeo de Recetas</h2></div>
       <div class="filtros-bar">
+        <select id="costeo-cat-select" class="filtro-select" style="max-width:220px">
+          <option value="">— Todas las categorías —</option>
+          ${categorias.map(c => `<option value="${c}">${c}</option>`).join('')}
+        </select>
         <select id="costeo-receta-select" class="filtro-select" style="max-width:400px">
           <option value="">— Seleccionar receta —</option>
-          ${(recetas || []).map(r => `<option value="${r.id_receta}">${r.nombre_platillo} (${r.categoria || 'sin categoría'})</option>`).join('')}
         </select>
       </div>
       <div id="costeo-resultado"></div>
     `
 
-    document.getElementById('costeo-receta-select').addEventListener('change', async (e) => {
-      const id_receta  = e.target.value
-      const resultado  = document.getElementById('costeo-resultado')
+    const catSelect    = document.getElementById('costeo-cat-select')
+    const recetaSelect = document.getElementById('costeo-receta-select')
+
+    const poblarRecetas = (catFiltro) => {
+      recetaSelect.innerHTML = '<option value="">— Seleccionar receta —</option>'
+      const filtradas = catFiltro
+        ? todasLasRecetas.filter(r => r.categoria === catFiltro)
+        : todasLasRecetas
+      filtradas.forEach(r => {
+        recetaSelect.insertAdjacentHTML('beforeend', `<option value="${r.id_receta}">${r.nombre_platillo}</option>`)
+      })
+      document.getElementById('costeo-resultado').innerHTML = ''
+    }
+
+    catSelect.addEventListener('change', e => poblarRecetas(e.target.value))
+    poblarRecetas('') // inicial: todas
+
+    // 5. Al seleccionar receta → calcular costeo
+    recetaSelect.addEventListener('change', async (e) => {
+      const id_receta = e.target.value
+      const resultado = document.getElementById('costeo-resultado')
       if (!id_receta) { resultado.innerHTML = ''; return }
 
       resultado.innerHTML = `<p style="color:var(--color-text-muted)">Calculando...</p>`
@@ -103,35 +144,51 @@ async function vistaCosteo() {
                   <th>Ingrediente</th>
                   <th>Cantidad</th>
                   <th>Unidad</th>
-                  <th>$/unidad base</th>
-                  <th>Costo</th>
-                  <th></th>
+                  <th colspan="2">Costo</th>
                 </tr>
               </thead>
               <tbody>
         `
 
         filas.forEach(f => {
-          const costoDisplay = f.costoIng !== null
-            ? `$${f.costoIng.toFixed(4)}`
-            : '—'
-          const ppuDisplay = f.ppu !== null
-            ? `$${f.ppu.toFixed(4)}/${f.unidadBase}`
-            : '—'
-          const flagDisplay = f.flagUnidad
-            ? `<span class="flag-unidad" title="Unidad incompatible con el precio — revisar">⚠️</span>`
-            : (f.ppu === null ? `<span class="flag-unidad" title="Sin precio registrado">sin precio</span>` : '')
+          const opcionesProv = preciosPorProducto[f.id_producto] || []
 
+          // Fila principal del ingrediente
           html += `
             <tr${f.costoIng === null ? ' class="fila-precio-revisar"' : ''}>
               <td data-label="Ingrediente">${f.producto || ''}</td>
               <td data-label="Cantidad">${f.cantidad ?? '—'}</td>
               <td data-label="Unidad">${f.unidad || '—'}</td>
-              <td data-label="$/unidad base" class="precio-base">${ppuDisplay}</td>
-              <td data-label="Costo" class="precio-monto">${costoDisplay}</td>
-              <td>${flagDisplay}</td>
+              <td data-label="Costo" class="precio-monto" colspan="2">
+                ${f.costoIng !== null ? `$${f.costoIng.toFixed(2)}` : '—'}
+                ${f.flagUnidad ? `<span class="flag-unidad" title="Unidad incompatible con el precio — revisar">⚠️</span>` : ''}
+                ${f.ppu === null ? `<span class="flag-unidad">sin precio</span>` : ''}
+              </td>
             </tr>
           `
+
+          // Sub-fila comparativo de proveedores
+          if (opcionesProv.length > 0) {
+            const minPpu = Math.min(...opcionesProv.map(p => p.precio_por_unidad_base))
+            const chips  = opcionesProv
+              .sort((a, b) => a.precio_por_unidad_base - b.precio_por_unidad_base)
+              .map(p => {
+                const esMin = p.precio_por_unidad_base === minPpu
+                return `<span class="costeo-prov-chip${esMin ? ' costeo-prov-min' : ''}">
+                  ${nombreProv[p.id_proveedor] || p.id_proveedor}
+                  <strong>$${p.precio_por_unidad_base.toFixed(4)}/${p.unidad_base}</strong>
+                  ${esMin ? '✓' : ''}
+                </span>`
+              }).join('')
+
+            html += `
+              <tr class="costeo-prov-row">
+                <td colspan="5" class="costeo-prov-cell">
+                  <div class="costeo-prov-chips">${chips}</div>
+                </td>
+              </tr>
+            `
+          }
         })
 
         html += `
