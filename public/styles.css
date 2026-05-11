@@ -798,6 +798,31 @@ body {
   color: var(--color-text-muted);
 }
 
+/* Comparativo proveedores en costeo */
+.costeo-prov-row { background: var(--color-bg); }
+.costeo-prov-cell {
+  padding: 6px 16px 10px !important;
+  border-bottom: 2px solid var(--color-border) !important;
+}
+.costeo-prov-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.costeo-prov-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--color-border);
+  font-size: 12px;
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+}
+.costeo-prov-min {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+}
+.costeo-prov-min strong { color: var(--color-primary); }
+
 /* ── VISTA PRECIOS ── */
 .precio-card {
   background: var(--color-surface);
