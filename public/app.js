@@ -60,7 +60,8 @@ async function mostrarApp(rol, email, tenant_id = null) {
   document.documentElement.style.setProperty('--color-primary', cfg.color_primario)
   document.title = cfg.nombre
 
-  window._rol = rol || 'operador'
+  window._rol   = rol || 'operador'
+  window._email = email || null
 
   document.getElementById('app').innerHTML = `
     <div class="layout">
@@ -80,6 +81,7 @@ async function mostrarApp(rol, email, tenant_id = null) {
             <li><a href="#" data-view="recetas">Revisión de Recetas</a></li>
             <li><a href="#" data-view="precios">Precios</a></li>
             <li><a href="#" data-view="costeo">Costeo</a></li>
+            <li><a href="#" data-view="pedidos">Pedidos</a></li>
           </ul>
         </nav>
         <main class="content" id="content">
@@ -106,6 +108,7 @@ async function mostrarApp(rol, email, tenant_id = null) {
       if (view === 'recetas')   await vistaRecetas()
       if (view === 'precios')   await vistaPrecios()
       if (view === 'costeo')    await vistaCosteo()
+      if (view === 'pedidos')   await vistaPedidos()
     })
   })
 
@@ -117,6 +120,7 @@ async function mostrarApp(rol, email, tenant_id = null) {
   else if (vistaGuardada === 'recetas') vistaRecetas()
   else if (vistaGuardada === 'precios') vistaPrecios()
   else if (vistaGuardada === 'costeo')  vistaCosteo()
+  else if (vistaGuardada === 'pedidos') vistaPedidos()
   else                                  mostrarBienvenida()
 }
 
