@@ -88,7 +88,7 @@ async function mostrarApp(rol, email, tenant_id = null) {
   `
 
   document.getElementById('logout-btn').addEventListener('click', async () => {
-    await logout()
+    try { await logout() } catch {}
     window.location.href = window.location.pathname
   })
 
