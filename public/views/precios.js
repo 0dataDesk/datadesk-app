@@ -44,7 +44,7 @@ async function vistaPrecios() {
       preciosPorProducto[pr.id_producto].push(pr)
     })
 
-    // Solo mostrar insumos que tienen al menos un precio
+    // Solo insumos que tienen al menos un precio
     const productosConPrecios = (productos || []).filter(p => preciosPorProducto[p.id_producto]?.length > 0)
 
     if (productosConPrecios.length === 0) {
@@ -55,82 +55,138 @@ async function vistaPrecios() {
       return
     }
 
-    // Agrupar por grupo para mostrar secciones
-    const porGrupo = {}
-    productosConPrecios.forEach(p => {
-      const g = p.grupo || 'General'
-      if (!porGrupo[g]) porGrupo[g] = []
-      porGrupo[g].push(p)
-    })
+    // Valores únicos para filtros
+    const grupos = [...new Set(productosConPrecios.map(p => p.grupo).filter(Boolean))].sort()
+    const provsUnicos = [...new Set((precios || []).map(p => p.id_proveedor).filter(Boolean))]
 
-    let html = `<div class="vista-header"><h2>Precios por Insumo</h2></div>`
+    content.innerHTML = `
+      <div class="vista-header"><h2>Precios por Insumo</h2></div>
 
-    Object.keys(porGrupo).sort().forEach(grupo => {
-      html += `<h3 class="seccion-titulo">${grupo}</h3>`
+      <div class="filtros-bar">
+        <input type="text" id="precios-search" placeholder="Buscar insumo..." class="filtro-search" />
+        <select id="filtro-precios-grupo" class="filtro-select">
+          <option value="">Todos los grupos</option>
+          ${grupos.map(g => `<option value="${g}">${g}</option>`).join('')}
+        </select>
+        <select id="filtro-precios-prov" class="filtro-select">
+          <option value="">Todos los proveedores</option>
+          ${provsUnicos.map(id => `<option value="${id}">${nombreProv[id] || id}</option>`).join('')}
+        </select>
+      </div>
 
-      porGrupo[grupo].forEach(prod => {
-        const filas = preciosPorProducto[prod.id_producto] || []
+      <div id="precios-lista-wrap"></div>
+    `
 
-        // Precio más bajo por unidad base (ignorando nulls y filas con REVISAR)
-        const filasConPrecioBase = filas.filter(f => f.precio_por_unidad_base !== null && !f.notas?.includes('REVISAR'))
-        const minPrecio = filasConPrecioBase.length > 0
-          ? Math.min(...filasConPrecioBase.map(f => f.precio_por_unidad_base))
-          : null
+    const aplicarFiltros = () => {
+      const texto = document.getElementById('precios-search')?.value.toLowerCase() || ''
+      const grupo = document.getElementById('filtro-precios-grupo')?.value || ''
+      const prov  = document.getElementById('filtro-precios-prov')?.value || ''
 
-        html += `
-          <div class="precio-card">
-            <div class="precio-card-header">
-              <span class="precio-insumo-nombre">${prod.producto}</span>
-              <span class="precio-insumo-meta">${prod.id_producto} · ${prod.unidad_medida || ''}</span>
-            </div>
-            <div class="precio-tabla-wrap">
-              <table class="precio-tabla">
-                <thead>
-                  <tr>
-                    <th>Proveedor</th>
-                    <th>Producto cotizado</th>
-                    <th>Precio</th>
-                    <th>Presentación</th>
-                    <th>$/unidad base</th>
-                    <th>Notas</th>
-                  </tr>
-                </thead>
-                <tbody>
-        `
+      return productosConPrecios
+        .filter(p => {
+          const matchTexto = !texto || p.producto?.toLowerCase().includes(texto)
+          const matchGrupo = !grupo || p.grupo === grupo
+          const matchProv  = !prov  || preciosPorProducto[p.id_producto]?.some(f => f.id_proveedor === prov)
+          return matchTexto && matchGrupo && matchProv
+        })
+        .map(p => ({
+          ...p,
+          filas: prov
+            ? preciosPorProducto[p.id_producto].filter(f => f.id_proveedor === prov)
+            : preciosPorProducto[p.id_producto]
+        }))
+    }
 
-        filas.forEach(f => {
-          const esMinimo    = minPrecio !== null && f.precio_por_unidad_base === minPrecio
-          const tieneRevisa = f.notas?.includes('REVISAR')
+    const renderPrecios = (lista) => {
+      const wrap = document.getElementById('precios-lista-wrap')
 
-          const precioDisplay = f.precio !== null
-            ? `$${Number(f.precio).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-            : '—'
+      if (!lista.length) {
+        wrap.innerHTML = `<p style="color:var(--color-text-muted);font-size:13px">No hay insumos para mostrar.</p>`
+        return
+      }
 
-          const ppubDisplay = f.precio_por_unidad_base !== null
-            ? `$${Number(f.precio_por_unidad_base).toFixed(4)}/${f.unidad_base}`
-            : '—'
+      // Agrupar por grupo
+      const porGrupo = {}
+      lista.forEach(p => {
+        const g = p.grupo || 'General'
+        if (!porGrupo[g]) porGrupo[g] = []
+        porGrupo[g].push(p)
+      })
 
-          const presentacion = f.cantidad_unidad !== null && f.unidad_base
-            ? `${f.unidad_precio} × ${f.cantidad_unidad} ${f.unidad_base}`
-            : (f.unidad_precio || '—')
+      let html = ''
+      Object.keys(porGrupo).sort().forEach(grupo => {
+        html += `<h3 class="seccion-titulo">${grupo}</h3>`
+        porGrupo[grupo].forEach(prod => {
+          const filas = prod.filas || []
+
+          const filasConPrecioBase = filas.filter(f => f.precio_por_unidad_base !== null && !f.notas?.includes('REVISAR'))
+          const minPrecio = filasConPrecioBase.length > 0
+            ? Math.min(...filasConPrecioBase.map(f => f.precio_por_unidad_base))
+            : null
 
           html += `
-            <tr class="${esMinimo ? 'fila-precio-min' : ''}${tieneRevisa ? ' fila-precio-revisar' : ''}">
-              <td class="precio-prov-nombre" data-label="Proveedor">${nombreProv[f.id_proveedor] || f.id_proveedor}</td>
-              <td class="precio-prod-nombre" data-label="Producto cotizado">${f.nombre_proveedor_producto || '—'}${f.codigo_proveedor ? ` <span class="precio-codigo">${f.codigo_proveedor}</span>` : ''}</td>
-              <td class="precio-monto" data-label="Precio">${precioDisplay}</td>
-              <td class="precio-presentacion" data-label="Presentación">${presentacion}</td>
-              <td class="precio-base${esMinimo ? ' precio-base-min' : ''}" data-label="$/unidad base">${ppubDisplay}${esMinimo ? ' ✓' : ''}</td>
-              <td class="precio-notas" data-label="Notas">${f.notas || ''}</td>
-            </tr>
+            <div class="precio-card">
+              <div class="precio-card-header">
+                <span class="precio-insumo-nombre">${prod.producto}</span>
+                <span class="precio-insumo-meta">${prod.id_producto} · ${prod.unidad_medida || ''}</span>
+              </div>
+              <div class="precio-tabla-wrap">
+                <table class="precio-tabla">
+                  <thead>
+                    <tr>
+                      <th>Proveedor</th>
+                      <th>Producto cotizado</th>
+                      <th>Precio</th>
+                      <th>Presentación</th>
+                      <th>$/unidad base</th>
+                      <th>Notas</th>
+                    </tr>
+                  </thead>
+                  <tbody>
           `
+
+          filas.forEach(f => {
+            const esMinimo    = minPrecio !== null && f.precio_por_unidad_base === minPrecio
+            const tieneRevisa = f.notas?.includes('REVISAR')
+
+            const precioDisplay = f.precio !== null
+              ? `$${Number(f.precio).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+              : '—'
+
+            const ppubDisplay = f.precio_por_unidad_base !== null
+              ? `$${Number(f.precio_por_unidad_base).toFixed(4)}/${f.unidad_base}`
+              : '—'
+
+            const presentacion = f.cantidad_unidad !== null && f.unidad_base
+              ? `${f.unidad_precio} × ${f.cantidad_unidad} ${f.unidad_base}`
+              : (f.unidad_precio || '—')
+
+            html += `
+              <tr class="${esMinimo ? 'fila-precio-min' : ''}${tieneRevisa ? ' fila-precio-revisar' : ''}">
+                <td class="precio-prov-nombre" data-label="Proveedor">${nombreProv[f.id_proveedor] || f.id_proveedor}</td>
+                <td class="precio-prod-nombre" data-label="Producto cotizado">${f.nombre_proveedor_producto || '—'}${f.codigo_proveedor ? ` <span class="precio-codigo">${f.codigo_proveedor}</span>` : ''}</td>
+                <td class="precio-monto" data-label="Precio">${precioDisplay}</td>
+                <td class="precio-presentacion" data-label="Presentación">${presentacion}</td>
+                <td class="precio-base${esMinimo ? ' precio-base-min' : ''}" data-label="$/unidad base">${ppubDisplay}${esMinimo ? ' ✓' : ''}</td>
+                <td class="precio-notas" data-label="Notas">${f.notas || ''}</td>
+              </tr>
+            `
+          })
+
+          html += `</tbody></table></div></div>`
         })
-
-        html += `</tbody></table></div></div>`
       })
-    })
 
-    content.innerHTML = html
+      wrap.innerHTML = html
+    }
+
+    const onFiltro = () => renderPrecios(aplicarFiltros())
+
+    document.getElementById('precios-search').addEventListener('input', onFiltro)
+    document.getElementById('filtro-precios-grupo').addEventListener('change', onFiltro)
+    document.getElementById('filtro-precios-prov').addEventListener('change', onFiltro)
+
+    renderPrecios(aplicarFiltros())
 
   } catch (err) {
     content.innerHTML = `<p>Error al cargar precios: ${err.message}</p>`
