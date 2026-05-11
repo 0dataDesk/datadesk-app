@@ -28,32 +28,28 @@ async function vistaCosteo() {
 
     if (errP) throw errP
 
-    // 3. Nombres de proveedores
+    // 3. Proveedores activos ordenados por nombre (definen el orden de columnas)
     const { data: proveedores } = await window._db
       .from('proveedores')
       .select('id_proveedor, nombre')
       .eq('tenant_id', tenant_id)
       .eq('activo', true)
+      .order('nombre')
 
+    const listaProv = proveedores || []
     const nombreProv = {}
-    ;(proveedores || []).forEach(p => { nombreProv[p.id_proveedor] = p.nombre })
+    listaProv.forEach(p => { nombreProv[p.id_proveedor] = p.nombre })
 
-    // Índice completo: id_producto → array de opciones de precio
-    const preciosPorProducto = {}
+    // Índice: id_producto__id_proveedor → precio más barato
+    const indicePrecio = {}
     ;(todosPrecios || []).forEach(p => {
-      if (!preciosPorProducto[p.id_producto]) preciosPorProducto[p.id_producto] = []
-      preciosPorProducto[p.id_producto].push(p)
+      const key = `${p.id_producto}__${p.id_proveedor}`
+      if (!indicePrecio[key] || p.precio_por_unidad_base < indicePrecio[key].precio_por_unidad_base) {
+        indicePrecio[key] = p
+      }
     })
 
-    // Precio mínimo por producto (para el cálculo del total)
-    const precioMejor = {}
-    Object.keys(preciosPorProducto).forEach(id => {
-      precioMejor[id] = preciosPorProducto[id].reduce((a, b) =>
-        a.precio_por_unidad_base < b.precio_por_unidad_base ? a : b
-      )
-    })
-
-    // 4. Render inicial — filtros en cascada
+    // 4. Render inicial — cascada categoría → receta
     const todasLasRecetas = recetas || []
     const categorias = [...new Set(todasLasRecetas.map(r => r.categoria).filter(Boolean))].sort()
 
@@ -86,7 +82,7 @@ async function vistaCosteo() {
     }
 
     catSelect.addEventListener('change', e => poblarRecetas(e.target.value))
-    poblarRecetas('') // inicial: todas
+    poblarRecetas('')
 
     // 5. Al seleccionar receta → calcular costeo
     recetaSelect.addEventListener('change', async (e) => {
@@ -110,95 +106,93 @@ async function vistaCosteo() {
         let costoTotal = 0
         let tieneIncompletos = false
 
-        const filas = (ingredientes || []).map(ing => {
-          const cantidad   = parseFloat(ing.cantidad) || null
-          const mejor      = precioMejor[ing.id_producto]
-          const ppu        = mejor?.precio_por_unidad_base ?? null
-          const unidadBase = mejor?.unidad_base ?? null
+        const filas = (ingredientes || []).map(ing => ({
+          ...ing,
+          cantidad: parseFloat(ing.cantidad) || null
+        }))
 
-          let costoIng  = null
-          let flagUnidad = false
-
-          if (cantidad !== null && ppu !== null) {
-            const unidadIng = (ing.unidad || '').toLowerCase().trim()
-            const unidadPr  = (unidadBase || '').toLowerCase().trim()
-            if (unidadIng === unidadPr) {
-              costoIng = cantidad * ppu
-              costoTotal += costoIng
-            } else {
-              flagUnidad = true
-              tieneIncompletos = true
-            }
-          } else {
-            tieneIncompletos = true
-          }
-
-          return { ...ing, cantidad, ppu, unidadBase, costoIng, flagUnidad }
-        })
+        // Header dinámico según proveedores
+        const headerProvs = listaProv
+          .map(p => `<th class="costeo-col-prov">${p.nombre}</th>`)
+          .join('')
 
         let html = `
           <div class="costeo-card">
-            <table class="precio-tabla">
+            <div class="costeo-tabla-wrap">
+            <table class="precio-tabla costeo-tabla">
               <thead>
                 <tr>
                   <th>Ingrediente</th>
-                  <th>Cantidad</th>
-                  <th>Unidad</th>
-                  <th colspan="2">Costo</th>
+                  <th class="costeo-col-num">Cantidad</th>
+                  <th class="costeo-col-num">Unidad</th>
+                  ${headerProvs}
+                  <th class="costeo-col-mejor">Mejor $</th>
                 </tr>
               </thead>
               <tbody>
         `
 
         filas.forEach(f => {
-          const opcionesProv = preciosPorProducto[f.id_producto] || []
+          const unidadIng = (f.unidad || '').toLowerCase().trim()
+          let mejorCosto = null
+          let mejorProv  = null
 
-          // Fila principal del ingrediente
+          // Primera pasada: encontrar el mejor proveedor
+          listaProv.forEach(p => {
+            const key   = `${f.id_producto}__${p.id_proveedor}`
+            const entry = indicePrecio[key]
+            if (!entry) return
+            const unidadPr = (entry.unidad_base || '').toLowerCase().trim()
+            if (unidadIng !== unidadPr) return
+            if (f.cantidad === null) return
+            const costo = f.cantidad * entry.precio_por_unidad_base
+            if (mejorCosto === null || costo < mejorCosto) {
+              mejorCosto = costo
+              mejorProv  = p.id_proveedor
+            }
+          })
+
+          // Segunda pasada: render de celdas con highlight del mínimo
+          const celdasProv = listaProv.map(p => {
+            const key   = `${f.id_producto}__${p.id_proveedor}`
+            const entry = indicePrecio[key]
+            if (!entry) return `<td class="costeo-col-prov costeo-sin-precio" data-label="${p.nombre}">—</td>`
+            const unidadPr = (entry.unidad_base || '').toLowerCase().trim()
+            if (unidadIng !== unidadPr) return `<td class="costeo-col-prov costeo-sin-precio" data-label="${p.nombre}">⚠️</td>`
+            if (f.cantidad === null) return `<td class="costeo-col-prov costeo-sin-precio" data-label="${p.nombre}">—</td>`
+            const costo = f.cantidad * entry.precio_por_unidad_base
+            const esMin = p.id_proveedor === mejorProv
+            return `<td class="costeo-col-prov${esMin ? ' costeo-col-min' : ''}" data-label="${p.nombre}">$${costo.toFixed(2)}</td>`
+          }).join('')
+
+          if (mejorCosto !== null) costoTotal += mejorCosto
+          else tieneIncompletos = true
+
+          const mejorDisplay  = mejorCosto !== null ? `$${mejorCosto.toFixed(2)}` : '—'
+          const claseIncompleta = mejorCosto === null ? ' class="fila-precio-revisar"' : ''
+
           html += `
-            <tr${f.costoIng === null ? ' class="fila-precio-revisar"' : ''}>
+            <tr${claseIncompleta}>
               <td data-label="Ingrediente">${f.producto || ''}</td>
-              <td data-label="Cantidad">${f.cantidad ?? '—'}</td>
-              <td data-label="Unidad">${f.unidad || '—'}</td>
-              <td data-label="Costo" class="precio-monto" colspan="2">
-                ${f.costoIng !== null ? `$${f.costoIng.toFixed(2)}` : '—'}
-                ${f.flagUnidad ? `<span class="flag-unidad" title="Unidad incompatible con el precio — revisar">⚠️</span>` : ''}
-                ${f.ppu === null ? `<span class="flag-unidad">sin precio</span>` : ''}
+              <td class="costeo-col-num" data-label="Cantidad">${f.cantidad ?? '—'}</td>
+              <td class="costeo-col-num" data-label="Unidad">${f.unidad || '—'}</td>
+              ${celdasProv}
+              <td class="costeo-col-mejor" data-label="Mejor $">
+                ${mejorDisplay}${mejorCosto !== null ? '<span class="costeo-check">✓</span>' : ''}
               </td>
             </tr>
           `
-
-          // Sub-fila comparativo de proveedores
-          if (opcionesProv.length > 0) {
-            const minPpu = Math.min(...opcionesProv.map(p => p.precio_por_unidad_base))
-            const chips  = opcionesProv
-              .sort((a, b) => a.precio_por_unidad_base - b.precio_por_unidad_base)
-              .map(p => {
-                const esMin = p.precio_por_unidad_base === minPpu
-                return `<span class="costeo-prov-chip${esMin ? ' costeo-prov-min' : ''}">
-                  ${nombreProv[p.id_proveedor] || p.id_proveedor}
-                  <strong>$${p.precio_por_unidad_base.toFixed(4)}/${p.unidad_base}</strong>
-                  ${esMin ? '✓' : ''}
-                </span>`
-              }).join('')
-
-            html += `
-              <tr class="costeo-prov-row">
-                <td colspan="5" class="costeo-prov-cell">
-                  <div class="costeo-prov-chips">${chips}</div>
-                </td>
-              </tr>
-            `
-          }
         })
 
         html += `
               </tbody>
             </table>
+            </div>
             <div class="costeo-total">
-              <span>Costo total de la receta</span>
+              <span>Costo total (mejor precio por ingrediente)</span>
               <strong>$${costoTotal.toFixed(2)} MXN</strong>
             </div>
-            ${tieneIncompletos ? `<p class="costeo-aviso">⚠️ Algunos ingredientes no tienen precio registrado o tienen unidades incompatibles — el costo total es parcial.</p>` : ''}
+            ${tieneIncompletos ? `<p class="costeo-aviso">⚠️ Algunos ingredientes no tienen precio en ningún proveedor o tienen unidades incompatibles — el total es parcial.</p>` : ''}
           </div>
         `
 
