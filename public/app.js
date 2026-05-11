@@ -88,11 +88,8 @@ async function mostrarApp(rol, email, tenant_id = null) {
   `
 
   document.getElementById('logout-btn').addEventListener('click', async () => {
-    _appMontado = false
-    window._tenantConfig = null
-    localStorage.removeItem('datadesk-view')
     await logout()
-    await mostrarLogin()
+    window.location.href = window.location.pathname
   })
 
   document.querySelectorAll('[data-view]').forEach(link => {
