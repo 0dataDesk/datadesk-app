@@ -9,7 +9,7 @@ async function vistaCosteo() {
     // 1. Catálogo de recetas activas
     const { data: recetas, error: errR } = await window._db
       .from('catalogo_recetas')
-      .select('id_receta, nombre_platillo, categoria, status')
+      .select('id_receta, nombre_platillo, categoria, status, fuente')
       .eq('tenant_id', tenant_id)
       .eq('activo', true)
       .order('categoria')
@@ -49,13 +49,19 @@ async function vistaCosteo() {
       }
     })
 
-    // 4. Render inicial — cascada categoría → receta
+    // 4. Render inicial — cascada fuente → categoría → receta
     const todasLasRecetas = recetas || []
+    const fuentes    = [...new Set(todasLasRecetas.map(r => r.fuente).filter(Boolean))].sort()
     const categorias = [...new Set(todasLasRecetas.map(r => r.categoria).filter(Boolean))].sort()
 
     content.innerHTML = `
       <div class="vista-header"><h2>Costeo de Recetas</h2></div>
       <div class="filtros-bar">
+        <select id="costeo-fuente-select" class="filtro-select" style="max-width:220px"
+          onchange="filtrarPorFuente()">
+          <option value="">— Todas las fuentes —</option>
+          ${fuentes.map(f => `<option value="${f}">${f}</option>`).join('')}
+        </select>
         <select id="costeo-cat-select" class="filtro-select" style="max-width:220px">
           <option value="">— Todas las categorías —</option>
           ${categorias.map(c => `<option value="${c}">${c}</option>`).join('')}
@@ -70,19 +76,39 @@ async function vistaCosteo() {
     const catSelect    = document.getElementById('costeo-cat-select')
     const recetaSelect = document.getElementById('costeo-receta-select')
 
-    const poblarRecetas = (catFiltro) => {
+    window.poblarRecetas = function(catFiltro, baseRecetas) {
+      baseRecetas = baseRecetas || todasLasRecetas
       recetaSelect.innerHTML = '<option value="">— Seleccionar receta —</option>'
       const filtradas = catFiltro
-        ? todasLasRecetas.filter(r => r.categoria === catFiltro)
-        : todasLasRecetas
+        ? baseRecetas.filter(r => r.categoria === catFiltro)
+        : baseRecetas
       filtradas.forEach(r => {
         recetaSelect.insertAdjacentHTML('beforeend', `<option value="${r.id_receta}">${r.nombre_platillo}</option>`)
       })
       document.getElementById('costeo-resultado').innerHTML = ''
     }
 
-    catSelect.addEventListener('change', e => poblarRecetas(e.target.value))
-    poblarRecetas('')
+    window.filtrarPorFuente = function() {
+      const fuente = document.getElementById('costeo-fuente-select')?.value || ''
+      const recetasFiltradas = fuente
+        ? todasLasRecetas.filter(r => r.fuente === fuente)
+        : todasLasRecetas
+
+      const cats = [...new Set(recetasFiltradas.map(r => r.categoria).filter(Boolean))].sort()
+      catSelect.innerHTML = '<option value="">— Todas las categorías —</option>'
+      cats.forEach(c => catSelect.insertAdjacentHTML('beforeend', `<option value="${c}">${c}</option>`))
+
+      window.poblarRecetas('', recetasFiltradas)
+      document.getElementById('costeo-resultado').innerHTML = ''
+    }
+
+    catSelect.addEventListener('change', e => {
+      const fuente = document.getElementById('costeo-fuente-select')?.value || ''
+      const base = fuente ? todasLasRecetas.filter(r => r.fuente === fuente) : todasLasRecetas
+      window.poblarRecetas(e.target.value, base)
+    })
+
+    window.poblarRecetas('')
 
     // 5. Al seleccionar receta → calcular costeo
     recetaSelect.addEventListener('change', async (e) => {
