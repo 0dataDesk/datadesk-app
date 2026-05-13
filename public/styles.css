@@ -843,6 +843,67 @@ body {
   margin-left: 4px;
 }
 
+/* ── PRECIOS NAVEGACIÓN ── */
+.precios-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+  position: sticky;
+  top: 0;
+  background: var(--color-bg);
+  padding: 10px 0;
+  z-index: 10;
+  border-bottom: 1px solid var(--color-border);
+}
+.precios-nav-pill {
+  padding: 5px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.precios-nav-pill:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+/* ── SECCIONES COLAPSABLES ── */
+.precios-seccion {
+  margin-bottom: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.precios-seccion-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--color-surface);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  user-select: none;
+}
+.precios-seccion-header:hover {
+  background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface));
+}
+.precios-seccion-count {
+  font-weight: 400;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-left: 8px;
+}
+.precios-seccion-chevron {
+  color: var(--color-text-muted);
+  font-size: 16px;
+}
+.precios-seccion-body { padding: 12px; }
+
 /* ── VISTA PRECIOS ── */
 .precio-card {
   background: var(--color-surface);
