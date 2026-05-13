@@ -97,6 +97,15 @@ async function vistaPrecios() {
         }))
     }
 
+    window.toggleSeccion = function(bodyId) {
+      const body = document.getElementById(bodyId)
+      const chev = document.getElementById('chev-' + bodyId)
+      if (!body) return
+      const open = body.style.display !== 'none'
+      body.style.display = open ? 'none' : 'block'
+      if (chev) chev.textContent = open ? '▸' : '▾'
+    }
+
     const renderPrecios = (lista) => {
       const wrap = document.getElementById('precios-lista-wrap')
 
@@ -113,9 +122,34 @@ async function vistaPrecios() {
         porGrupo[g].push(p)
       })
 
-      let html = ''
-      Object.keys(porGrupo).sort().forEach(grupo => {
-        html += `<h3 class="seccion-titulo">${grupo}</h3>`
+      const grupos = Object.keys(porGrupo).sort()
+
+      // Barra de navegación por grupo
+      let html = `
+        <div class="precios-nav">
+          ${grupos.map(g => `
+            <button class="precios-nav-pill"
+              onclick="document.getElementById('sec-${g.replace(/\s+/g,'-')}').scrollIntoView({behavior:'smooth',block:'start'})">
+              ${g}
+            </button>`).join('')}
+        </div>
+      `
+
+      // Secciones colapsables
+      grupos.forEach((grupo, idx) => {
+        const secId  = `sec-${grupo.replace(/\s+/g, '-')}`
+        const bodyId = `body-${grupo.replace(/\s+/g, '-')}`
+        const count  = porGrupo[grupo].length
+
+        html += `
+          <div class="precios-seccion" id="${secId}">
+            <div class="precios-seccion-header" onclick="toggleSeccion('${bodyId}')">
+              <span>${grupo} <span class="precios-seccion-count">${count}</span></span>
+              <span class="precios-seccion-chevron" id="chev-${bodyId}">${idx === 0 ? '▾' : '▸'}</span>
+            </div>
+            <div class="precios-seccion-body" id="${bodyId}" style="display:${idx === 0 ? 'block' : 'none'}">
+        `
+
         porGrupo[grupo].forEach(prod => {
           const filas = prod.filas || []
 
@@ -175,6 +209,8 @@ async function vistaPrecios() {
 
           html += `</tbody></table></div></div>`
         })
+
+        html += `</div></div>`
       })
 
       wrap.innerHTML = html
