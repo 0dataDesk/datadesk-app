@@ -98,10 +98,19 @@ async function vistaNuevoPedido() {
     .lte('fecha_inicio', hoy)
     .gte('fecha_fin', hoy)
 
+  const { data: todosProd } = await window._db
+    .from('productos')
+    .select('id_producto, grupo')
+    .eq('tenant_id', tenant_id)
+    .eq('activo', true)
+
+  const grupoPorProducto = {}
+  ;(todosProd || []).forEach(p => { grupoPorProducto[p.id_producto] = p.grupo || 'General' })
+
   const preciosPorProv = {}
   ;(todosPrecios || []).forEach(p => {
     if (!preciosPorProv[p.id_proveedor]) preciosPorProv[p.id_proveedor] = []
-    preciosPorProv[p.id_proveedor].push(p)
+    preciosPorProv[p.id_proveedor].push({ ...p, grupo: grupoPorProducto[p.id_producto] || 'General' })
   })
 
   // Generar siguiente id_pedido
@@ -170,58 +179,84 @@ function renderItemsPedido(preciosPorProv) {
   const items = preciosPorProv[provId]
   if (acciones) acciones.style.display = 'flex'
 
+  // Agrupar por grupo
+  const porGrupo = {}
+  items.forEach(item => {
+    const g = item.grupo || 'General'
+    if (!porGrupo[g]) porGrupo[g] = []
+    porGrupo[g].push(item)
+  })
+
+  const grupos = Object.keys(porGrupo).sort()
+  let globalIdx = 0
+
   let html = `
-    <div class="tabla-wrapper">
-      <table class="tabla" id="tabla-items-pedido">
-        <thead>
-          <tr>
-            <th>Insumo</th>
-            <th>Código</th>
-            <th>Presentación</th>
-            <th style="text-align:right">Precio unitario</th>
-            <th style="text-align:right;width:110px">Cantidad</th>
-            <th style="text-align:right">Subtotal</th>
-          </tr>
-        </thead>
-        <tbody>
+    <div class="precios-nav" style="margin-bottom:12px">
+      ${grupos.map(g => `
+        <button class="precios-nav-pill"
+          onclick="document.getElementById('ped-sec-${g.replace(/\s+/g,'-')}').scrollIntoView({behavior:'smooth',block:'start'})">
+          ${g} (${porGrupo[g].length})
+        </button>`).join('')}
+    </div>
   `
 
-  items.forEach((item, i) => {
-    const presentacion = item.cantidad_unidad
-      ? `${item.unidad_precio} × ${item.cantidad_unidad} ${item.unidad_base}`
-      : item.unidad_precio
-    const precio = item.precio != null ? `$${Number(item.precio).toFixed(2)}` : '—'
+  grupos.forEach((grupo, gIdx) => {
+    const secId  = `ped-sec-${grupo.replace(/\s+/g, '-')}`
+    const bodyId = `ped-body-${grupo.replace(/\s+/g, '-')}`
 
     html += `
-      <tr>
-        <td>${item.nombre_proveedor_producto}</td>
-        <td style="font-size:11px;color:var(--color-text-muted)">${item.codigo_proveedor || '—'}</td>
-        <td style="font-size:12px;color:var(--color-text-muted)">${presentacion}</td>
-        <td style="text-align:right">${precio}</td>
-        <td>
-          <input type="number" min="0" step="1" value="0"
-            class="edit-input edit-num" style="text-align:right"
-            data-precio="${item.precio || 0}"
-            id="qty-${i}"
-            oninput="actualizarSubtotal(${i}, ${item.precio || 0})">
-        </td>
-        <td style="text-align:right;font-weight:600" id="sub-${i}">$0.00</td>
-      </tr>
+      <div class="precios-seccion" id="${secId}">
+        <div class="precios-seccion-header" onclick="toggleSeccion('${bodyId}')">
+          <span>${grupo} <span class="precios-seccion-count">${porGrupo[grupo].length} insumos</span></span>
+          <span class="precios-seccion-chevron" id="chev-${bodyId}">${gIdx === 0 ? '▾' : '▸'}</span>
+        </div>
+        <div class="precios-seccion-body" id="${bodyId}" style="display:${gIdx === 0 ? 'block' : 'none'}">
+          <table class="tabla">
+            <thead>
+              <tr>
+                <th>Insumo</th>
+                <th>Código</th>
+                <th>Presentación</th>
+                <th style="text-align:right">Precio</th>
+                <th style="text-align:right;width:110px">Cantidad</th>
+                <th style="text-align:right">Subtotal</th>
+              </tr>
+            </thead>
+            <tbody>
     `
+
+    porGrupo[grupo].forEach(item => {
+      const i = globalIdx++
+      const presentacion = item.cantidad_unidad
+        ? `${item.unidad_precio} × ${item.cantidad_unidad} ${item.unidad_base}`
+        : item.unidad_precio
+      const precio = item.precio != null ? `$${Number(item.precio).toFixed(2)}` : '—'
+
+      html += `
+        <tr>
+          <td>${item.nombre_proveedor_producto}</td>
+          <td style="font-size:11px;color:var(--color-text-muted)">${item.codigo_proveedor || '—'}</td>
+          <td style="font-size:12px;color:var(--color-text-muted)">${presentacion}</td>
+          <td style="text-align:right">${precio}</td>
+          <td>
+            <input type="number" min="0" step="1" value="0"
+              class="edit-input edit-num" style="text-align:right"
+              id="qty-${i}"
+              oninput="actualizarSubtotal(${i}, ${item.precio || 0})">
+          </td>
+          <td style="text-align:right;font-weight:600" id="sub-${i}">$0.00</td>
+        </tr>
+      `
+    })
+
+    html += `</tbody></table></div></div>`
   })
 
   html += `
-      </tbody>
-      <tfoot>
-        <tr>
-          <td colspan="5" style="text-align:right;font-weight:600;padding:12px 16px;border-top:2px solid var(--color-primary)">
-            TOTAL ESTIMADO
-          </td>
-          <td style="text-align:right;font-weight:700;font-size:16px;color:var(--color-primary);padding:12px 16px;border-top:2px solid var(--color-primary)"
-            id="total-pedido">$0.00</td>
-        </tr>
-      </tfoot>
-    </table></div>
+    <div style="display:flex;justify-content:flex-end;align-items:center;gap:16px;padding:16px 0;font-size:15px">
+      <span style="font-weight:600">TOTAL ESTIMADO</span>
+      <span style="font-weight:700;font-size:20px;color:var(--color-primary)" id="total-pedido">$0.00</span>
+    </div>
   `
 
   container.innerHTML = html
