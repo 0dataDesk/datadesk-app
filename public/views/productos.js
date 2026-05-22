@@ -5,14 +5,14 @@ async function vistaProductos() {
   try {
     const tenant_id = await getTenantId()
     const rol        = window._rol || 'operador'
-    const puedeEditar = rol === 'editor' || rol === 'admin'
+    const puedeEditar = ['admin', 'editor', 'cocina'].includes(rol)
 
     const [
       { data: productos, error: errP },
       { data: unidades,  error: errU }
     ] = await Promise.all([
       window._db.from('productos').select('*').eq('tenant_id', tenant_id).order('producto'),
-      window._db.from('catalogo_unidades').select('*').order('nombre')
+      window._db.from('catalogo_unidades').select('*').eq('tenant_id', tenant_id).order('nombre')
     ])
 
     if (errP) throw errP
@@ -79,23 +79,24 @@ async function vistaProductos() {
       <tr data-prod-id="${p.id_producto}">
         <td style="font-size:11px;color:var(--color-text-muted)">${p.id_producto}</td>
         <td>${puedeEditar
-          ? `<input class="edit-input insumo-nombre-input" type="text"
-                  value="${p.producto.replace(/"/g, '&quot;')}"
-                  data-field="producto" />`
+          ? `<input type="text" class="edit-input" id="prod-nombre-${p.id_producto}"
+                  value="${p.producto.replace(/"/g, '&quot;')}" style="width:100%">`
           : p.producto}
         </td>
         <td>${puedeEditar
           ? (hayUnidades
-              ? `<select class="edit-select insumo-unidad-select" data-field="unidad_medida">
+              ? `<select class="edit-select" id="prod-unidad-${p.id_producto}">
                    <option value="">—</option>
                    ${uOptsFor(p.unidad_medida || '')}
                  </select>`
-              : `<input class="edit-input insumo-unidad-input" type="text"
+              : `<input type="text" class="edit-input edit-num" id="prod-unidad-${p.id_producto}"
                       value="${(p.unidad_medida || '').replace(/"/g, '&quot;')}"
-                      data-field="unidad_medida" placeholder="unidad" />`)
+                      placeholder="unidad" style="width:60px">`)
           : (p.unidad_medida || '')}
         </td>
-        ${puedeEditar ? `<td><button class="btn-guardar-fila" data-id="${p.id_producto}" title="Guardar">✓</button></td>` : ''}
+        <td><span class="badge-status ${p.status || 'pendiente'}">${p.status || 'pendiente'}</span></td>
+        ${puedeEditar ? `<td style="text-align:right"><button class="btn-fila btn-guardar-ing"
+          onclick="guardarProducto('${p.id_producto}')">💾</button></td>` : ''}
       </tr>
     `
 
@@ -142,6 +143,7 @@ async function vistaProductos() {
                     <th>ID</th>
                     <th>Insumo</th>
                     <th>Unidad</th>
+                    <th>Status</th>
                     ${puedeEditar ? '<th></th>' : ''}
                   </tr>
                 </thead>
@@ -155,37 +157,6 @@ async function vistaProductos() {
       })
 
       wrap.innerHTML = html
-
-      if (!puedeEditar) return
-
-      wrap.querySelectorAll('.btn-guardar-fila').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const id  = btn.dataset.id
-          const row = btn.closest('tr')
-          const producto      = row.querySelector('[data-field="producto"]')?.value || ''
-          const unidad_medida = row.querySelector('[data-field="unidad_medida"]')?.value || null
-
-          btn.textContent = '…'
-          btn.disabled = true
-
-          const { error } = await window._db.from('productos')
-            .update({ producto, unidad_medida })
-            .eq('id_producto', id)
-
-          if (!error) {
-            const p = window._productos.find(p => String(p.id_producto) === String(id))
-            if (p) { p.producto = producto; p.unidad_medida = unidad_medida }
-            btn.textContent = '✓'
-            btn.classList.add('guardado')
-            setTimeout(() => { btn.textContent = '✓'; btn.disabled = false; btn.classList.remove('guardado') }, 1500)
-          } else {
-            btn.textContent = '✕'
-            btn.disabled = false
-            console.error(error)
-            mostrarToast('Error al guardar')
-          }
-        })
-      })
     }
 
     const onFiltro = () => renderTabla(aplicarFiltros())
@@ -200,4 +171,17 @@ async function vistaProductos() {
   } catch (err) {
     content.innerHTML = `<p style="color:var(--color-highlight)">Error: ${err.message}</p>`
   }
+}
+
+async function guardarProducto(idProducto) {
+  const nombre    = document.getElementById(`prod-nombre-${idProducto}`)?.value?.trim()
+  const unidad    = document.getElementById(`prod-unidad-${idProducto}`)?.value?.trim()
+  const tenant_id = await getTenantId()
+  if (!nombre) return
+  const { error } = await window._db
+    .from('productos')
+    .update({ producto: nombre, unidad_medida: unidad || null })
+    .eq('id_producto', idProducto)
+    .eq('tenant_id', tenant_id)
+  if (error) alert(`Error: ${error.message}`)
 }
