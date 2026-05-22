@@ -112,16 +112,29 @@ async function mostrarApp(rol, email, tenant_id = null) {
     })
   })
 
+  // Ocultar nav items según rol
+  const permitidasPorRol = {
+    admin:  ['inicio','productos','recetas','precios','costeo','pedidos'],
+    editor: ['inicio','productos','recetas'],
+    cocina: ['productos','recetas']
+  }
+  const visibles = permitidasPorRol[window._rol] || ['inicio','productos','recetas','precios','costeo','pedidos']
+  document.querySelectorAll('nav [data-view]').forEach(item => {
+    const view = item.getAttribute('data-view')
+    item.closest('li').style.display = visibles.includes(view) ? '' : 'none'
+  })
+
   const vistaGuardada = localStorage.getItem('datadesk-view')
-  const linkActivo = document.querySelector(`[data-view="${vistaGuardada || 'inicio'}"]`)
+  const vistaInicial  = visibles.includes(vistaGuardada) ? vistaGuardada : (window._rol === 'cocina' ? 'productos' : 'inicio')
+  const linkActivo = document.querySelector(`[data-view="${vistaInicial}"]`)
   if (linkActivo) linkActivo.classList.add('active')
 
-  if (vistaGuardada === 'productos')    vistaProductos()
-  else if (vistaGuardada === 'recetas') vistaRecetas()
-  else if (vistaGuardada === 'precios') vistaPrecios()
-  else if (vistaGuardada === 'costeo')  vistaCosteo()
-  else if (vistaGuardada === 'pedidos') vistaPedidos()
-  else                                  mostrarBienvenida()
+  if (vistaInicial === 'productos')    vistaProductos()
+  else if (vistaInicial === 'recetas') vistaRecetas()
+  else if (vistaInicial === 'precios') vistaPrecios()
+  else if (vistaInicial === 'costeo')  vistaCosteo()
+  else if (vistaInicial === 'pedidos') vistaPedidos()
+  else                                 mostrarBienvenida()
 }
 
 async function mostrarBienvenida() {
