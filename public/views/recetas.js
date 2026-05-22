@@ -163,30 +163,24 @@ async function cargarDetalleReceta(receta, puedeEditar, esAdmin) {
               </tr>
             </thead>
             <tbody>
-              ${ings.map(i => {
-                const inactivo = i.activo === false
-                return `
-                <tr id="ing-row-${i.id}" class="${inactivo ? 'fila-inactiva' : ''}">
+              ${ings.filter(i => i.activo !== false).map(i => `
+                <tr id="ing-row-${i.id}">
                   <td>${i.producto || ''}</td>
                   <td><input type="number" class="edit-input edit-num" id="ing-cant-${i.id}"
                         value="${i.cantidad != null ? i.cantidad : ''}" min="0" step="0.01"
-                        style="width:70px" ${inactivo ? 'disabled' : ''}></td>
-                  <td><select class="edit-select" id="ing-unidad-${i.id}" style="width:70px" ${inactivo ? 'disabled' : ''}>
+                        style="width:70px"></td>
+                  <td><select class="edit-select" id="ing-unidad-${i.id}" style="width:70px">
                         <option value="">— unidad —</option>
                         ${uOptsFor(i.unidad || '')}
                       </select></td>
                   <td><input type="text" class="edit-input edit-wide" id="ing-nota-${i.id}"
                         value="${(i.notas_ingrediente || '').replace(/"/g, '&quot;')}"
-                        placeholder="nota..." style="width:100%" ${inactivo ? 'disabled' : ''}></td>
+                        placeholder="nota..." style="width:100%"></td>
                   <td class="acciones-fila" style="white-space:nowrap">
                     <button class="btn-fila btn-guardar-ing" onclick="guardarIngrediente('${i.id}')">💾</button>
-                    <button class="btn-fila ${inactivo ? 'btn-restaurar' : 'btn-inactivar-ing'}"
-                      onclick="${inactivo ? `restaurarIngrediente('${i.id}')` : `inactivarIngrediente('${i.id}')`}">
-                      ${inactivo ? '↩' : '✕'}
-                    </button>
+                    <button class="btn-fila btn-inactivar-ing" onclick="inactivarIngrediente('${i.id}')">✕</button>
                   </td>
-                </tr>`
-              }).join('')}
+                </tr>`).join('')}
             </tbody>
           </table>
         </div>`
@@ -209,23 +203,17 @@ async function cargarDetalleReceta(receta, puedeEditar, esAdmin) {
     // ── Procedimiento ───────────────────────────────────────────────────
     const htmlPasos = puedeEditar
       ? `<ol class="procedimiento procedimiento-editable">
-          ${steps.map(p => {
-            const inactivo = p.activo === false
-            return `
-            <li id="paso-row-${p.id}" class="paso-row${inactivo ? ' fila-inactiva' : ''}">
+          ${steps.filter(p => p.activo !== false).map(p => `
+            <li id="paso-row-${p.id}" class="paso-row">
               <div class="paso-editable-row">
                 <textarea class="edit-input edit-paso" id="paso-texto-${p.id}"
-                          style="flex:1;min-height:60px" ${inactivo ? 'disabled' : ''}>${limpiarPaso(p.proceso)}</textarea>
+                          style="flex:1;min-height:60px">${limpiarPaso(p.proceso)}</textarea>
                 <div class="acciones-paso">
                   <button class="btn-fila btn-guardar-paso" onclick="guardarPaso('${p.id}')">💾</button>
-                  <button class="btn-fila ${inactivo ? 'btn-restaurar' : 'btn-inactivar-paso'}"
-                    onclick="${inactivo ? `restaurarPaso('${p.id}')` : `inactivarPaso('${p.id}')`}">
-                    ${inactivo ? '↩' : '✕'}
-                  </button>
+                  <button class="btn-fila btn-inactivar-paso" onclick="inactivarPaso('${p.id}')">✕</button>
                 </div>
               </div>
-            </li>`
-          }).join('')}
+            </li>`).join('')}
         </ol>`
       : `<ol class="procedimiento">
           ${steps.filter(p => p.activo !== false).map(p => `<li>${limpiarPaso(p.proceso)}</li>`).join('')}
@@ -299,7 +287,7 @@ async function guardarIngrediente(id) {
   const nota      = document.getElementById(`ing-nota-${id}`)?.value || null
   const { error } = await window._db
     .from('receta_ingredientes')
-    .update({ cantidad, unidad, notas_ingrediente: nota, updated_by: window._email })
+    .update({ cantidad, unidad, notas_ingrediente: nota })
     .eq('id', id)
     .eq('tenant_id', tenant_id)
   if (error) alert(`Error: ${error.message}`)
@@ -307,32 +295,11 @@ async function guardarIngrediente(id) {
 
 async function inactivarIngrediente(id) {
   const tenant_id = await getTenantId()
-  await window._db.from('receta_ingredientes')
-    .update({ activo: false, updated_by: window._email })
+  const { error } = await window._db.from('receta_ingredientes')
+    .update({ activo: false })
     .eq('id', id).eq('tenant_id', tenant_id)
-  document.getElementById(`ing-row-${id}`)?.classList.add('fila-inactiva')
-  const btn = document.querySelector(`#ing-row-${id} .btn-inactivar-ing`)
-  if (btn) {
-    btn.className = 'btn-fila btn-restaurar'
-    btn.textContent = '↩'
-    btn.onclick = () => restaurarIngrediente(id)
-  }
-  document.querySelectorAll(`#ing-row-${id} input, #ing-row-${id} select`).forEach(el => el.disabled = true)
-}
-
-async function restaurarIngrediente(id) {
-  const tenant_id = await getTenantId()
-  await window._db.from('receta_ingredientes')
-    .update({ activo: true, updated_by: window._email })
-    .eq('id', id).eq('tenant_id', tenant_id)
-  document.getElementById(`ing-row-${id}`)?.classList.remove('fila-inactiva')
-  const btn = document.querySelector(`#ing-row-${id} .btn-restaurar`)
-  if (btn) {
-    btn.className = 'btn-fila btn-inactivar-ing'
-    btn.textContent = '✕'
-    btn.onclick = () => inactivarIngrediente(id)
-  }
-  document.querySelectorAll(`#ing-row-${id} input, #ing-row-${id} select`).forEach(el => el.disabled = false)
+  if (error) { alert(`Error: ${error.message}`); return }
+  document.getElementById(`ing-row-${id}`)?.remove()
 }
 
 async function guardarPaso(id) {
@@ -340,7 +307,7 @@ async function guardarPaso(id) {
   const proceso = document.getElementById(`paso-texto-${id}`)?.value || ''
   const { error } = await window._db
     .from('receta_procedimientos')
-    .update({ proceso, updated_by: window._email })
+    .update({ proceso })
     .eq('id', id)
     .eq('tenant_id', tenant_id)
   if (error) alert(`Error: ${error.message}`)
@@ -348,34 +315,11 @@ async function guardarPaso(id) {
 
 async function inactivarPaso(id) {
   const tenant_id = await getTenantId()
-  await window._db.from('receta_procedimientos')
-    .update({ activo: false, updated_by: window._email })
+  const { error } = await window._db.from('receta_procedimientos')
+    .update({ activo: false })
     .eq('id', id).eq('tenant_id', tenant_id)
-  document.getElementById(`paso-row-${id}`)?.classList.add('fila-inactiva')
-  const btn = document.querySelector(`#paso-row-${id} .btn-inactivar-paso`)
-  if (btn) {
-    btn.className = 'btn-fila btn-restaurar'
-    btn.textContent = '↩'
-    btn.onclick = () => restaurarPaso(id)
-  }
-  const ta = document.getElementById(`paso-texto-${id}`)
-  if (ta) ta.disabled = true
-}
-
-async function restaurarPaso(id) {
-  const tenant_id = await getTenantId()
-  await window._db.from('receta_procedimientos')
-    .update({ activo: true, updated_by: window._email })
-    .eq('id', id).eq('tenant_id', tenant_id)
-  document.getElementById(`paso-row-${id}`)?.classList.remove('fila-inactiva')
-  const btn = document.querySelector(`#paso-row-${id} .btn-restaurar`)
-  if (btn) {
-    btn.className = 'btn-fila btn-inactivar-paso'
-    btn.textContent = '✕'
-    btn.onclick = () => inactivarPaso(id)
-  }
-  const ta = document.getElementById(`paso-texto-${id}`)
-  if (ta) ta.disabled = false
+  if (error) { alert(`Error: ${error.message}`); return }
+  document.getElementById(`paso-row-${id}`)?.remove()
 }
 
 async function guardarNotaRevision(id_receta) {
