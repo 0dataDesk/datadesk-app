@@ -101,6 +101,12 @@ async function vistaRecetas() {
       if (receta) cargarDetalleReceta(receta, puedeEditar, esAdmin)
     })
 
+    // Preseleccionar fuente para rol cocina
+    if (window._rol === 'cocina' && fFuente) {
+      fFuente.value = 'levantamiento_furia'
+      fFuente.dispatchEvent(new Event('change'))
+    }
+
   } catch (err) {
     content.innerHTML = `<p>Error al cargar recetas: ${err.message}</p>`
   }
