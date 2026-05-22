@@ -75,6 +75,30 @@ async function vistaProductos() {
       })
     }
 
+    const renderFilaProducto = (p) => `
+      <tr data-prod-id="${p.id_producto}">
+        <td style="font-size:11px;color:var(--color-text-muted)">${p.id_producto}</td>
+        <td>${puedeEditar
+          ? `<input class="edit-input insumo-nombre-input" type="text"
+                  value="${p.producto.replace(/"/g, '&quot;')}"
+                  data-field="producto" />`
+          : p.producto}
+        </td>
+        <td>${puedeEditar
+          ? (hayUnidades
+              ? `<select class="edit-select insumo-unidad-select" data-field="unidad_medida">
+                   <option value="">—</option>
+                   ${uOptsFor(p.unidad_medida || '')}
+                 </select>`
+              : `<input class="edit-input insumo-unidad-input" type="text"
+                      value="${(p.unidad_medida || '').replace(/"/g, '&quot;')}"
+                      data-field="unidad_medida" placeholder="unidad" />`)
+          : (p.unidad_medida || '')}
+        </td>
+        ${puedeEditar ? `<td><button class="btn-guardar-fila" data-id="${p.id_producto}" title="Guardar">✓</button></td>` : ''}
+      </tr>
+    `
+
     const renderTabla = (filtrados) => {
       const wrap = document.getElementById('insumos-lista-wrap')
 
@@ -83,42 +107,54 @@ async function vistaProductos() {
         return
       }
 
-      wrap.innerHTML = `
-        <div class="tabla-wrapper">
-          <table class="tabla insumos-tabla">
-            <thead>
-              <tr>
-                <th>Insumo</th>
-                <th class="col-unidad">Unidad</th>
-                ${puedeEditar ? '<th class="col-guardar"></th>' : ''}
-              </tr>
-            </thead>
-            <tbody>
-              ${filtrados.map(p => `
-                <tr data-prod-id="${p.id_producto}">
-                  <td>${puedeEditar
-                    ? `<input class="edit-input insumo-nombre-input" type="text"
-                            value="${p.producto.replace(/"/g, '&quot;')}"
-                            data-field="producto" />`
-                    : p.producto}
-                  </td>
-                  <td>${puedeEditar
-                    ? (hayUnidades
-                        ? `<select class="edit-select insumo-unidad-select" data-field="unidad_medida">
-                             <option value="">—</option>
-                             ${uOptsFor(p.unidad_medida || '')}
-                           </select>`
-                        : `<input class="edit-input insumo-unidad-input" type="text"
-                                value="${(p.unidad_medida || '').replace(/"/g, '&quot;')}"
-                                data-field="unidad_medida" placeholder="unidad" />`)
-                    : (p.unidad_medida || '')}
-                  </td>
-                  ${puedeEditar ? `<td><button class="btn-guardar-fila" data-id="${p.id_producto}" title="Guardar">✓</button></td>` : ''}
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>`
+      // Agrupar por categoría
+      const porCategoria = {}
+      filtrados.forEach(p => {
+        const cat = p.categoria || 'General'
+        if (!porCategoria[cat]) porCategoria[cat] = []
+        porCategoria[cat].push(p)
+      })
+      const categorias = Object.keys(porCategoria).sort()
+
+      let html = `
+        <div class="precios-nav">
+          ${categorias.map(c => `
+            <button class="precios-nav-pill"
+              onclick="document.getElementById('prod-sec-${c.replace(/\s+/g,'-')}').scrollIntoView({behavior:'smooth',block:'start'})">
+              ${c} (${porCategoria[c].length})
+            </button>`).join('')}
+        </div>
+      `
+
+      categorias.forEach((cat, idx) => {
+        const secId  = `prod-sec-${cat.replace(/\s+/g, '-')}`
+        const bodyId = `prod-body-${cat.replace(/\s+/g, '-')}`
+        html += `
+          <div class="precios-seccion" id="${secId}">
+            <div class="precios-seccion-header" onclick="toggleSeccion('${bodyId}')">
+              <span>${cat} <span class="precios-seccion-count">${porCategoria[cat].length} insumos</span></span>
+              <span class="precios-seccion-chevron" id="chev-${bodyId}">${idx === 0 ? '▾' : '▸'}</span>
+            </div>
+            <div class="precios-seccion-body" id="${bodyId}" style="display:${idx === 0 ? 'block' : 'none'}">
+              <table class="tabla">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Insumo</th>
+                    <th>Unidad</th>
+                    ${puedeEditar ? '<th></th>' : ''}
+                  </tr>
+                </thead>
+                <tbody>
+                  ${porCategoria[cat].map(p => renderFilaProducto(p)).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `
+      })
+
+      wrap.innerHTML = html
 
       if (!puedeEditar) return
 
