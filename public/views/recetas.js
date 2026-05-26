@@ -5,11 +5,11 @@ async function vistaRecetas() {
   try {
     const tenant_id = await getTenantId()
 
-    const [
-      { data: recetas, error: errR }
-    ] = await Promise.all([
-      window._db.from('catalogo_recetas').select('*').eq('tenant_id', tenant_id).order('nombre_platillo')
-    ])
+    const { data: recetas, error: errR } = await window._db
+      .from('catalogo_recetas')
+      .select('*')
+      .eq('tenant_id', tenant_id)
+      .order('nombre_platillo')
 
     if (errR) throw errR
 
@@ -107,7 +107,8 @@ async function cargarDetalleReceta(receta) {
 
     const [
       { data: ingredientes, error: errI },
-      { data: pasos,        error: errP }
+      { data: pasos,        error: errP },
+      { data: productos,    error: errPr }
     ] = await Promise.all([
       window._db.from('receta_ingredientes')
         .select('*')
@@ -118,12 +119,21 @@ async function cargarDetalleReceta(receta) {
         .select('*')
         .eq('id_receta', receta.id_receta)
         .eq('activo', true)
-        .order('paso_num')
+        .order('paso_num'),
+      window._db.from('productos')
+        .select('id_producto, unidad_medida')
+        .eq('tenant_id', tenant_id)
+        .eq('activo', true)
     ])
 
     if (errI) throw errI
     if (errP) throw errP
 
+    // Índice de unidad por id_producto
+    const unidadPorProducto = {}
+    ;(productos || []).forEach(p => { unidadPorProducto[p.id_producto] = p.unidad_medida })
+
+    // ── Ingredientes (unidad desde catálogo) ─────────────────────────────
     const htmlIngredientes = `
       <div class="tabla-wrapper">
         <table class="tabla">
@@ -140,13 +150,14 @@ async function cargarDetalleReceta(receta) {
               <tr>
                 <td>${i.producto || ''}</td>
                 <td>${i.cantidad != null ? i.cantidad : ''}</td>
-                <td>${i.unidad || ''}</td>
+                <td style="color:var(--color-text-muted)">${unidadPorProducto[i.id_producto] || ''}</td>
                 <td style="color:var(--color-text-muted);font-size:12px">${i.notas_ingrediente || ''}</td>
               </tr>`).join('')}
           </tbody>
         </table>
       </div>`
 
+    // ── Procedimiento agrupado por sección ───────────────────────────────
     const steps = pasos || []
     let htmlPasos = ''
 
@@ -173,6 +184,7 @@ async function cargarDetalleReceta(receta) {
       `).join('')
     }
 
+    // ── Notas adicionales ────────────────────────────────────────────────
     const htmlNotas = receta.notas_revision
       ? `<div class="solicitudes-texto">${receta.notas_revision}</div>`
       : `<p style="color:var(--color-text-muted);font-size:13px">Sin notas adicionales.</p>`
