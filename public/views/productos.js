@@ -116,7 +116,7 @@ async function vistaProductos() {
 
       const porCategoria = {}
       filtrados.forEach(p => {
-        const cat = p.categoria || p.grupo || 'General'
+        const cat = p.grupo || 'General'
         if (!porCategoria[cat]) porCategoria[cat] = []
         porCategoria[cat].push(p)
       })
