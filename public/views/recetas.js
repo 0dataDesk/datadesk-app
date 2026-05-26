@@ -9,6 +9,7 @@ async function vistaRecetas() {
       .from('catalogo_recetas')
       .select('*')
       .eq('tenant_id', tenant_id)
+      .eq('activo', true)
       .order('nombre_platillo')
 
     if (errR) throw errR
