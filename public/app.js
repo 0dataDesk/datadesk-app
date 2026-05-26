@@ -78,7 +78,7 @@ async function mostrarApp(rol, email, tenant_id = null) {
           <ul>
             <li><a href="#" data-view="inicio">Inicio</a></li>
             <li><a href="#" data-view="productos">Insumos</a></li>
-            <li><a href="#" data-view="recetas">Revisión de Recetas</a></li>
+            <li><a href="#" data-view="recetas">Recetas</a></li>
             <li><a href="#" data-view="precios">Precios</a></li>
             <li><a href="#" data-view="costeo">Costeo</a></li>
             <li><a href="#" data-view="pedidos">Pedidos</a></li>

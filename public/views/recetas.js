@@ -4,30 +4,23 @@ async function vistaRecetas() {
 
   try {
     const tenant_id = await getTenantId()
-    const rol        = window._rol || 'operador'
-    const puedeEditar = ['admin', 'editor', 'cocina'].includes(rol)
-    const esAdmin     = rol === 'admin'
 
     const [
-      { data: recetas,  error: errR },
-      { data: unidades, error: errU }
+      { data: recetas, error: errR }
     ] = await Promise.all([
-      window._db.from('catalogo_recetas').select('*').eq('tenant_id', tenant_id).order('nombre_platillo'),
-      window._db.from('catalogo_unidades').select('*').eq('tenant_id', tenant_id).order('nombre')
+      window._db.from('catalogo_recetas').select('*').eq('tenant_id', tenant_id).order('nombre_platillo')
     ])
 
     if (errR) throw errR
 
-    window._recetas  = recetas  || []
-    window._unidades = unidades || []
+    window._recetas = recetas || []
 
     const fuentes = [...new Set(window._recetas.map(r => r.fuente).filter(Boolean))].sort()
     const cats0   = [...new Set(window._recetas.map(r => r.categoria).filter(Boolean))].sort()
-    const plats0  = [...window._recetas].sort((a, b) => a.nombre_platillo.localeCompare(b.nombre_platillo))
 
     content.innerHTML = `
       <div class="vista-header">
-        <h2>Revisión de Recetas</h2>
+        <h2>Recetas</h2>
       </div>
 
       <div class="filtros-cascada">
@@ -49,7 +42,7 @@ async function vistaRecetas() {
           <label class="filtro-label">Platillo</label>
           <select id="f-platillo" class="filtro-select">
             <option value="">Selecciona un platillo...</option>
-            ${plats0.map(r => `<option value="${r.id_receta}">${r.nombre_platillo}</option>`).join('')}
+            ${window._recetas.map(r => `<option value="${r.id_receta}">${r.nombre_platillo}</option>`).join('')}
           </select>
         </div>
       </div>
@@ -61,7 +54,7 @@ async function vistaRecetas() {
     const fCategoria = document.getElementById('f-categoria')
     const fPlatillo  = document.getElementById('f-platillo')
 
-    const actualizarFiltros = (resetPlatillo = true) => {
+    const actualizarFiltros = () => {
       const fuente    = fFuente.value
       const categoria = fCategoria.value
 
@@ -71,10 +64,9 @@ async function vistaRecetas() {
           .map(r => r.categoria).filter(Boolean)
       )].sort()
 
-      const catActual = fCategoria.value
       fCategoria.innerHTML =
         `<option value="">Todas las categorías</option>` +
-        catsDisp.map(c => `<option value="${c}"${c === catActual ? ' selected' : ''}>${c}</option>`).join('')
+        catsDisp.map(c => `<option value="${c}"${c === categoria ? ' selected' : ''}>${c}</option>`).join('')
 
       const platsDisp = window._recetas
         .filter(r =>
@@ -87,37 +79,32 @@ async function vistaRecetas() {
         `<option value="">Selecciona un platillo...</option>` +
         platsDisp.map(r => `<option value="${r.id_receta}">${r.nombre_platillo}</option>`).join('')
 
-      if (resetPlatillo) document.getElementById('receta-detalle-wrap').innerHTML = ''
+      document.getElementById('receta-detalle-wrap').innerHTML = ''
     }
 
-    fFuente.addEventListener('change', () => actualizarFiltros())
-    fCategoria.addEventListener('change', () => actualizarFiltros())
+    fFuente.addEventListener('change', actualizarFiltros)
+    fCategoria.addEventListener('change', actualizarFiltros)
 
     fPlatillo.addEventListener('change', () => {
       const val = fPlatillo.value
       document.getElementById('receta-detalle-wrap').innerHTML = ''
       if (!val) return
       const receta = window._recetas.find(r => String(r.id_receta) === String(val))
-      if (receta) cargarDetalleReceta(receta, puedeEditar, esAdmin)
+      if (receta) cargarDetalleReceta(receta)
     })
-
-    // Preseleccionar fuente para rol cocina
-    if (window._rol === 'cocina' && fFuente) {
-      fFuente.value = 'levantamiento_furia'
-      fFuente.dispatchEvent(new Event('change'))
-    }
 
   } catch (err) {
     content.innerHTML = `<p>Error al cargar recetas: ${err.message}</p>`
   }
 }
 
-// ── Detalle de receta ────────────────────────────────────────────────────────
-async function cargarDetalleReceta(receta, puedeEditar, esAdmin) {
+async function cargarDetalleReceta(receta) {
   const wrap = document.getElementById('receta-detalle-wrap')
   wrap.innerHTML = `<p style="color:var(--color-text-muted);margin-top:24px">Cargando receta...</p>`
 
   try {
+    const tenant_id = await getTenantId()
+
     const [
       { data: ingredientes, error: errI },
       { data: pasos,        error: errP }
@@ -125,252 +112,98 @@ async function cargarDetalleReceta(receta, puedeEditar, esAdmin) {
       window._db.from('receta_ingredientes')
         .select('*')
         .eq('id_receta', receta.id_receta)
+        .eq('activo', true)
         .order('id'),
       window._db.from('receta_procedimientos')
         .select('*')
         .eq('id_receta', receta.id_receta)
+        .eq('activo', true)
         .order('paso_num')
     ])
 
     if (errI) throw errI
     if (errP) throw errP
 
-    // Activos primero, inactivos al final
-    const sortActivo = (arr) => [
-      ...arr.filter(x => x.activo !== false),
-      ...arr.filter(x => x.activo === false)
-    ]
-
-    const ings  = sortActivo(ingredientes || [])
-    const steps = sortActivo(pasos        || [])
-
-    const uOptsFor = (valorActual) =>
-      (window._unidades || [])
-        .map(u => { const v = u.nombre || u.unidad || u.id; return `<option value="${v}"${v === valorActual ? ' selected' : ''}>${v}</option>` })
-        .join('')
-
-    // ── Ingredientes ────────────────────────────────────────────────────
-    const htmlIngredientes = puedeEditar
-      ? `<div class="tabla-wrapper">
-          <table class="tabla tabla-editable ingredientes-tabla">
-            <thead>
+    const htmlIngredientes = `
+      <div class="tabla-wrapper">
+        <table class="tabla">
+          <thead>
+            <tr>
+              <th>Ingrediente</th>
+              <th>Cantidad</th>
+              <th>Unidad</th>
+              <th>Nota</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${(ingredientes || []).map(i => `
               <tr>
-                <th>Ingrediente</th>
-                <th>Cantidad</th>
-                <th>Unidad</th>
-                <th>Nota</th>
-                <th class="col-acciones"></th>
-              </tr>
-            </thead>
-            <tbody>
-              ${ings.filter(i => i.activo !== false).map(i => `
-                <tr id="ing-row-${i.id}">
-                  <td>${i.producto || ''}</td>
-                  <td><input type="number" class="edit-input edit-num" id="ing-cant-${i.id}"
-                        value="${i.cantidad != null ? i.cantidad : ''}" min="0" step="0.01"
-                        style="width:70px"></td>
-                  <td><select class="edit-select" id="ing-unidad-${i.id}" style="width:70px">
-                        <option value="">— unidad —</option>
-                        ${uOptsFor(i.unidad || '')}
-                      </select></td>
-                  <td><input type="text" class="edit-input edit-wide" id="ing-nota-${i.id}"
-                        value="${(i.notas_ingrediente || '').replace(/"/g, '&quot;')}"
-                        placeholder="nota..." style="width:100%"></td>
-                  <td class="acciones-fila" style="white-space:nowrap">
-                    <button class="btn-fila btn-guardar-ing" onclick="guardarIngrediente('${i.id}')">💾</button>
-                    <button class="btn-fila btn-inactivar-ing" onclick="inactivarIngrediente('${i.id}')">✕</button>
-                  </td>
-                </tr>`).join('')}
-            </tbody>
-          </table>
-        </div>`
-      : `<div class="tabla-wrapper">
-          <table class="tabla">
-            <thead>
-              <tr><th>Ingrediente</th><th>Cantidad</th><th>Unidad</th><th>Nota</th></tr>
-            </thead>
-            <tbody>
-              ${ings.filter(i => i.activo !== false).map(i => `<tr>
                 <td>${i.producto || ''}</td>
                 <td>${i.cantidad != null ? i.cantidad : ''}</td>
                 <td>${i.unidad || ''}</td>
-                <td>${i.notas_ingrediente || ''}</td>
+                <td style="color:var(--color-text-muted);font-size:12px">${i.notas_ingrediente || ''}</td>
               </tr>`).join('')}
-            </tbody>
-          </table>
-        </div>`
+          </tbody>
+        </table>
+      </div>`
 
-    // ── Procedimiento ───────────────────────────────────────────────────
-    const htmlPasos = puedeEditar
-      ? `<ol class="procedimiento procedimiento-editable">
-          ${steps.filter(p => p.activo !== false).map(p => `
-            <li id="paso-row-${p.id}" class="paso-row">
-              <div class="paso-editable-row">
-                <textarea class="edit-input edit-paso" id="paso-texto-${p.id}"
-                          style="flex:1;min-height:60px">${limpiarPaso(p.proceso)}</textarea>
-                <div class="acciones-paso">
-                  <button class="btn-fila btn-guardar-paso" onclick="guardarPaso('${p.id}')">💾</button>
-                  <button class="btn-fila btn-inactivar-paso" onclick="inactivarPaso('${p.id}')">✕</button>
-                </div>
-              </div>
-            </li>`).join('')}
-        </ol>`
-      : `<ol class="procedimiento">
-          ${steps.filter(p => p.activo !== false).map(p => `<li>${limpiarPaso(p.proceso)}</li>`).join('')}
-        </ol>`
+    const steps = pasos || []
+    let htmlPasos = ''
 
-    // ── Render ──────────────────────────────────────────────────────────
+    if (steps.length > 0) {
+      const secciones = []
+      let seccionActual = null
+
+      steps.forEach(p => {
+        const sec = p.seccion || 'Procedimiento'
+        if (sec !== seccionActual) {
+          secciones.push({ nombre: sec, pasos: [] })
+          seccionActual = sec
+        }
+        secciones[secciones.length - 1].pasos.push(p)
+      })
+
+      const mostrarEncabezados = secciones.length > 1
+
+      htmlPasos = secciones.map(sec => `
+        ${mostrarEncabezados ? `<h5 class="seccion-procedimiento">${sec.nombre}</h5>` : ''}
+        <ol class="procedimiento" ${mostrarEncabezados ? 'style="margin-bottom:20px"' : ''}>
+          ${sec.pasos.map(p => `<li>${limpiarPaso(p.proceso)}</li>`).join('')}
+        </ol>
+      `).join('')
+    }
+
+    const htmlNotas = receta.notas_revision
+      ? `<div class="solicitudes-texto">${receta.notas_revision}</div>`
+      : `<p style="color:var(--color-text-muted);font-size:13px">Sin notas adicionales.</p>`
+
     wrap.innerHTML = `
       <div class="receta-detalle-card">
-
         <div class="detalle-header">
           <div>
             <h3>${receta.nombre_platillo}</h3>
             <p class="detalle-categoria">${receta.categoria || ''}</p>
           </div>
-          <div class="detalle-acciones">
-            <span class="badge-status ${receta.status || 'pendiente'}">${receta.status || 'pendiente'}</span>
-            ${esAdmin ? `
-              <div class="acciones-receta" style="margin-top:8px">
-                <button class="btn-accion btn-aprobar" id="btn-aprobar">Aprobar</button>
-                <button class="btn-accion btn-archivar" id="btn-archivar">Archivar</button>
-              </div>` : ''}
-          </div>
+          <span class="badge-status ${receta.status || 'pendiente'}">${receta.status || 'pendiente'}</span>
         </div>
 
         <h4>Ingredientes</h4>
-        <div id="section-ingredientes">${htmlIngredientes}</div>
+        ${htmlIngredientes}
 
         <h4>Procedimiento</h4>
-        <div id="section-pasos">${htmlPasos}</div>
+        ${htmlPasos}
 
-        <h4>Solicitudes y comentarios</h4>
-        <p class="solicitudes-hint">
-          Usa este espacio para pedir cambios a la receta: agregar o eliminar ingredientes,
-          modificar pasos, correcciones, etc.
-        </p>
-        ${puedeEditar
-          ? `<textarea id="nota-revision-texto" class="edit-input" rows="4"
-                style="width:100%;min-height:80px"
-                placeholder="Correcciones de ingredientes, pasos o especificaciones..."
-              >${receta.notas_revision || ''}</textarea>
-             <button class="btn-accion btn-aprobar" style="margin-top:8px"
-               onclick="guardarNotaRevision('${receta.id_receta}')">
-               Guardar nota
-             </button>`
-          : `<div class="solicitudes-texto">${receta.notas_revision || '<em style="color:var(--color-text-muted)">Sin solicitudes registradas.</em>'}</div>`
-        }
-
+        <h4>Notas adicionales</h4>
+        ${htmlNotas}
       </div>
     `
 
-    // ── Eventos admin ────────────────────────────────────────────────────
-    if (esAdmin) {
-      document.getElementById('btn-aprobar')?.addEventListener('click', () =>
-        cambiarStatusReceta(receta, 'aprobado', puedeEditar, esAdmin))
-      document.getElementById('btn-archivar')?.addEventListener('click', () =>
-        cambiarStatusReceta(receta, 'archivado', puedeEditar, esAdmin))
-    }
-
   } catch (err) {
     wrap.innerHTML = `<p style="margin-top:24px;color:var(--color-highlight)">Error al cargar receta: ${err.message}</p>`
-    console.error(err)
   }
 }
-
-// ── Funciones globales de edición ────────────────────────────────────────────
-
-async function guardarIngrediente(id) {
-  const tenant_id = await getTenantId()
-  const cantidad  = document.getElementById(`ing-cant-${id}`)?.value || null
-  const unidad    = document.getElementById(`ing-unidad-${id}`)?.value || null
-  const nota      = document.getElementById(`ing-nota-${id}`)?.value || null
-  const { error } = await window._db
-    .from('receta_ingredientes')
-    .update({ cantidad, unidad, notas_ingrediente: nota })
-    .eq('id', id)
-    .eq('tenant_id', tenant_id)
-  if (error) alert(`Error: ${error.message}`)
-}
-
-async function inactivarIngrediente(id) {
-  const tenant_id = await getTenantId()
-  const { error } = await window._db.from('receta_ingredientes')
-    .update({ activo: false })
-    .eq('id', id).eq('tenant_id', tenant_id)
-  if (error) { alert(`Error: ${error.message}`); return }
-  document.getElementById(`ing-row-${id}`)?.remove()
-}
-
-async function guardarPaso(id) {
-  const tenant_id = await getTenantId()
-  const proceso = document.getElementById(`paso-texto-${id}`)?.value || ''
-  const { error } = await window._db
-    .from('receta_procedimientos')
-    .update({ proceso })
-    .eq('id', id)
-    .eq('tenant_id', tenant_id)
-  if (error) alert(`Error: ${error.message}`)
-}
-
-async function inactivarPaso(id) {
-  const tenant_id = await getTenantId()
-  const { error } = await window._db.from('receta_procedimientos')
-    .update({ activo: false })
-    .eq('id', id).eq('tenant_id', tenant_id)
-  if (error) { alert(`Error: ${error.message}`); return }
-  document.getElementById(`paso-row-${id}`)?.remove()
-}
-
-async function guardarNotaRevision(id_receta) {
-  const tenant_id = await getTenantId()
-  const nota = document.getElementById('nota-revision-texto')?.value || null
-  const { error } = await window._db
-    .from('catalogo_recetas')
-    .update({ notas_revision: nota })
-    .eq('id_receta', id_receta)
-    .eq('tenant_id', tenant_id)
-  if (error) alert(`Error: ${error.message}`)
-}
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
 
 function limpiarPaso(texto) {
   if (!texto) return ''
   return texto.replace(/^Paso\s+\d+\s*[—\-:]\s*/i, '').trim()
-}
-
-async function cambiarStatusReceta(receta, nuevoStatus, puedeEditar, esAdmin) {
-  const { error } = await window._db.from('catalogo_recetas')
-    .update({ status: nuevoStatus })
-    .eq('id_receta', receta.id_receta)
-  if (error) { mostrarToast('Error: ' + error.message); return }
-
-  receta.status = nuevoStatus
-  const r = window._recetas?.find(r => r.id_receta === receta.id_receta)
-  if (r) r.status = nuevoStatus
-
-  mostrarToast(`Receta ${nuevoStatus}`)
-  cargarDetalleReceta(receta, puedeEditar, esAdmin)
-}
-
-function mostrarToast(msg) {
-  let toast = document.getElementById('_toast')
-  if (!toast) {
-    toast = document.createElement('div')
-    toast.id = '_toast'
-    toast.style.cssText = [
-      'position:fixed', 'bottom:24px', 'right:24px',
-      'background:#10B981', 'color:#fff',
-      'padding:10px 20px', 'border-radius:8px',
-      'font-size:13px', 'font-weight:600',
-      'z-index:9999', 'opacity:0',
-      'transition:opacity 0.3s'
-    ].join(';')
-    document.body.appendChild(toast)
-  }
-  toast.textContent = msg
-  toast.style.opacity = '1'
-  clearTimeout(toast._t)
-  toast._t = setTimeout(() => { toast.style.opacity = '0' }, 2500)
 }
