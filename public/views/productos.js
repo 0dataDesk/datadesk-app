@@ -23,7 +23,7 @@ async function vistaProductos() {
 
     const hayUnidades = window._unidades.length > 0
 
-    // Valores únicos para los filtros
+    const fuentes = [...new Set(window._productos.map(p => p.fuente).filter(Boolean))].sort()
     const grupos  = [...new Set(window._productos.map(p => p.grupo).filter(Boolean))].sort()
     const cats    = [...new Set(window._productos.map(p => p.categoria).filter(Boolean))].sort()
 
@@ -36,10 +36,14 @@ async function vistaProductos() {
 
     content.innerHTML = `
       <div class="vista-header">
-        <h2>Revisión de Insumos</h2>
+        <h2>Insumos</h2>
       </div>
 
       <div class="filtros-bar">
+        <select id="filtro-fuente" class="filtro-select">
+          <option value="">Todas las fuentes</option>
+          ${fuentes.map(f => `<option value="${f}">${f}</option>`).join('')}
+        </select>
         <input type="text" id="insumos-search" placeholder="Buscar insumo..." class="filtro-search" />
         <select id="filtro-grupo" class="filtro-select">
           <option value="">Todos los grupos</option>
@@ -61,17 +65,19 @@ async function vistaProductos() {
     `
 
     const aplicarFiltros = () => {
+      const fuente = document.getElementById('filtro-fuente')?.value || ''
       const texto  = document.getElementById('insumos-search')?.value.toLowerCase() || ''
       const grupo  = document.getElementById('filtro-grupo')?.value || ''
       const cat    = document.getElementById('filtro-categoria')?.value || ''
       const status = document.getElementById('filtro-status')?.value || ''
 
       return window._productos.filter(p => {
+        const matchFuente = !fuente || p.fuente === fuente
         const matchTexto  = !texto  || p.producto?.toLowerCase().includes(texto)
         const matchGrupo  = !grupo  || p.grupo === grupo
         const matchCat    = !cat    || p.categoria === cat
         const matchStatus = !status || (p.status || 'pendiente') === status
-        return matchTexto && matchGrupo && matchCat && matchStatus
+        return matchFuente && matchTexto && matchGrupo && matchCat && matchStatus
       })
     }
 
@@ -108,10 +114,9 @@ async function vistaProductos() {
         return
       }
 
-      // Agrupar por categoría
       const porCategoria = {}
       filtrados.forEach(p => {
-        const cat = p.categoria || 'General'
+        const cat = p.categoria || p.grupo || 'General'
         if (!porCategoria[cat]) porCategoria[cat] = []
         porCategoria[cat].push(p)
       })
@@ -161,6 +166,7 @@ async function vistaProductos() {
 
     const onFiltro = () => renderTabla(aplicarFiltros())
 
+    document.getElementById('filtro-fuente').addEventListener('change', onFiltro)
     document.getElementById('insumos-search').addEventListener('input', onFiltro)
     document.getElementById('filtro-grupo').addEventListener('change', onFiltro)
     document.getElementById('filtro-categoria').addEventListener('change', onFiltro)
@@ -184,4 +190,13 @@ async function guardarProducto(idProducto) {
     .eq('id_producto', idProducto)
     .eq('tenant_id', tenant_id)
   if (error) alert(`Error: ${error.message}`)
+}
+
+window.toggleSeccion = function(bodyId) {
+  const body = document.getElementById(bodyId)
+  const chev = document.getElementById('chev-' + bodyId)
+  if (!body) return
+  const open = body.style.display !== 'none'
+  body.style.display = open ? 'none' : 'block'
+  if (chev) chev.textContent = open ? '▸' : '▾'
 }
