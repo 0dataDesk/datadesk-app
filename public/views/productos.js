@@ -9,18 +9,14 @@ async function vistaProductos() {
 
     const [
       { data: productos, error: errP },
-      { data: unidades,  error: errU },
-      { data: ingSinCantidad, error: errSC }
+      { data: unidades,  error: errU }
     ] = await Promise.all([
       window._db.from('productos').select('*').eq('tenant_id', tenant_id).order('producto'),
-      window._db.from('catalogo_unidades').select('*').eq('tenant_id', tenant_id).order('nombre'),
-      window._db.from('receta_ingredientes').select('id_producto').eq('tenant_id', tenant_id).eq('activo', true).or('cantidad.is.null,cantidad.eq.')
+      window._db.from('catalogo_unidades').select('*').eq('tenant_id', tenant_id).order('nombre')
     ])
 
     if (errP) throw errP
     if (errU) console.warn('catalogo_unidades:', errU.message)
-
-    const productosConFaltantes = new Set((ingSinCantidad || []).map(r => r.id_producto))
 
     window._productos = productos || []
     window._unidades  = unidades  || []
@@ -77,18 +73,14 @@ async function vistaProductos() {
           ? `<input type="text" class="edit-input" id="prod-nombre-${p.id_producto}"
                   value="${p.producto.replace(/"/g, '&quot;')}" style="width:100%">`
           : p.producto}
-          ${productosConFaltantes.has(p.id_producto) ? '<span class="badge-faltante" title="Tiene usos en recetas sin cantidad capturada">⚠ falta cantidad</span>' : ''}
         </td>
         <td>${puedeEditar
-          ? (hayUnidades
-              ? `<select class="edit-select" id="prod-unidad-${p.id_producto}">
-                   <option value="">—</option>
-                   ${uOptsFor(p.unidad_medida || '')}
-                 </select>`
-              : `<input type="text" class="edit-input edit-num" id="prod-unidad-${p.id_producto}"
-                      value="${(p.unidad_medida || '').replace(/"/g, '&quot;')}"
-                      placeholder="unidad" style="width:60px">`)
-          : (p.unidad_medida || '')}
+          ? `<select class="edit-select" id="prod-unidad-${p.id_producto}">
+               <option value=""${!p.unidad_medida ? ' selected' : ''}>—</option>
+               ${uOptsFor(p.unidad_medida || '')}
+             </select>
+             ${!p.unidad_medida ? '<span class="badge-faltante" title="Este insumo no tiene unidad definida">⚠ falta unidad</span>' : ''}`
+          : (p.unidad_medida || `<span class="badge-faltante">⚠ falta unidad</span>`)}
         </td>
         <td><span class="badge-status ${p.status || 'pendiente'}">${p.status || 'pendiente'}</span></td>
         ${puedeEditar ? `<td style="text-align:right"><button class="btn-fila btn-guardar-ing"
