@@ -25,7 +25,6 @@ async function vistaProductos() {
 
     const fuentes = [...new Set(window._productos.map(p => p.fuente).filter(Boolean))].sort()
     const grupos  = [...new Set(window._productos.map(p => p.grupo).filter(Boolean))].sort()
-    const cats    = [...new Set(window._productos.map(p => p.categoria).filter(Boolean))].sort()
 
     const uOptsFor = (valorActual) => {
       if (!hayUnidades) return `<option value="${valorActual}">${valorActual || '—'}</option>`
@@ -48,16 +47,7 @@ async function vistaProductos() {
           <option value="">Todos los grupos</option>
           ${grupos.map(g => `<option value="${g}">${g}</option>`).join('')}
         </select>
-        <select id="filtro-categoria" class="filtro-select">
-          <option value="">Todas las categorías</option>
-          ${cats.map(c => `<option value="${c}">${c}</option>`).join('')}
-        </select>
-        <select id="filtro-status" class="filtro-select">
-          <option value="">Todos los status</option>
-          <option value="pendiente">Pendiente</option>
-          <option value="aprobado">Aprobado</option>
-          <option value="archivado">Archivado</option>
-        </select>
+
       </div>
 
       <div id="insumos-lista-wrap"></div>
@@ -67,16 +57,12 @@ async function vistaProductos() {
       const fuente = document.getElementById('filtro-fuente')?.value || ''
       const texto  = document.getElementById('insumos-search')?.value.toLowerCase() || ''
       const grupo  = document.getElementById('filtro-grupo')?.value || ''
-      const cat    = document.getElementById('filtro-categoria')?.value || ''
-      const status = document.getElementById('filtro-status')?.value || ''
 
       return window._productos.filter(p => {
         const matchFuente = !fuente || p.fuente === fuente
         const matchTexto  = !texto  || p.producto?.toLowerCase().includes(texto)
         const matchGrupo  = !grupo  || p.grupo === grupo
-        const matchCat    = !cat    || p.categoria === cat
-        const matchStatus = !status || (p.status || 'pendiente') === status
-        return matchFuente && matchTexto && matchGrupo && matchCat && matchStatus
+        return matchFuente && matchTexto && matchGrupo
       })
     }
 
@@ -168,8 +154,7 @@ async function vistaProductos() {
     document.getElementById('filtro-fuente').addEventListener('change', onFiltro)
     document.getElementById('insumos-search').addEventListener('input', onFiltro)
     document.getElementById('filtro-grupo').addEventListener('change', onFiltro)
-    document.getElementById('filtro-categoria').addEventListener('change', onFiltro)
-    document.getElementById('filtro-status').addEventListener('change', onFiltro)
+
 
     renderTabla(aplicarFiltros())
 
