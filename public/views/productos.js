@@ -40,9 +40,8 @@ async function vistaProductos() {
       </div>
 
       <div class="filtros-bar">
-        <select id="filtro-fuente" class="filtro-select">
-          <option value="">Todas las fuentes</option>
-          ${fuentes.map(f => `<option value="${f}"${f === 'carga_eugenio' ? ' selected' : ''}>${f}</option>`).join('')}
+        <select id="filtro-fuente" class="filtro-select" disabled>
+          <option value="carga_eugenio" selected>carga_eugenio</option>
         </select>
         <input type="text" id="insumos-search" placeholder="Buscar insumo..." class="filtro-search" />
         <select id="filtro-grupo" class="filtro-select">
