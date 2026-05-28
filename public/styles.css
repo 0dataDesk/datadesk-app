@@ -1190,3 +1190,31 @@ body {
   padding-bottom: 4px;
   border-bottom: 1px solid var(--color-border);
 }
+
+/* ── BADGE FALTANTE EN INSUMOS ── */
+.badge-faltante {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 600;
+  background: rgba(184,92,42,0.12);
+  color: var(--color-highlight);
+  border: 1px solid rgba(184,92,42,0.3);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+}
+
+/* ── BANNER AVISO EN RECETA ── */
+.banner-aviso {
+  background: rgba(200,137,42,0.1);
+  border: 1px solid rgba(200,137,42,0.3);
+  color: var(--color-accent);
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  margin: 16px 0;
+  font-weight: 500;
+}

@@ -130,6 +130,9 @@ async function cargarDetalleReceta(receta) {
     if (errI) throw errI
     if (errP) throw errP
 
+    const ingSinCantidad = (ingredientes || []).filter(i => i.cantidad === null || i.cantidad === '' || i.cantidad === undefined)
+    const hayCantidadFaltante = ingSinCantidad.length > 0
+
     // Índice de unidad por id_producto
     const unidadPorProducto = {}
     ;(productos || []).forEach(p => { unidadPorProducto[p.id_producto] = p.unidad_medida })
@@ -199,6 +202,11 @@ async function cargarDetalleReceta(receta) {
           </div>
           <span class="badge-status ${receta.status || 'pendiente'}">${receta.status || 'pendiente'}</span>
         </div>
+
+        ${hayCantidadFaltante ? `
+        <div class="banner-aviso">
+          ⚠ Esta receta tiene ${ingSinCantidad.length} ingrediente${ingSinCantidad.length > 1 ? 's' : ''} sin cantidad capturada.
+        </div>` : ''}
 
         <h4>Ingredientes</h4>
         ${htmlIngredientes}
