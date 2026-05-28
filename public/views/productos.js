@@ -82,7 +82,6 @@ async function vistaProductos() {
              ${!p.unidad_medida ? '<span class="badge-faltante" title="Este insumo no tiene unidad definida">⚠ falta unidad</span>' : ''}`
           : (p.unidad_medida || `<span class="badge-faltante">⚠ falta unidad</span>`)}
         </td>
-        <td><span class="badge-status ${p.status || 'pendiente'}">${p.status || 'pendiente'}</span></td>
         ${puedeEditar ? `<td style="text-align:right"><button class="btn-fila btn-guardar-ing"
           onclick="guardarProducto('${p.id_producto}')">💾</button></td>` : ''}
       </tr>
@@ -130,7 +129,6 @@ async function vistaProductos() {
                     <th>ID</th>
                     <th>Insumo</th>
                     <th>Unidad</th>
-                    <th>Status</th>
                     ${puedeEditar ? '<th></th>' : ''}
                   </tr>
                 </thead>
