@@ -1218,3 +1218,8 @@ body {
   margin: 16px 0;
   font-weight: 500;
 }
+
+/* ── ALINEACIÓN VERTICAL TABLA INSUMOS ── */
+.tabla tbody td {
+  vertical-align: middle;
+}
