@@ -27,6 +27,7 @@ document.addEventListener('visibilitychange', () => {})
 
 async function mostrarLogin() {
   const cfg = await getTenantConfig()
+  document.title = 'dataDesk'
   document.documentElement.style.setProperty('--color-primary', cfg.color_primario)
 
   document.getElementById('app').innerHTML = `
