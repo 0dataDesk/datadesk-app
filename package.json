@@ -8,7 +8,7 @@
     "dev": "node --watch src/index.js",
     "build": "node scripts/inject-env.js"
   },
-  "dependencies": {
+  "devDependencies": {
     "@supabase/supabase-js": "^2.45.0",
     "express": "^4.19.0",
     "dotenv": "^16.4.0",
