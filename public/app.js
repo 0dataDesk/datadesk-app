@@ -85,6 +85,7 @@ async function mostrarApp(rol, email, tenant_id = null) {
             <li><a href="#" data-view="costeo">Costeo</a></li>
             <li><a href="#" data-view="pedidos">Pedidos</a></li>
             <li><a href="#" data-view="recepciones">Recepciones</a></li>
+            <li><a href="#" data-view="gastos">Gastos</a></li>
           </ul>
         </nav>
         <main class="content" id="content">
@@ -113,12 +114,13 @@ async function mostrarApp(rol, email, tenant_id = null) {
       if (view === 'costeo')    await vistaCosteo()
       if (view === 'pedidos')       await vistaPedidos()
       if (view === 'recepciones')  await vistaRecepciones()
+      if (view === 'gastos')       await vistaGastos()
     })
   })
 
   // Ocultar nav items según rol
   const permitidasPorRol = {
-    admin:  ['inicio','productos','recetas','precios','costeo','pedidos','recepciones'],
+    admin:  ['inicio','productos','recetas','precios','costeo','pedidos','recepciones','gastos'],
     editor: ['inicio','productos','recetas','recepciones'],
     cocina: ['productos','recetas']
   }
@@ -139,6 +141,7 @@ async function mostrarApp(rol, email, tenant_id = null) {
   else if (vistaInicial === 'costeo')  vistaCosteo()
   else if (vistaInicial === 'pedidos')      vistaPedidos()
   else if (vistaInicial === 'recepciones') vistaRecepciones()
+  else if (vistaInicial === 'gastos')      vistaGastos()
   else                                     mostrarBienvenida()
 }
 
