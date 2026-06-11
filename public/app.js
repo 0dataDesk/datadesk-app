@@ -86,6 +86,7 @@ async function mostrarApp(rol, email, tenant_id = null) {
             <li><a href="#" data-view="pedidos">Pedidos</a></li>
             <li><a href="#" data-view="recepciones">Recepciones</a></li>
             <li><a href="#" data-view="gastos">Gastos</a></li>
+            <li><a href="#" data-view="inventario">Inventario</a></li>
           </ul>
         </nav>
         <main class="content" id="content">
@@ -115,13 +116,14 @@ async function mostrarApp(rol, email, tenant_id = null) {
       if (view === 'pedidos')       await vistaPedidos()
       if (view === 'recepciones')  await vistaRecepciones()
       if (view === 'gastos')       await vistaGastos()
+      if (view === 'inventario')   await vistaInventario()
     })
   })
 
   // Ocultar nav items según rol
   const permitidasPorRol = {
-    admin:  ['inicio','productos','recetas','precios','costeo','pedidos','recepciones','gastos'],
-    editor: ['inicio','productos','recetas','recepciones'],
+    admin:  ['inicio','productos','recetas','precios','costeo','pedidos','recepciones','gastos','inventario'],
+    editor: ['inicio','productos','recetas','recepciones','inventario'],
     cocina: ['productos','recetas']
   }
   const visibles = permitidasPorRol[window._rol] || ['inicio','productos','recetas','precios','costeo','pedidos']
@@ -142,6 +144,7 @@ async function mostrarApp(rol, email, tenant_id = null) {
   else if (vistaInicial === 'pedidos')      vistaPedidos()
   else if (vistaInicial === 'recepciones') vistaRecepciones()
   else if (vistaInicial === 'gastos')      vistaGastos()
+  else if (vistaInicial === 'inventario') vistaInventario()
   else                                     mostrarBienvenida()
 }
 
