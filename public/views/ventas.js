@@ -45,6 +45,31 @@ async function renderVentas(container, tenantId) {
     return `${dd}/${mm} ${hh}:${mi}`
   }
 
+  const SUPA_URL = window._db.supabaseUrl
+  const SUPA_KEY = window._db.supabaseKey
+
+  async function supaDelete(table, filters) {
+    const params = new URLSearchParams(filters)
+    const res = await fetch(
+      `${SUPA_URL}/rest/v1/${table}?${params}`,
+      {
+        method: 'DELETE',
+        headers: {
+          'apikey': SUPA_KEY,
+          'Authorization': 'Bearer ' + SUPA_KEY,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        }
+      }
+    )
+    if (!res.ok) {
+      const err = await res.text()
+      throw new Error(err)
+    }
+  }
+
+  window._supaDelete = supaDelete
+
   let html = `
     <div class="vista-header">
       <h2>Ventas</h2>
@@ -59,8 +84,8 @@ async function renderVentas(container, tenantId) {
   }
 
   ventas.forEach(v => {
-    const badge    = estadoBadge[v.estado] || ''
-    const items    = itemsPorVenta[v.id] || []
+    const badge     = estadoBadge[v.estado] || ''
+    const items     = itemsPorVenta[v.id] || []
     const itemsHtml = items.map(it => {
       let modsText = ''
       if (it.modificadores) {
@@ -108,27 +133,36 @@ async function renderVentas(container, tenantId) {
 async function eliminarVenta(id, folio, tenantId) {
   if (!window.confirm(`¿Eliminar orden ${folio}? Esta acción no se puede deshacer.`)) return
 
-  const { error: e1 } = await window._db
-    .from('ordenes_cocina')
-    .delete()
-    .eq('id_venta', id)
-    .eq('tenant_id', tenantId)
-  if (e1) { alert('Error al eliminar orden de cocina: ' + e1.message); return }
+  const SUPA_URL = window._db.supabaseUrl
+  const SUPA_KEY = window._db.supabaseKey
 
-  const { error: e2 } = await window._db
-    .from('venta_items')
-    .delete()
-    .eq('id_venta', id)
-    .eq('tenant_id', tenantId)
-  if (e2) { alert('Error al eliminar ítems: ' + e2.message); return }
+  async function supaDelete(table, filters) {
+    const params = new URLSearchParams(filters)
+    const res = await fetch(
+      `${SUPA_URL}/rest/v1/${table}?${params}`,
+      {
+        method: 'DELETE',
+        headers: {
+          'apikey': SUPA_KEY,
+          'Authorization': 'Bearer ' + SUPA_KEY,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        }
+      }
+    )
+    if (!res.ok) {
+      const err = await res.text()
+      throw new Error(err)
+    }
+  }
 
-  const { error: e3 } = await window._db
-    .from('ventas')
-    .delete()
-    .eq('id', id)
-    .eq('tenant_id', tenantId)
-  if (e3) { alert('Error al eliminar venta: ' + e3.message); return }
-
-  const card = document.getElementById('venta-' + id)
-  if (card) card.remove()
+  try {
+    await supaDelete('ordenes_cocina', { id_venta: 'eq.' + id, tenant_id: 'eq.' + tenantId })
+    await supaDelete('venta_items',    { id_venta: 'eq.' + id, tenant_id: 'eq.' + tenantId })
+    await supaDelete('ventas',         { id:       'eq.' + id, tenant_id: 'eq.' + tenantId })
+    const card = document.getElementById('venta-' + id)
+    if (card) card.remove()
+  } catch(err) {
+    alert('Error al eliminar: ' + err.message)
+  }
 }
