@@ -5,57 +5,40 @@ async function vistaInventario() {
   try {
     const tenant_id = await getTenantId()
 
-    const { data: rawFechas, error: errF } = await window._db
-      .from('inventario_conteos')
-      .select('fecha_conteo')
-      .eq('tenant_id', tenant_id)
-      .order('fecha_conteo', { ascending: false })
-
-    if (errF) throw errF
-
-    const fechas = [...new Set((rawFechas || []).map(r => r.fecha_conteo))]
-
-    if (!fechas.length) {
-      content.innerHTML = `<div class="vista-header"><h2>Inventario</h2></div><p style="color:var(--color-text-muted)">No hay conteos registrados.</p>`
-      return
-    }
-
     content.innerHTML = `
       <div class="vista-header"><h2>Inventario</h2></div>
       <div class="filtros-bar">
-        <select id="inv-fecha" class="filtro-select">
-          ${fechas.map(f => `<option value="${f}">${f}</option>`).join('')}
-        </select>
         <input type="text" id="inv-search" placeholder="Buscar insumo..." class="filtro-search" />
         <button class="btn-accion btn-aprobar" onclick="exportarInventarioExcel()">Exportar Excel</button>
         <button class="btn-accion" style="border:1px solid var(--color-border)" onclick="exportarInventarioPDF()">Exportar PDF</button>
       </div>
-      <div id="inv-resultado"></div>
+      <div id="inv-resultado"><p style="color:var(--color-text-muted)">Cargando...</p></div>
     `
 
-    const cargarConteo = async (fecha) => {
-      const resultado = document.getElementById('inv-resultado')
-      resultado.innerHTML = `<p style="color:var(--color-text-muted)">Cargando...</p>`
+    const [{ data: conteo, error: errC }, { data: productos, error: errP }] = await Promise.all([
+      window._db.from('inventario_conteos').select('id_producto, cantidad, unidad, notas, fecha_conteo').eq('tenant_id', tenant_id),
+      window._db.from('productos').select('id_producto, producto, grupo').eq('tenant_id', tenant_id).eq('activo', true)
+    ])
 
-      const [{ data: conteo, error: errC }, { data: productos, error: errP }] = await Promise.all([
-        window._db.from('inventario_conteos').select('id_producto, cantidad, unidad, notas').eq('tenant_id', tenant_id).eq('fecha_conteo', fecha),
-        window._db.from('productos').select('id_producto, producto, grupo').eq('tenant_id', tenant_id).eq('activo', true)
-      ])
+    if (errC) throw errC
+    if (errP) throw errP
 
-      if (errC) throw errC
-      if (errP) throw errP
+    const prodMap = {}
+    ;(productos || []).forEach(p => { prodMap[p.id_producto] = p })
 
-      const prodMap = {}
-      ;(productos || []).forEach(p => { prodMap[p.id_producto] = p })
+    const porProducto = {}
+    ;(conteo || []).forEach(c => {
+      const existente = porProducto[c.id_producto]
+      if (!existente || c.fecha_conteo > existente.fecha_conteo) {
+        porProducto[c.id_producto] = c
+      }
+    })
 
-      window._invConteo = (conteo || []).map(c => ({
-        ...c,
-        producto: prodMap[c.id_producto]?.producto || c.id_producto,
-        grupo: prodMap[c.id_producto]?.grupo || 'Sin grupo'
-      }))
-
-      renderInventario()
-    }
+    window._invConteo = Object.values(porProducto).map(c => ({
+      ...c,
+      producto: prodMap[c.id_producto]?.producto || c.id_producto,
+      grupo: prodMap[c.id_producto]?.grupo || 'Sin grupo'
+    }))
 
     window.renderInventario = function() {
       const resultado = document.getElementById('inv-resultado')
@@ -126,10 +109,8 @@ async function vistaInventario() {
       resultado.innerHTML = html
     }
 
-    document.getElementById('inv-fecha').addEventListener('change', e => cargarConteo(e.target.value))
     document.getElementById('inv-search').addEventListener('input', renderInventario)
-
-    await cargarConteo(fechas[0])
+    renderInventario()
 
   } catch (err) {
     content.innerHTML = `<p style="color:var(--color-highlight)">Error: ${err.message}</p>`
@@ -137,7 +118,7 @@ async function vistaInventario() {
 }
 
 function exportarInventarioPDF() {
-  const fecha = document.getElementById('inv-fecha')?.value || '—'
+  const fecha = new Date().toISOString().split('T')[0]
   const conteo = window._invConteo || []
 
   const porGrupo = {}
@@ -184,7 +165,7 @@ function exportarInventarioPDF() {
 }
 
 function exportarInventarioExcel() {
-  const fecha = document.getElementById('inv-fecha')?.value
+  const fecha = new Date().toISOString().split('T')[0]
   const filas = (window._invConteo || []).map(c => ({
     Grupo: c.grupo,
     Insumo: c.producto,
