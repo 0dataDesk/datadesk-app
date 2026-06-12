@@ -10,6 +10,7 @@ async function renderVentas(container, tenantId) {
     .from('ventas')
     .select('id, folio, created_at, total, estado, tipo_entrega, cliente_nombre, metodo_pago')
     .eq('tenant_id', tenantId)
+    .is('id_cierre', null)
     .order('created_at', { ascending: false })
     .limit(50)
 
@@ -148,6 +149,10 @@ async function mostrarCierreCaja(tenantId) {
       <input type="date" id="cierre-fecha" value="${hoy}" style="border:1px solid var(--color-border);background:var(--color-bg-card);color:var(--color-text);border-radius:6px;padding:4px 10px">
       <button class="btn-accion btn-aprobar" id="cierre-export-btn" style="display:none"
         onclick="exportarCierreExcel(document.getElementById('cierre-fecha').value, window._cierreVentas)">Exportar Excel</button>
+      <button class="btn-accion" id="cierre-pdf-btn" style="display:none;border:1px solid var(--color-border)"
+        onclick="exportarVentasPDF()">Exportar PDF</button>
+      <button class="btn-accion" id="cierre-cerrar-btn" style="display:none;background:var(--color-primary);color:#fff;border:none"
+        onclick="confirmarCierreDia(document.getElementById('cierre-fecha').value, '${tenantId}')">Cerrar día</button>
     </div>
     <div id="cierre-resultado"></div>
   `
@@ -161,23 +166,27 @@ async function mostrarCierreCaja(tenantId) {
     const resultado = document.getElementById('cierre-resultado')
     resultado.innerHTML = `<p style="color:var(--color-text-muted)">Cargando...</p>`
     document.getElementById('cierre-export-btn').style.display = 'none'
+    document.getElementById('cierre-pdf-btn').style.display = 'none'
+    document.getElementById('cierre-cerrar-btn').style.display = 'none'
 
     const { data: ventasDia, error } = await window._db
       .from('ventas')
       .select('folio, metodo_pago, total, estado, created_at')
       .eq('tenant_id', tenantId)
       .eq('estado', 'cerrada')
+      .is('id_cierre', null)
       .gte('created_at', `${fecha}T00:00:00`)
       .lt('created_at', `${fecha}T23:59:59`)
       .order('created_at')
 
     if (error) { resultado.innerHTML = `<p style="color:var(--color-highlight)">Error: ${error.message}</p>`; return }
     if (!ventasDia || !ventasDia.length) {
-      resultado.innerHTML = `<p style="color:var(--color-text-muted)">Sin ventas cerradas para ${fecha}.</p>`
+      resultado.innerHTML = `<p style="color:var(--color-text-muted)">Sin ventas cerradas pendientes para ${fecha}.</p>`
       return
     }
 
     window._cierreVentas = ventasDia
+    window._cierreFecha  = fecha
 
     const totalGeneral = ventasDia.reduce((s, v) => s + Number(v.total), 0)
     const porMetodo = {}
@@ -187,10 +196,11 @@ async function mostrarCierreCaja(tenantId) {
       porMetodo[m].suma += Number(v.total)
       porMetodo[m].count++
     })
+    window._cierrePorMetodo = porMetodo
 
     const fmtHora = iso => new Date(iso).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
 
-    let html = `
+    const html = `
       <table class="tabla" style="margin-bottom:14px">
         <thead><tr><th>Método de pago</th><th style="text-align:right">Tickets</th><th style="text-align:right">Total</th></tr></thead>
         <tbody>
@@ -222,10 +232,102 @@ async function mostrarCierreCaja(tenantId) {
     `
     resultado.innerHTML = html
     document.getElementById('cierre-export-btn').style.display = ''
+    document.getElementById('cierre-pdf-btn').style.display = ''
+    document.getElementById('cierre-cerrar-btn').style.display = ''
   }
 
   document.getElementById('cierre-fecha').addEventListener('change', e => cargarCierre(e.target.value))
   await cargarCierre(hoy)
+}
+
+async function confirmarCierreDia(fecha, tenantId) {
+  if (!window.confirm(`¿Cerrar el día ${fecha}? Las ventas de hoy se archivarán y la vista de Ventas quedará vacía para el siguiente día. Esta acción cambia el estatus de las ventas, no las elimina.`)) return
+
+  const ventasDia = window._cierreVentas || []
+  if (!ventasDia.length) return
+
+  const totalGeneral = ventasDia.reduce((s, v) => s + Number(v.total), 0)
+  const porMetodo = {}
+  ventasDia.forEach(v => {
+    const m = v.metodo_pago || 'Sin método'
+    if (!porMetodo[m]) porMetodo[m] = { suma: 0, count: 0 }
+    porMetodo[m].suma += Number(v.total)
+    porMetodo[m].count++
+  })
+
+  const { data: cierre, error: errC } = await window._db
+    .from('cierres_caja')
+    .insert({
+      tenant_id: tenantId,
+      fecha,
+      total_general: totalGeneral,
+      num_tickets: ventasDia.length,
+      desglose_metodo: porMetodo,
+      cerrado_por: window._email || null
+    })
+    .select().single()
+
+  if (errC) { alert(`Error al crear cierre: ${errC.message}`); return }
+
+  const { error: errU } = await window._db
+    .from('ventas')
+    .update({ id_cierre: cierre.id })
+    .eq('tenant_id', tenantId)
+    .eq('estado', 'cerrada')
+    .is('id_cierre', null)
+    .gte('created_at', `${fecha}T00:00:00`)
+    .lt('created_at', `${fecha}T23:59:59`)
+
+  if (errU) { alert(`Error al archivar ventas: ${errU.message}`); return }
+
+  alert('Día cerrado correctamente.')
+  document.getElementById('cierre-panel')?.remove()
+  await vistaVentas()
+}
+
+function exportarVentasPDF() {
+  const fecha     = window._cierreFecha || '—'
+  const ventas    = window._cierreVentas || []
+  const porMetodo = window._cierrePorMetodo || {}
+  const total     = ventas.reduce((s, v) => s + Number(v.total), 0)
+  const fmtHora   = iso => new Date(iso).toLocaleTimeString('es-MX')
+
+  const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Ventas ${fecha}</title>
+<style>
+  body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 13px; color: #2B1A0F; margin: 0; padding: 40px; background: #FAF7F2; }
+  .header { border-bottom: 3px solid #C8892A; padding-bottom: 16px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: flex-end; }
+  .header h1 { font-size: 22px; margin: 0; }
+  .header small { color: #9B7B6A; font-size: 12px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 20px; background: #fff; }
+  thead th { padding: 8px 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: #9B7B6A; border-bottom: 2px solid #E8DDD5; }
+  td { padding: 8px 12px; border-bottom: 1px solid #E8DDD5; }
+  .total-row td { border-top: 2px solid #C8892A; font-weight: 700; }
+  .footer { margin-top: 30px; font-size: 11px; color: #9B7B6A; text-align: center; }
+</style></head><body>
+  <div class="header">
+    <div><h1>Resumen de Ventas — Furia</h1><small>Fecha: ${fecha}</small></div>
+    <div style="font-size:11px;color:#9B7B6A">${ventas.length} tickets</div>
+  </div>
+  <table>
+    <thead><tr><th>Método de pago</th><th style="text-align:right">Tickets</th><th style="text-align:right">Total</th></tr></thead>
+    <tbody>
+      ${Object.entries(porMetodo).map(([m, d]) => `<tr><td>${m}</td><td style="text-align:right">${d.count}</td><td style="text-align:right">$${Number(d.suma).toFixed(2)}</td></tr>`).join('')}
+      <tr class="total-row"><td>TOTAL</td><td style="text-align:right">${ventas.length}</td><td style="text-align:right;color:#C8892A">$${total.toFixed(2)}</td></tr>
+    </tbody>
+  </table>
+  <table>
+    <thead><tr><th>Folio</th><th>Método</th><th style="text-align:right">Total</th><th>Hora</th></tr></thead>
+    <tbody>${ventas.map(v => `<tr><td>${v.folio||'—'}</td><td>${v.metodo_pago||'—'}</td><td style="text-align:right">$${Number(v.total).toFixed(2)}</td><td>${fmtHora(v.created_at)}</td></tr>`).join('')}</tbody>
+  </table>
+  <div class="footer">Documento generado por dataDesk · ${new Date().toLocaleDateString('es-MX')}</div>
+</body></html>`
+
+  const ventana = window.open('', '_blank')
+  ventana.document.write(html)
+  ventana.document.close()
+  ventana.focus()
+  setTimeout(() => ventana.print(), 500)
 }
 
 function exportarCierreExcel(fecha, ventasDia) {

@@ -28,6 +28,7 @@ async function vistaInventario() {
         </select>
         <input type="text" id="inv-search" placeholder="Buscar insumo..." class="filtro-search" />
         <button class="btn-accion btn-aprobar" onclick="exportarInventarioExcel()">Exportar Excel</button>
+        <button class="btn-accion" style="border:1px solid var(--color-border)" onclick="exportarInventarioPDF()">Exportar PDF</button>
       </div>
       <div id="inv-resultado"></div>
     `
@@ -133,6 +134,53 @@ async function vistaInventario() {
   } catch (err) {
     content.innerHTML = `<p style="color:var(--color-highlight)">Error: ${err.message}</p>`
   }
+}
+
+function exportarInventarioPDF() {
+  const fecha = document.getElementById('inv-fecha')?.value || '—'
+  const conteo = window._invConteo || []
+
+  const porGrupo = {}
+  conteo.forEach(c => {
+    const g = c.grupo || 'Sin grupo'
+    if (!porGrupo[g]) porGrupo[g] = []
+    porGrupo[g].push(c)
+  })
+  const grupos = Object.keys(porGrupo).sort()
+
+  const seccionesHtml = grupos.map(g => {
+    const filas = porGrupo[g]
+      .slice()
+      .sort((a, b) => a.producto.localeCompare(b.producto))
+      .map(c => `<tr><td style="padding:6px 12px;border-bottom:1px solid #E8DDD5">${c.producto}</td><td style="padding:6px 12px;border-bottom:1px solid #E8DDD5;text-align:right;font-weight:600">${c.cantidad}</td><td style="padding:6px 12px;border-bottom:1px solid #E8DDD5;color:#9B7B6A">${c.unidad}</td><td style="padding:6px 12px;border-bottom:1px solid #E8DDD5;font-size:11px;color:#9B7B6A">${c.notas || ''}</td></tr>`).join('')
+    return `<h3 style="font-size:13px;text-transform:uppercase;letter-spacing:1px;color:#9B7B6A;margin:20px 0 6px">${g}</h3>
+<table style="width:100%;border-collapse:collapse;background:#fff;margin-bottom:8px">
+<thead><tr><th style="padding:8px 12px;text-align:left;font-size:11px;text-transform:uppercase;color:#9B7B6A;border-bottom:2px solid #E8DDD5">Insumo</th><th style="padding:8px 12px;text-align:right;font-size:11px;text-transform:uppercase;color:#9B7B6A;border-bottom:2px solid #E8DDD5">Cantidad</th><th style="padding:8px 12px;font-size:11px;text-transform:uppercase;color:#9B7B6A;border-bottom:2px solid #E8DDD5">Unidad</th><th style="padding:8px 12px;font-size:11px;text-transform:uppercase;color:#9B7B6A;border-bottom:2px solid #E8DDD5">Notas</th></tr></thead>
+<tbody>${filas}</tbody></table>`
+  }).join('')
+
+  const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Inventario ${fecha}</title>
+<style>
+  body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 13px; color: #2B1A0F; margin: 0; padding: 40px; background: #FAF7F2; }
+  .header { border-bottom: 3px solid #C8892A; padding-bottom: 16px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: flex-end; }
+  .header h1 { font-size: 22px; margin: 0; }
+  .header small { color: #9B7B6A; font-size: 12px; }
+  .footer { margin-top: 30px; font-size: 11px; color: #9B7B6A; text-align: center; border-top: 1px solid #E8DDD5; padding-top: 12px; }
+</style></head><body>
+  <div class="header">
+    <div><h1>Inventario — Furia</h1><small>Conteo: ${fecha}</small></div>
+    <div style="font-size:11px;color:#9B7B6A">${conteo.length} insumos</div>
+  </div>
+  ${seccionesHtml}
+  <div class="footer">Documento generado por dataDesk · ${new Date().toLocaleDateString('es-MX')}</div>
+</body></html>`
+
+  const ventana = window.open('', '_blank')
+  ventana.document.write(html)
+  ventana.document.close()
+  ventana.focus()
+  setTimeout(() => ventana.print(), 500)
 }
 
 function exportarInventarioExcel() {
