@@ -85,6 +85,7 @@ async function renderVentas(container, tenantId) {
     return
   }
 
+  let listaHtml = ''
   ventas.forEach(v => {
     const badge     = estadoBadge[v.estado] || ''
     const items     = itemsPorVenta[v.id] || []
@@ -105,7 +106,7 @@ async function renderVentas(container, tenantId) {
       return `<div style="padding:3px 0;font-size:13px">${it.nombre} ×${it.cantidad} — <strong>$${it.importe}</strong>${modsText}</div>`
     }).join('')
 
-    html += `
+    listaHtml += `
       <div class="receta-card" id="venta-${v.id}" style="margin-bottom:14px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
           <div>
@@ -129,6 +130,7 @@ async function renderVentas(container, tenantId) {
     `
   })
 
+  html += `<div id="lista-ventas-wrap">${listaHtml}</div>`
   container.innerHTML = html
 }
 
@@ -141,7 +143,12 @@ function rangoDiaMexico(fecha) {
 
 async function mostrarCierreCaja(tenantId) {
   const panel = document.getElementById('cierre-panel')
-  if (panel) { panel.remove(); return }
+  const listaWrap = document.getElementById('lista-ventas-wrap')
+  if (panel) {
+    panel.remove()
+    if (listaWrap) listaWrap.style.display = ''
+    return
+  }
 
   const hoy = new Date().toISOString().split('T')[0]
   const container = document.getElementById('content')
@@ -168,6 +175,8 @@ async function mostrarCierreCaja(tenantId) {
   } else {
     container.appendChild(panelDiv)
   }
+
+  if (listaWrap) listaWrap.style.display = 'none'
 
   const cargarCierre = async (fecha) => {
     const resultado = document.getElementById('cierre-resultado')
