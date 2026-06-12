@@ -132,6 +132,13 @@ async function renderVentas(container, tenantId) {
   container.innerHTML = html
 }
 
+function rangoDiaMexico(fecha) {
+  return {
+    inicio: new Date(`${fecha}T00:00:00-06:00`).toISOString(),
+    fin:    new Date(`${fecha}T23:59:59-06:00`).toISOString()
+  }
+}
+
 async function mostrarCierreCaja(tenantId) {
   const panel = document.getElementById('cierre-panel')
   if (panel) { panel.remove(); return }
@@ -175,8 +182,8 @@ async function mostrarCierreCaja(tenantId) {
       .eq('tenant_id', tenantId)
       .eq('estado', 'cerrada')
       .is('id_cierre', null)
-      .gte('created_at', `${fecha}T00:00:00`)
-      .lt('created_at', `${fecha}T23:59:59`)
+      .gte('created_at', rangoDiaMexico(fecha).inicio)
+      .lt('created_at', rangoDiaMexico(fecha).fin)
       .order('created_at')
 
     if (error) { resultado.innerHTML = `<p style="color:var(--color-highlight)">Error: ${error.message}</p>`; return }
@@ -275,8 +282,8 @@ async function confirmarCierreDia(fecha, tenantId) {
     .eq('tenant_id', tenantId)
     .eq('estado', 'cerrada')
     .is('id_cierre', null)
-    .gte('created_at', `${fecha}T00:00:00`)
-    .lt('created_at', `${fecha}T23:59:59`)
+    .gte('created_at', rangoDiaMexico(fecha).inicio)
+    .lt('created_at', rangoDiaMexico(fecha).fin)
 
   if (errU) { alert(`Error al archivar ventas: ${errU.message}`); return }
 
