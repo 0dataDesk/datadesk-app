@@ -73,6 +73,7 @@ async function renderVentas(container, tenantId) {
   let html = `
     <div class="vista-header">
       <h2>Ventas</h2>
+      <button class="btn-accion" onclick="mostrarCierreCaja('${tenantId}')">Cierre de caja</button>
       <button class="btn-accion btn-aprobar" onclick="vistaVentas()">↺ Recargar</button>
     </div>
   `
@@ -128,6 +129,116 @@ async function renderVentas(container, tenantId) {
   })
 
   container.innerHTML = html
+}
+
+async function mostrarCierreCaja(tenantId) {
+  const panel = document.getElementById('cierre-panel')
+  if (panel) { panel.remove(); return }
+
+  const hoy = new Date().toISOString().split('T')[0]
+  const container = document.getElementById('content')
+  const header = container.querySelector('.vista-header')
+  const panelDiv = document.createElement('div')
+  panelDiv.id = 'cierre-panel'
+  panelDiv.className = 'receta-card'
+  panelDiv.style.marginBottom = '18px'
+  panelDiv.innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+      <strong style="font-size:15px">Cierre de caja</strong>
+      <input type="date" id="cierre-fecha" value="${hoy}" style="border:1px solid var(--color-border);background:var(--color-bg-card);color:var(--color-text);border-radius:6px;padding:4px 10px">
+      <button class="btn-accion btn-aprobar" id="cierre-export-btn" style="display:none"
+        onclick="exportarCierreExcel(document.getElementById('cierre-fecha').value, window._cierreVentas)">Exportar Excel</button>
+    </div>
+    <div id="cierre-resultado"></div>
+  `
+  if (header && header.nextSibling) {
+    container.insertBefore(panelDiv, header.nextSibling)
+  } else {
+    container.appendChild(panelDiv)
+  }
+
+  const cargarCierre = async (fecha) => {
+    const resultado = document.getElementById('cierre-resultado')
+    resultado.innerHTML = `<p style="color:var(--color-text-muted)">Cargando...</p>`
+    document.getElementById('cierre-export-btn').style.display = 'none'
+
+    const { data: ventasDia, error } = await window._db
+      .from('ventas')
+      .select('folio, metodo_pago, total, estado, created_at')
+      .eq('tenant_id', tenantId)
+      .eq('estado', 'cerrada')
+      .gte('created_at', `${fecha}T00:00:00`)
+      .lt('created_at', `${fecha}T23:59:59`)
+      .order('created_at')
+
+    if (error) { resultado.innerHTML = `<p style="color:var(--color-highlight)">Error: ${error.message}</p>`; return }
+    if (!ventasDia || !ventasDia.length) {
+      resultado.innerHTML = `<p style="color:var(--color-text-muted)">Sin ventas cerradas para ${fecha}.</p>`
+      return
+    }
+
+    window._cierreVentas = ventasDia
+
+    const totalGeneral = ventasDia.reduce((s, v) => s + Number(v.total), 0)
+    const porMetodo = {}
+    ventasDia.forEach(v => {
+      const m = v.metodo_pago || 'Sin método'
+      if (!porMetodo[m]) porMetodo[m] = { suma: 0, count: 0 }
+      porMetodo[m].suma += Number(v.total)
+      porMetodo[m].count++
+    })
+
+    const fmtHora = iso => new Date(iso).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+
+    let html = `
+      <table class="tabla" style="margin-bottom:14px">
+        <thead><tr><th>Método de pago</th><th style="text-align:right">Tickets</th><th style="text-align:right">Total</th></tr></thead>
+        <tbody>
+          ${Object.entries(porMetodo).map(([m, d]) => `
+            <tr>
+              <td>${m}</td>
+              <td style="text-align:right">${d.count}</td>
+              <td style="text-align:right;font-weight:600">$${d.suma.toFixed(2)}</td>
+            </tr>`).join('')}
+          <tr class="costeo-total">
+            <td><strong>TOTAL</strong></td>
+            <td style="text-align:right"><strong>${ventasDia.length} tickets</strong></td>
+            <td style="text-align:right"><strong>$${totalGeneral.toFixed(2)}</strong></td>
+          </tr>
+        </tbody>
+      </table>
+      <table class="tabla">
+        <thead><tr><th>Folio</th><th>Método</th><th style="text-align:right">Total</th><th>Hora</th></tr></thead>
+        <tbody>
+          ${ventasDia.map(v => `
+            <tr>
+              <td>${v.folio || '—'}</td>
+              <td>${v.metodo_pago || '—'}</td>
+              <td style="text-align:right">$${Number(v.total).toFixed(2)}</td>
+              <td style="color:var(--color-text-muted)">${fmtHora(v.created_at)}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    `
+    resultado.innerHTML = html
+    document.getElementById('cierre-export-btn').style.display = ''
+  }
+
+  document.getElementById('cierre-fecha').addEventListener('change', e => cargarCierre(e.target.value))
+  await cargarCierre(hoy)
+}
+
+function exportarCierreExcel(fecha, ventasDia) {
+  const filas = ventasDia.map(v => ({
+    Folio: v.folio,
+    'Método de pago': v.metodo_pago,
+    Total: Number(v.total),
+    Hora: new Date(v.created_at).toLocaleTimeString('es-MX')
+  }))
+  const ws = XLSX.utils.json_to_sheet(filas)
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Cierre')
+  XLSX.writeFile(wb, `cierre_caja_furia_${fecha}.xlsx`)
 }
 
 async function eliminarVenta(id, folio, tenantId) {
