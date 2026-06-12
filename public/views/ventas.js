@@ -1,4 +1,4 @@
-async function vistaVentas() {
+﻿async function vistaVentas() {
   const content = document.getElementById('content')
   content.innerHTML = `<p style="color:var(--color-text-muted)">Cargando ventas...</p>`
   const tenant_id = await getTenantId()
@@ -134,7 +134,33 @@ async function renderVentas(container, tenantId) {
   container.innerHTML = html
 }
 
-function rangoDiaMexico(fecha) {
+function calcularDesglosePorMetodo(ventasDia) {
+  const porMetodo = {}
+  const addMetodo = (m, monto, esTicketCompleto) => {
+    if (!porMetodo[m]) porMetodo[m] = { suma: 0, count: 0 }
+    porMetodo[m].suma += monto
+    if (esTicketCompleto) porMetodo[m].count++
+  }
+  ventasDia.forEach(v => {
+    const m = (v.metodo_pago || '').toLowerCase()
+    if (m === 'mixto' || m === 'dividido' || (Number(v.monto_efectivo) > 0 && Number(v.monto_tarjeta) > 0)) {
+      if (Number(v.monto_efectivo) > 0) addMetodo('efectivo', Number(v.monto_efectivo), false)
+      if (Number(v.monto_tarjeta) > 0) addMetodo('tarjeta', Number(v.monto_tarjeta), false)
+      if (Number(v.monto_efectivo) > 0) porMetodo['efectivo'].count++
+      if (Number(v.monto_tarjeta) > 0) porMetodo['tarjeta'].count++
+    } else {
+      addMetodo(v.metodo_pago || 'Sin método', Number(v.total), true)
+    }
+  })
+  return porMetodo
+}
+
+function metodoDisplay(v) {
+  return (Number(v.monto_efectivo) > 0 && Number(v.monto_tarjeta) > 0)
+    ? `Efectivo $${Number(v.monto_efectivo).toFixed(2)} + Tarjeta $${Number(v.monto_tarjeta).toFixed(2)}`
+    : (v.metodo_pago || '—')
+}
+function rangoDiaMexico(fecha) {
   return {
     inicio: new Date(`${fecha}T00:00:00-06:00`).toISOString(),
     fin:    new Date(`${fecha}T23:59:59-06:00`).toISOString()
@@ -187,7 +213,7 @@ async function mostrarCierreCaja(tenantId) {
 
     const { data: ventasDia, error } = await window._db
       .from('ventas')
-      .select('folio, metodo_pago, total, estado, created_at')
+      .select('folio, metodo_pago, total, monto_efectivo, monto_tarjeta, estado, created_at')
       .eq('tenant_id', tenantId)
       .eq('estado', 'cerrada')
       .is('id_cierre', null)
@@ -205,13 +231,7 @@ async function mostrarCierreCaja(tenantId) {
     window._cierreFecha  = fecha
 
     const totalGeneral = ventasDia.reduce((s, v) => s + Number(v.total), 0)
-    const porMetodo = {}
-    ventasDia.forEach(v => {
-      const m = v.metodo_pago || 'Sin método'
-      if (!porMetodo[m]) porMetodo[m] = { suma: 0, count: 0 }
-      porMetodo[m].suma += Number(v.total)
-      porMetodo[m].count++
-    })
+    const porMetodo = calcularDesglosePorMetodo(ventasDia)
     window._cierrePorMetodo = porMetodo
 
     const fmtHora = iso => new Date(iso).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
@@ -239,7 +259,7 @@ async function mostrarCierreCaja(tenantId) {
           ${ventasDia.map(v => `
             <tr>
               <td>${v.folio || '—'}</td>
-              <td>${v.metodo_pago || '—'}</td>
+              <td>${metodoDisplay(v)}</td>
               <td style="text-align:right">$${Number(v.total).toFixed(2)}</td>
               <td style="color:var(--color-text-muted)">${fmtHora(v.created_at)}</td>
             </tr>`).join('')}
@@ -263,13 +283,7 @@ async function confirmarCierreDia(fecha, tenantId) {
   if (!ventasDia.length) return
 
   const totalGeneral = ventasDia.reduce((s, v) => s + Number(v.total), 0)
-  const porMetodo = {}
-  ventasDia.forEach(v => {
-    const m = v.metodo_pago || 'Sin método'
-    if (!porMetodo[m]) porMetodo[m] = { suma: 0, count: 0 }
-    porMetodo[m].suma += Number(v.total)
-    porMetodo[m].count++
-  })
+  const porMetodo = calcularDesglosePorMetodo(ventasDia)
 
   const { data: cierre, error: errC } = await window._db
     .from('cierres_caja')
@@ -334,7 +348,7 @@ function exportarVentasPDF() {
   </table>
   <table>
     <thead><tr><th>Folio</th><th>Método</th><th style="text-align:right">Total</th><th>Hora</th></tr></thead>
-    <tbody>${ventas.map(v => `<tr><td>${v.folio||'—'}</td><td>${v.metodo_pago||'—'}</td><td style="text-align:right">$${Number(v.total).toFixed(2)}</td><td>${fmtHora(v.created_at)}</td></tr>`).join('')}</tbody>
+    <tbody>${ventas.map(v => `<tr><td>${v.folio||'—'}</td><td>${metodoDisplay(v)}</td><td style="text-align:right">$${Number(v.total).toFixed(2)}</td><td>${fmtHora(v.created_at)}</td></tr>`).join('')}</tbody>
   </table>
   <div class="footer">Documento generado por dataDesk · ${new Date().toLocaleDateString('es-MX')}</div>
 </body></html>`
@@ -349,7 +363,7 @@ function exportarVentasPDF() {
 function exportarCierreExcel(fecha, ventasDia) {
   const filas = ventasDia.map(v => ({
     Folio: v.folio,
-    'Método de pago': v.metodo_pago,
+    'Método de pago': metodoDisplay(v),
     Total: Number(v.total),
     Hora: new Date(v.created_at).toLocaleTimeString('es-MX')
   }))
@@ -395,3 +409,5 @@ async function eliminarVenta(id, folio, tenantId) {
     alert('Error al eliminar: ' + err.message)
   }
 }
+
+
