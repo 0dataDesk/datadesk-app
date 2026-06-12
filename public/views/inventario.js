@@ -27,6 +27,7 @@ async function vistaInventario() {
           ${fechas.map(f => `<option value="${f}">${f}</option>`).join('')}
         </select>
         <input type="text" id="inv-search" placeholder="Buscar insumo..." class="filtro-search" />
+        <button class="btn-accion btn-aprobar" onclick="exportarInventarioExcel()">Exportar Excel</button>
       </div>
       <div id="inv-resultado"></div>
     `
@@ -132,4 +133,21 @@ async function vistaInventario() {
   } catch (err) {
     content.innerHTML = `<p style="color:var(--color-highlight)">Error: ${err.message}</p>`
   }
+}
+
+function exportarInventarioExcel() {
+  const fecha = document.getElementById('inv-fecha')?.value
+  const filas = (window._invConteo || []).map(c => ({
+    Grupo: c.grupo,
+    Insumo: c.producto,
+    Cantidad: c.cantidad,
+    Unidad: c.unidad,
+    Notas: c.notas || ''
+  }))
+  filas.sort((a, b) => a.Grupo.localeCompare(b.Grupo) || a.Insumo.localeCompare(b.Insumo))
+
+  const ws = XLSX.utils.json_to_sheet(filas)
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Inventario')
+  XLSX.writeFile(wb, `inventario_furia_${fecha}.xlsx`)
 }
