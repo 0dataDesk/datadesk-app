@@ -107,6 +107,7 @@ async function mostrarApp(rol, email, tenant_id = null) {
                 <li><a href="#" data-view="cierres">Cierres</a></li>
                 <li><a href="#" data-view="mrp">Sugerido</a></li>
                 <li><a href="#" data-view="resultados">Resultados</a></li>
+                <li><a href="#" data-view="tesoreria">Tesorería</a></li>
               </ul>
             </li>
           </ul>
@@ -143,12 +144,13 @@ async function mostrarApp(rol, email, tenant_id = null) {
       if (view === 'mrp')          await vistaMRP()
       if (view === 'resultados')   await vistaResultados()
       if (view === 'cierres')      await vistaCierres()
+      if (view === 'tesoreria')    await vistaTesoreria()
     })
   })
 
   // Ocultar nav items según rol
   const permitidasPorRol = {
-    admin:  ['inicio','productos','recetas','precios','costeo','pedidos','recepciones','gastos','ventas','conteos','cierres','mrp','resultados'],
+    admin:  ['inicio','productos','recetas','precios','costeo','pedidos','recepciones','gastos','ventas','conteos','cierres','mrp','resultados','tesoreria'],
     editor: ['inicio','productos','recetas','recepciones','conteos'],
     cocina: ['productos','recetas']
   }
@@ -203,6 +205,7 @@ async function mostrarApp(rol, email, tenant_id = null) {
   else if (vistaInicial === 'mrp')          vistaMRP()
   else if (vistaInicial === 'resultados')   vistaResultados()
   else if (vistaInicial === 'cierres')      vistaCierres()
+  else if (vistaInicial === 'tesoreria')    vistaTesoreria()
   else                                      mostrarBienvenida()
 }
 
