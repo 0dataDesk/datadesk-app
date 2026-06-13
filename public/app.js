@@ -77,20 +77,38 @@ async function mostrarApp(rol, email, tenant_id = null) {
       </header>
       <div class="body">
         <nav class="sidebar">
-          <ul>
+          <ul class="nav-menu">
             <li><a href="#" data-view="inicio">Inicio</a></li>
-            <li><a href="#" data-view="productos">Insumos</a></li>
-            <li><a href="#" data-view="recetas">Recetas</a></li>
-            <li><a href="#" data-view="precios">Precios</a></li>
-            <li><a href="#" data-view="costeo">Costeo</a></li>
-            <li><a href="#" data-view="pedidos">Pedidos</a></li>
-            <li><a href="#" data-view="recepciones">Recepciones</a></li>
-            <li><a href="#" data-view="gastos">Gastos</a></li>
-            <li><a href="#" data-view="ventas">🧾 Ventas</a></li>
-            <li><a href="#" data-view="conteos">Conteos</a></li>
-            <li><a href="#" data-view="mrp">Sugerido</a></li>
-            <li><a href="#" data-view="resultados">Resultados</a></li>
-            <li><a href="#" data-view="cierres">Cierres</a></li>
+
+            <li class="nav-dropdown">
+              <a href="#" class="nav-dropdown-toggle">Catálogo</a>
+              <ul class="nav-dropdown-menu">
+                <li><a href="#" data-view="productos">Insumos</a></li>
+                <li><a href="#" data-view="recetas">Recetas</a></li>
+                <li><a href="#" data-view="precios">Precios</a></li>
+                <li><a href="#" data-view="costeo">Costeo</a></li>
+              </ul>
+            </li>
+
+            <li class="nav-dropdown">
+              <a href="#" class="nav-dropdown-toggle">Operación</a>
+              <ul class="nav-dropdown-menu">
+                <li><a href="#" data-view="pedidos">Pedidos</a></li>
+                <li><a href="#" data-view="recepciones">Recepciones</a></li>
+                <li><a href="#" data-view="ventas">Ventas</a></li>
+                <li><a href="#" data-view="conteos">Conteos</a></li>
+              </ul>
+            </li>
+
+            <li class="nav-dropdown">
+              <a href="#" class="nav-dropdown-toggle">Finanzas</a>
+              <ul class="nav-dropdown-menu">
+                <li><a href="#" data-view="gastos">Gastos</a></li>
+                <li><a href="#" data-view="cierres">Cierres</a></li>
+                <li><a href="#" data-view="mrp">Sugerido</a></li>
+                <li><a href="#" data-view="resultados">Resultados</a></li>
+              </ul>
+            </li>
           </ul>
         </nav>
         <main class="content" id="content">
@@ -140,10 +158,38 @@ async function mostrarApp(rol, email, tenant_id = null) {
     item.closest('li').style.display = visibles.includes(view) ? '' : 'none'
   })
 
+  // Ocultar grupos dropdown que quedaron sin vistas visibles
+  document.querySelectorAll('.nav-dropdown').forEach(group => {
+    const hayVisibles = [...group.querySelectorAll('[data-view]')].some(a => a.closest('li').style.display !== 'none')
+    if (!hayVisibles) group.style.display = 'none'
+  })
+
+  // Toggle dropdown por click (soporte táctil)
+  document.querySelectorAll('.nav-dropdown-toggle').forEach(toggle => {
+    toggle.addEventListener('click', e => {
+      e.preventDefault()
+      const parent = toggle.closest('.nav-dropdown')
+      const isOpen = parent.classList.contains('open')
+      document.querySelectorAll('.nav-dropdown').forEach(d => d.classList.remove('open'))
+      if (!isOpen) parent.classList.add('open')
+    })
+  })
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.nav-dropdown')) {
+      document.querySelectorAll('.nav-dropdown').forEach(d => d.classList.remove('open'))
+    }
+  })
+
   const vistaGuardada = localStorage.getItem('datadesk-view')
   const vistaInicial  = visibles.includes(vistaGuardada) ? vistaGuardada : (window._rol === 'cocina' ? 'productos' : 'inicio')
   const linkActivo = document.querySelector(`[data-view="${vistaInicial}"]`)
   if (linkActivo) linkActivo.classList.add('active')
+
+  // Marcar grupo activo
+  if (linkActivo) {
+    const toggle = linkActivo.closest('.nav-dropdown')?.querySelector('.nav-dropdown-toggle')
+    if (toggle) toggle.classList.add('active-group')
+  }
 
   if (vistaInicial === 'productos')    vistaProductos()
   else if (vistaInicial === 'recetas') vistaRecetas()

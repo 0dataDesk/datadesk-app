@@ -244,6 +244,48 @@ body {
   font-weight: 600;
 }
 
+/* ── NAV DROPDOWNS ── */
+.nav-menu { display: flex; gap: 0; list-style: none; align-items: stretch; }
+
+.nav-dropdown { position: relative; }
+
+.nav-dropdown-toggle::after { content: ' ▾'; font-size: 10px; opacity: 0.7; }
+
+/* Override .sidebar ul so dropdown menus don't inherit flex+overflow */
+.sidebar .nav-dropdown-menu {
+  display: none;
+  position: absolute;
+  top: 100%; left: 0;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  min-width: 160px;
+  padding: 4px;
+  list-style: none;
+  width: auto;
+  overflow-x: visible;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(43,26,15,0.08);
+  flex-direction: column;
+}
+
+.nav-dropdown:hover .nav-dropdown-menu,
+.nav-dropdown:focus-within .nav-dropdown-menu,
+.nav-dropdown.open .nav-dropdown-menu { display: flex; }
+
+.sidebar .nav-dropdown-menu li a {
+  padding: 8px 14px;
+  border-bottom: none;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.nav-dropdown-toggle.active-group {
+  color: var(--color-primary);
+  font-weight: 600;
+  border-bottom-color: var(--color-accent);
+}
+
 /* ── CONTENT ── */
 .content {
   flex: 1;
