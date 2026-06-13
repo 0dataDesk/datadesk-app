@@ -87,7 +87,7 @@ async function mostrarApp(rol, email, tenant_id = null) {
             <li><a href="#" data-view="recepciones">Recepciones</a></li>
             <li><a href="#" data-view="gastos">Gastos</a></li>
             <li><a href="#" data-view="ventas">🧾 Ventas</a></li>
-            <li><a href="#" data-view="inventario">Inventario</a></li>
+            <li><a href="#" data-view="conteos">Conteos</a></li>
             <li><a href="#" data-view="cierres">Cierres</a></li>
           </ul>
         </nav>
@@ -119,15 +119,15 @@ async function mostrarApp(rol, email, tenant_id = null) {
       if (view === 'recepciones')  await vistaRecepciones()
       if (view === 'gastos')       await vistaGastos()
       if (view === 'ventas')       await vistaVentas()
-      if (view === 'inventario')   await vistaInventario()
+      if (view === 'conteos')      await vistaConteos()
       if (view === 'cierres')      await vistaCierres()
     })
   })
 
   // Ocultar nav items según rol
   const permitidasPorRol = {
-    admin:  ['inicio','productos','recetas','precios','costeo','pedidos','recepciones','gastos','ventas','inventario','cierres'],
-    editor: ['inicio','productos','recetas','recepciones','inventario'],
+    admin:  ['inicio','productos','recetas','precios','costeo','pedidos','recepciones','gastos','ventas','conteos','cierres'],
+    editor: ['inicio','productos','recetas','recepciones','conteos'],
     cocina: ['productos','recetas']
   }
   const visibles = permitidasPorRol[window._rol] || ['inicio','productos','recetas','precios','costeo','pedidos']
@@ -149,7 +149,7 @@ async function mostrarApp(rol, email, tenant_id = null) {
   else if (vistaInicial === 'recepciones')  vistaRecepciones()
   else if (vistaInicial === 'gastos')       vistaGastos()
   else if (vistaInicial === 'ventas')       vistaVentas()
-  else if (vistaInicial === 'inventario')   vistaInventario()
+  else if (vistaInicial === 'conteos')      vistaConteos()
   else if (vistaInicial === 'cierres')      vistaCierres()
   else                                      mostrarBienvenida()
 }
