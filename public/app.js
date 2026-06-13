@@ -86,7 +86,9 @@ async function mostrarApp(rol, email, tenant_id = null) {
             <li><a href="#" data-view="pedidos">Pedidos</a></li>
             <li><a href="#" data-view="recepciones">Recepciones</a></li>
             <li><a href="#" data-view="gastos">Gastos</a></li>
+            <li><a href="#" data-view="ventas">🧾 Ventas</a></li>
             <li><a href="#" data-view="inventario">Inventario</a></li>
+            <li><a href="#" data-view="cierres">Cierres</a></li>
           </ul>
         </nav>
         <main class="content" id="content">
@@ -113,16 +115,18 @@ async function mostrarApp(rol, email, tenant_id = null) {
       if (view === 'recetas')   await vistaRecetas()
       if (view === 'precios')   await vistaPrecios()
       if (view === 'costeo')    await vistaCosteo()
-      if (view === 'pedidos')       await vistaPedidos()
+      if (view === 'pedidos')      await vistaPedidos()
       if (view === 'recepciones')  await vistaRecepciones()
       if (view === 'gastos')       await vistaGastos()
+      if (view === 'ventas')       await vistaVentas()
       if (view === 'inventario')   await vistaInventario()
+      if (view === 'cierres')      await vistaCierres()
     })
   })
 
   // Ocultar nav items según rol
   const permitidasPorRol = {
-    admin:  ['inicio','productos','recetas','precios','costeo','pedidos','recepciones','gastos','inventario'],
+    admin:  ['inicio','productos','recetas','precios','costeo','pedidos','recepciones','gastos','ventas','inventario','cierres'],
     editor: ['inicio','productos','recetas','recepciones','inventario'],
     cocina: ['productos','recetas']
   }
@@ -142,10 +146,12 @@ async function mostrarApp(rol, email, tenant_id = null) {
   else if (vistaInicial === 'precios') vistaPrecios()
   else if (vistaInicial === 'costeo')  vistaCosteo()
   else if (vistaInicial === 'pedidos')      vistaPedidos()
-  else if (vistaInicial === 'recepciones') vistaRecepciones()
-  else if (vistaInicial === 'gastos')      vistaGastos()
-  else if (vistaInicial === 'inventario') vistaInventario()
-  else                                     mostrarBienvenida()
+  else if (vistaInicial === 'recepciones')  vistaRecepciones()
+  else if (vistaInicial === 'gastos')       vistaGastos()
+  else if (vistaInicial === 'ventas')       vistaVentas()
+  else if (vistaInicial === 'inventario')   vistaInventario()
+  else if (vistaInicial === 'cierres')      vistaCierres()
+  else                                      mostrarBienvenida()
 }
 
 async function mostrarBienvenida() {
