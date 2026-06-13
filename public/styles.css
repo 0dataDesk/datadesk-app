@@ -208,14 +208,16 @@ body {
   border-bottom: 1px solid var(--color-border);
   box-shadow: 0 2px 6px rgba(43,26,15,0.05);
   display: flex;
+  position: relative;
+  z-index: 200;
+  overflow: visible;
 }
 
 .sidebar ul {
   display: flex;
   list-style: none;
   width: 100%;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
+  overflow: visible;
   scrollbar-width: none;
 }
 .sidebar ul::-webkit-scrollbar { display: none; }
@@ -264,7 +266,7 @@ body {
   list-style: none;
   width: auto;
   overflow-x: visible;
-  z-index: 100;
+  z-index: 1000;
   box-shadow: 0 4px 12px rgba(43,26,15,0.08);
   flex-direction: column;
 }
