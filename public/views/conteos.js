@@ -153,8 +153,7 @@ async function verDetalleConteo(id) {
             <thead>
               <tr>
                 <th>Insumo</th>
-                <th style="text-align:right;width:110px">Locación 1</th>
-                <th style="text-align:right;width:110px">Locación 2</th>
+                <th style="text-align:right;width:130px">Cantidad contada</th>
                 <th style="text-align:right;width:90px">Total</th>
                 <th style="text-align:right;width:90px">Teórico</th>
                 <th style="text-align:right;width:110px">Discrepancia</th>
@@ -165,7 +164,6 @@ async function verDetalleConteo(id) {
                 const item = itemsPorProducto[p.id_producto] || {}
                 const teorico = stockTeorico[p.id_producto]
                 const l1 = item.cantidad_locacion_1 ?? ''
-                const l2 = item.cantidad_locacion_2 ?? ''
                 const total = item.cantidad_total
                 const disc = item.discrepancia
                 const discPct = item.discrepancia_pct
@@ -175,9 +173,6 @@ async function verDetalleConteo(id) {
                   <td>${p.producto}<div style="font-size:11px;color:var(--color-text-muted)">${p.unidad_medida || ''}</div></td>
                   <td style="text-align:right">
                     ${soloLectura ? (l1 ?? '—') : `<input type="number" class="edit-input edit-num" style="text-align:right" id="ct-l1-${p.id_producto}" value="${l1}" min="0" step="any" onchange="actualizarConteoItem('${p.id_producto}')">`}
-                  </td>
-                  <td style="text-align:right">
-                    ${soloLectura ? (l2 ?? '—') : `<input type="number" class="edit-input edit-num" style="text-align:right" id="ct-l2-${p.id_producto}" value="${l2}" min="0" step="any" onchange="actualizarConteoItem('${p.id_producto}')">`}
                   </td>
                   <td style="text-align:right;font-weight:600" id="ct-total-${p.id_producto}">${total ?? '—'}</td>
                   <td style="text-align:right;color:var(--color-text-muted)">${teorico ?? '—'}</td>
@@ -203,7 +198,7 @@ async function actualizarConteoItem(id_producto) {
   const id_conteo = window._conteo_actual_id
 
   const l1 = parseFloat(document.getElementById(`ct-l1-${id_producto}`)?.value) || 0
-  const l2 = parseFloat(document.getElementById(`ct-l2-${id_producto}`)?.value) || 0
+  const l2 = 0
 
   const { data: existente } = await window._db.from('conteo_items')
     .select('id').eq('id_conteo', id_conteo).eq('id_producto', id_producto).maybeSingle()
