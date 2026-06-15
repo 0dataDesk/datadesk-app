@@ -19,13 +19,12 @@ async function vistaProductos() {
 
     const tenantActual = (window._tenantNombre || '').toLowerCase()
     const fuentesDef   = FUENTES_POR_TENANT[tenantActual] || []
-    const fuentesIds   = fuentesDef.map(f => f.fuente)
 
     const [
       { data: productos, error: errP },
       { data: unidades,  error: errU }
     ] = await Promise.all([
-      window._db.from('productos').select('*').eq('tenant_id', tenant_id).in('fuente', fuentesIds.length ? fuentesIds : ['__ninguna__']).order('producto'),
+      window._db.from('productos').select('*').eq('tenant_id', tenant_id).eq('activo', true).order('producto'),
       window._db.from('catalogo_unidades').select('*').eq('tenant_id', tenant_id).order('nombre')
     ])
 
@@ -77,10 +76,9 @@ async function vistaProductos() {
       const texto  = document.getElementById('insumos-search')?.value.toLowerCase() || ''
       const grupo  = document.getElementById('filtro-grupo')?.value || ''
       return window._productos.filter(p => {
-        const matchFuente = fuentesIds.includes(p.fuente)
-        const matchTexto  = !texto  || p.producto?.toLowerCase().includes(texto)
-        const matchGrupo  = !grupo  || p.grupo === grupo
-        return matchFuente && matchTexto && matchGrupo
+        const matchTexto = !texto || p.producto?.toLowerCase().includes(texto)
+        const matchGrupo = !grupo || p.grupo === grupo
+        return matchTexto && matchGrupo
       })
     }
 
