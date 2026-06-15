@@ -1223,3 +1223,33 @@ body {
 .tabla tbody td {
   vertical-align: middle;
 }
+
+/* ── EXPORTADOR PDF ── */
+.export-bar {
+  display: inline-flex;
+  gap: 8px;
+  margin-left: auto;
+  align-items: center;
+}
+
+@media print {
+  body { font-family: Helvetica, Arial, sans-serif; color: #2B1A0F; }
+  .pdf-header { border-bottom: 2px solid #C8892A; padding-bottom: 12px; margin-bottom: 18px; }
+  .pdf-title { font-size: 22px; font-weight: bold; color: #2B1A0F; margin: 0; }
+  .pdf-subtitle { font-size: 10px; color: #9B7B6A; margin-top: 4px; }
+  .pdf-grupo-titulo { font-size: 13px; font-weight: bold; color: #C8892A; margin-top: 18px; margin-bottom: 6px; }
+  .pdf-table { width: 100%; border-collapse: collapse; font-size: 10px; }
+  .pdf-table th { background: #FAF7F2; color: #9B7B6A; text-align: left; padding: 5px 8px; border: 0.5px solid #E8DDD5; font-weight: bold; font-size: 9px; }
+  .pdf-table td { padding: 4px 8px; border: 0.5px solid #E8DDD5; vertical-align: top; }
+  .pdf-receta { page-break-after: always; }
+  .pdf-receta:last-child { page-break-after: auto; }
+  .pdf-receta-titulo { font-size: 18px; font-weight: bold; color: #2B1A0F; margin: 0; }
+  .pdf-receta-meta { font-size: 9px; color: #9B7B6A; margin-top: 4px; margin-bottom: 14px; }
+  .pdf-seccion-titulo { font-size: 11px; font-weight: bold; color: #C8892A; margin-top: 14px; margin-bottom: 4px; }
+  .pdf-subseccion { font-size: 10px; font-weight: bold; color: #C8892A; margin-top: 10px; margin-bottom: 4px; }
+  .pdf-paso { font-size: 10px; margin: 3px 0 3px 18px; line-height: 1.4; }
+  .pdf-notas { background: #FAF7F2; border: 0.5px solid #E8DDD5; padding: 8px 10px; font-style: italic; font-size: 9px; color: #9B7B6A; margin-top: 14px; line-height: 1.4; }
+  .pdf-footer { position: fixed; bottom: 1cm; left: 2cm; right: 2cm; font-size: 8px; color: #9B7B6A; display: flex; justify-content: space-between; }
+  @page { size: letter; margin: 2cm; }
+  .export-bar, .sidebar, .topbar, .filtro-row { display: none !important; }
+}

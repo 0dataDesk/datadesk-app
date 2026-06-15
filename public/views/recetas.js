@@ -22,6 +22,13 @@ async function vistaRecetas() {
     content.innerHTML = `
       <div class="vista-header">
         <h2>Recetas</h2>
+        <div class="export-bar">
+          <select id="export-fuente" class="filtro-select">
+            <option value="carga_eugenio">Cocina</option>
+            <option value="barra_nacho">Barra</option>
+          </select>
+          <button id="btn-export-pdf" class="btn-primary">Exportar PDF</button>
+        </div>
       </div>
 
       <div class="filtros-cascada">
@@ -85,6 +92,11 @@ async function vistaRecetas() {
 
     fFuente.addEventListener('change', actualizarFiltros)
     fCategoria.addEventListener('change', actualizarFiltros)
+
+    document.getElementById('btn-export-pdf').addEventListener('click', () => {
+      const fuente = document.getElementById('export-fuente').value
+      exportarRecetasPDF(fuente)
+    })
 
     fPlatillo.addEventListener('change', () => {
       const val = fPlatillo.value
@@ -227,4 +239,171 @@ async function cargarDetalleReceta(receta) {
 function limpiarPaso(texto) {
   if (!texto) return ''
   return texto.replace(/^Paso\s+\d+\s*[—\-:]\s*/i, '').trim()
+}
+
+async function exportarRecetasPDF(fuente) {
+  const etiquetas = { carga_eugenio: 'Cocina', barra_nacho: 'Barra' }
+  const etiqueta = etiquetas[fuente] || fuente
+  const tenant_id = await getTenantId()
+  const tenantNombre = window._tenantNombre || tenant_id
+
+  const recetas = (window._recetas || [])
+    .filter(r => r.activo !== false && r.fuente === fuente && r.tenant_id === tenant_id)
+    .sort((a, b) => a.nombre_platillo.localeCompare(b.nombre_platillo))
+
+  if (!recetas.length) { alert('No hay recetas para exportar con esta fuente.'); return }
+
+  const ids = recetas.map(r => r.id_receta)
+
+  const [
+    { data: todosIngredientes },
+    { data: todosPasos },
+    { data: todosProductos }
+  ] = await Promise.all([
+    window._db.from('receta_ingredientes').select('*').in('id_receta', ids).eq('activo', true).order('orden', { ascending: true, nullsFirst: false }),
+    window._db.from('receta_procedimientos').select('*').in('id_receta', ids).eq('activo', true).order('paso_num'),
+    window._db.from('productos').select('id_producto, unidad_medida').eq('tenant_id', tenant_id).eq('activo', true)
+  ])
+
+  const unidadPorProducto = {}
+  ;(todosProductos || []).forEach(p => { unidadPorProducto[p.id_producto] = p.unidad_medida })
+
+  const ingPorReceta = {}
+  ;(todosIngredientes || []).forEach(i => {
+    if (!ingPorReceta[i.id_receta]) ingPorReceta[i.id_receta] = []
+    ingPorReceta[i.id_receta].push(i)
+  })
+
+  const pasosPorReceta = {}
+  ;(todosPasos || []).forEach(p => {
+    if (!pasosPorReceta[p.id_receta]) pasosPorReceta[p.id_receta] = []
+    pasosPorReceta[p.id_receta].push(p)
+  })
+
+  const fecha = new Date().toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' })
+
+  const htmlBloqueReceta = (receta) => {
+    const ings = ingPorReceta[receta.id_receta] || []
+    const pasos = pasosPorReceta[receta.id_receta] || []
+
+    const htmlIng = `
+      <p class="pdf-seccion-titulo">Ingredientes</p>
+      <table class="pdf-table">
+        <thead><tr><th>Insumo</th><th>Cantidad</th><th>Unidad</th><th>Nota</th></tr></thead>
+        <tbody>
+          ${ings.map(i => `<tr>
+            <td>${i.producto || ''}</td>
+            <td>${i.cantidad != null ? i.cantidad : '—'}</td>
+            <td>${unidadPorProducto[i.id_producto] || ''}</td>
+            <td>${i.notas_ingrediente || ''}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`
+
+    let htmlProc = '<p class="pdf-seccion-titulo">Procedimiento</p>'
+    if (pasos.length > 0) {
+      const secciones = []
+      let seccionActual = null
+      pasos.forEach(p => {
+        const sec = p.seccion || null
+        if (sec !== seccionActual) {
+          secciones.push({ nombre: sec, pasos: [] })
+          seccionActual = sec
+        }
+        secciones[secciones.length - 1].pasos.push(p)
+      })
+
+      const mostrarSecciones = secciones.length > 1 || (secciones.length === 1 && secciones[0].nombre)
+
+      if (mostrarSecciones) {
+        htmlProc += secciones.map(sec => `
+          ${sec.nombre ? `<p class="pdf-subseccion">${sec.nombre}</p>` : ''}
+          <ol class="pdf-ol">
+            ${sec.pasos.map(p => `<li class="pdf-paso">${limpiarPaso(p.proceso)}</li>`).join('')}
+          </ol>`).join('')
+      } else {
+        htmlProc += `<ol class="pdf-ol">
+          ${pasos.map(p => `<li class="pdf-paso">${limpiarPaso(p.proceso)}</li>`).join('')}
+        </ol>`
+      }
+    }
+
+    const metaParts = [receta.categoria, etiqueta]
+    if (receta.peso_pieza_g) metaParts.push(`Peso pieza: ${receta.peso_pieza_g}g`)
+    const meta = metaParts.filter(Boolean).join(' · ')
+
+    const htmlNotas = receta.notas_revision
+      ? `<div class="pdf-notas"><strong>Notas adicionales:</strong><br>${receta.notas_revision}</div>`
+      : ''
+
+    return `
+      <div class="pdf-receta">
+        <p class="pdf-receta-titulo">${receta.nombre_platillo}</p>
+        <p class="pdf-receta-meta">${meta}</p>
+        ${htmlIng}
+        ${htmlProc}
+        ${htmlNotas}
+      </div>`
+  }
+
+  const htmlPortada = `
+    <div class="pdf-receta">
+      <div class="pdf-header">
+        <p class="pdf-title">Catálogo de Recetas — ${etiqueta}</p>
+        <p class="pdf-subtitle">${fecha} · ${recetas.length} recetas</p>
+      </div>
+    </div>`
+
+  const htmlIndice = `
+    <div class="pdf-receta">
+      <p class="pdf-grupo-titulo">Índice</p>
+      <table class="pdf-table">
+        <thead><tr><th>Receta</th><th>Categoría</th></tr></thead>
+        <tbody>
+          ${recetas.map(r => `<tr><td>${r.nombre_platillo}</td><td>${r.categoria || ''}</td></tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`
+
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Catálogo de Recetas — ${etiqueta}</title>
+<style>
+  body { font-family: Helvetica, Arial, sans-serif; color: #2B1A0F; margin: 0; }
+  .pdf-header { border-bottom: 2px solid #C8892A; padding-bottom: 12px; margin-bottom: 18px; }
+  .pdf-title { font-size: 22px; font-weight: bold; color: #2B1A0F; margin: 0; }
+  .pdf-subtitle { font-size: 10px; color: #9B7B6A; margin-top: 4px; }
+  .pdf-grupo-titulo { font-size: 13px; font-weight: bold; color: #C8892A; margin-top: 18px; margin-bottom: 6px; }
+  .pdf-receta { page-break-after: always; }
+  .pdf-receta:last-child { page-break-after: auto; }
+  .pdf-receta-titulo { font-size: 18px; font-weight: bold; color: #2B1A0F; margin: 0; }
+  .pdf-receta-meta { font-size: 9px; color: #9B7B6A; margin-top: 4px; margin-bottom: 14px; }
+  .pdf-seccion-titulo { font-size: 11px; font-weight: bold; color: #C8892A; margin-top: 14px; margin-bottom: 4px; }
+  .pdf-subseccion { font-size: 10px; font-weight: bold; color: #C8892A; margin-top: 10px; margin-bottom: 4px; }
+  .pdf-ol { font-size: 10px; margin: 0 0 8px 0; padding-left: 20px; line-height: 1.4; }
+  .pdf-paso { margin: 3px 0; line-height: 1.4; }
+  .pdf-table { width: 100%; border-collapse: collapse; font-size: 10px; }
+  .pdf-table th { background: #FAF7F2; color: #9B7B6A; text-align: left; padding: 5px 8px; border: 0.5px solid #E8DDD5; font-weight: bold; font-size: 9px; }
+  .pdf-table td { padding: 4px 8px; border: 0.5px solid #E8DDD5; vertical-align: top; }
+  .pdf-notas { background: #FAF7F2; border: 0.5px solid #E8DDD5; padding: 8px 10px; font-style: italic; font-size: 9px; color: #9B7B6A; margin-top: 14px; line-height: 1.4; }
+  .pdf-footer { position: fixed; bottom: 1cm; left: 0; right: 0; font-size: 8px; color: #9B7B6A; display: flex; justify-content: space-between; }
+  @page { size: letter; margin: 2cm; @bottom-right { content: "Página " counter(page) " de " counter(pages); font-size: 8px; color: #9B7B6A; } }
+</style>
+</head>
+<body>
+${htmlPortada}
+${htmlIndice}
+${recetas.map(r => htmlBloqueReceta(r)).join('')}
+<div class="pdf-footer">
+  <span>dataDesk · ${tenantNombre}</span>
+</div>
+</body>
+</html>`
+
+  const win = window.open('', '_blank')
+  win.document.write(html)
+  win.document.close()
+  win.onload = () => win.print()
 }

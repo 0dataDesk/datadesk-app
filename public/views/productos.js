@@ -35,6 +35,13 @@ async function vistaProductos() {
     content.innerHTML = `
       <div class="vista-header">
         <h2>Insumos</h2>
+        <div class="export-bar">
+          <select id="export-fuente" class="filtro-select">
+            <option value="carga_eugenio">Cocina</option>
+            <option value="barra_nacho">Barra</option>
+          </select>
+          <button id="btn-export-pdf" class="btn-primary">Exportar PDF</button>
+        </div>
       </div>
 
       <div class="filtros-bar">
@@ -147,7 +154,10 @@ async function vistaProductos() {
 
     document.getElementById('insumos-search').addEventListener('input', onFiltro)
     document.getElementById('filtro-grupo').addEventListener('change', onFiltro)
-
+    document.getElementById('btn-export-pdf').addEventListener('click', () => {
+      const fuente = document.getElementById('export-fuente').value
+      exportarInsumosPDF(fuente)
+    })
 
     renderTabla(aplicarFiltros())
 
@@ -167,6 +177,70 @@ async function guardarProducto(idProducto) {
     .eq('id_producto', idProducto)
     .eq('tenant_id', tenant_id)
   if (error) alert(`Error: ${error.message}`)
+}
+
+async function exportarInsumosPDF(fuente) {
+  const etiquetas = { carga_eugenio: 'Cocina', barra_nacho: 'Barra' }
+  const etiqueta = etiquetas[fuente] || fuente
+  const tenant_id = await getTenantId()
+  const tenantNombre = window._tenantNombre || tenant_id
+
+  const productos = (window._productos || []).filter(p =>
+    p.activo !== false && p.fuente === fuente && p.tenant_id === tenant_id
+  )
+
+  const porGrupo = {}
+  productos.forEach(p => {
+    const g = p.grupo || 'General'
+    if (!porGrupo[g]) porGrupo[g] = []
+    porGrupo[g].push(p)
+  })
+  const grupos = Object.keys(porGrupo).sort()
+  grupos.forEach(g => porGrupo[g].sort((a, b) => a.producto.localeCompare(b.producto)))
+
+  const fecha = new Date().toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' })
+
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Catálogo de Insumos — ${etiqueta}</title>
+<style>
+  body { font-family: Helvetica, Arial, sans-serif; color: #2B1A0F; margin: 0; }
+  .pdf-header { border-bottom: 2px solid #C8892A; padding-bottom: 12px; margin-bottom: 18px; }
+  .pdf-title { font-size: 22px; font-weight: bold; color: #2B1A0F; margin: 0; }
+  .pdf-subtitle { font-size: 10px; color: #9B7B6A; margin-top: 4px; }
+  .pdf-grupo-titulo { font-size: 13px; font-weight: bold; color: #C8892A; margin-top: 18px; margin-bottom: 6px; }
+  .pdf-table { width: 100%; border-collapse: collapse; font-size: 10px; }
+  .pdf-table th { background: #FAF7F2; color: #9B7B6A; text-align: left; padding: 5px 8px; border: 0.5px solid #E8DDD5; font-weight: bold; font-size: 9px; }
+  .pdf-table td { padding: 4px 8px; border: 0.5px solid #E8DDD5; vertical-align: top; }
+  .pdf-footer { position: fixed; bottom: 1cm; left: 0; right: 0; font-size: 8px; color: #9B7B6A; display: flex; justify-content: space-between; }
+  @page { size: letter; margin: 2cm; @bottom-right { content: "Página " counter(page) " de " counter(pages); font-size: 8px; color: #9B7B6A; } }
+</style>
+</head>
+<body>
+<div class="pdf-header">
+  <p class="pdf-title">Catálogo de Insumos — ${etiqueta}</p>
+  <p class="pdf-subtitle">${fecha} · ${productos.length} insumos</p>
+</div>
+${grupos.map(g => `
+  <p class="pdf-grupo-titulo">${g}</p>
+  <table class="pdf-table">
+    <thead><tr><th>Insumo</th><th>Unidad</th></tr></thead>
+    <tbody>
+      ${porGrupo[g].map(p => `<tr><td>${p.producto}</td><td>${p.unidad_medida || '—'}</td></tr>`).join('')}
+    </tbody>
+  </table>`).join('')}
+<div class="pdf-footer">
+  <span>dataDesk · ${tenantNombre}</span>
+</div>
+</body>
+</html>`
+
+  const win = window.open('', '_blank')
+  win.document.write(html)
+  win.document.close()
+  win.onload = () => win.print()
 }
 
 window.toggleSeccion = function(bodyId) {
