@@ -1,3 +1,13 @@
+const FUENTES_POR_TENANT = {
+  tita: [
+    { fuente: 'carga_eugenio', etiqueta: 'Cocina' },
+    { fuente: 'barra_nacho',   etiqueta: 'Barra'  }
+  ],
+  furia: [
+    { fuente: 'menu_charly', etiqueta: 'Menú Charly' }
+  ]
+}
+
 async function vistaProductos() {
   const content = document.getElementById('content')
   content.innerHTML = `<p style="color:var(--color-text-muted)">Cargando...</p>`
@@ -23,6 +33,9 @@ async function vistaProductos() {
 
     const hayUnidades = window._unidades.length > 0
 
+    const tenantActual = (window._tenantNombre || '').toLowerCase()
+    const fuentesDef   = FUENTES_POR_TENANT[tenantActual] || []
+
     const grupos  = [...new Set(window._productos.map(p => p.grupo).filter(Boolean))].sort()
 
     const uOptsFor = (valorActual) => {
@@ -35,13 +48,13 @@ async function vistaProductos() {
     content.innerHTML = `
       <div class="vista-header">
         <h2>Insumos</h2>
+        ${fuentesDef.length ? `
         <div class="export-bar">
           <select id="export-fuente" class="filtro-select">
-            <option value="carga_eugenio">Cocina</option>
-            <option value="barra_nacho">Barra</option>
+            ${fuentesDef.map(f => `<option value="${f.fuente}">${f.etiqueta}</option>`).join('')}
           </select>
           <button id="btn-export-pdf" class="btn-primary">Exportar PDF</button>
-        </div>
+        </div>` : ''}
       </div>
 
       <div class="filtros-bar">
@@ -154,10 +167,12 @@ async function vistaProductos() {
 
     document.getElementById('insumos-search').addEventListener('input', onFiltro)
     document.getElementById('filtro-grupo').addEventListener('change', onFiltro)
-    document.getElementById('btn-export-pdf').addEventListener('click', () => {
-      const fuente = document.getElementById('export-fuente').value
-      exportarInsumosPDF(fuente)
-    })
+    if (fuentesDef.length) {
+      document.getElementById('btn-export-pdf').addEventListener('click', () => {
+        const fuente = document.getElementById('export-fuente').value
+        exportarInsumosPDF(fuente)
+      })
+    }
 
     renderTabla(aplicarFiltros())
 
@@ -180,10 +195,10 @@ async function guardarProducto(idProducto) {
 }
 
 async function exportarInsumosPDF(fuente) {
-  const etiquetas = { carga_eugenio: 'Cocina', barra_nacho: 'Barra' }
-  const etiqueta = etiquetas[fuente] || fuente
-  const tenant_id = await getTenantId()
+  const tenant_id    = await getTenantId()
   const tenantNombre = window._tenantNombre || tenant_id
+  const tenantActual = (window._tenantNombre || '').toLowerCase()
+  const etiqueta     = (FUENTES_POR_TENANT[tenantActual] || []).find(f => f.fuente === fuente)?.etiqueta || fuente
 
   const productos = (window._productos || []).filter(p =>
     p.activo !== false && p.fuente === fuente && p.tenant_id === tenant_id

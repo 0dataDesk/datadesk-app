@@ -1,9 +1,21 @@
+const FUENTES_POR_TENANT = {
+  tita: [
+    { fuente: 'carga_eugenio', etiqueta: 'Cocina' },
+    { fuente: 'barra_nacho',   etiqueta: 'Barra'  }
+  ],
+  furia: [
+    { fuente: 'menu_charly', etiqueta: 'Menú Charly' }
+  ]
+}
+
 async function vistaRecetas() {
   const content = document.getElementById('content')
   content.innerHTML = `<p style="color:var(--color-text-muted)">Cargando...</p>`
 
   try {
-    const tenant_id = await getTenantId()
+    const tenant_id    = await getTenantId()
+    const tenantActual = (window._tenantNombre || '').toLowerCase()
+    const fuentesDef   = FUENTES_POR_TENANT[tenantActual] || []
 
     const { data: recetas, error: errR } = await window._db
       .from('catalogo_recetas')
@@ -22,13 +34,13 @@ async function vistaRecetas() {
     content.innerHTML = `
       <div class="vista-header">
         <h2>Recetas</h2>
+        ${fuentesDef.length ? `
         <div class="export-bar">
           <select id="export-fuente" class="filtro-select">
-            <option value="carga_eugenio">Cocina</option>
-            <option value="barra_nacho">Barra</option>
+            ${fuentesDef.map(f => `<option value="${f.fuente}">${f.etiqueta}</option>`).join('')}
           </select>
           <button id="btn-export-pdf" class="btn-primary">Exportar PDF</button>
-        </div>
+        </div>` : ''}
       </div>
 
       <div class="filtros-cascada">
@@ -93,10 +105,12 @@ async function vistaRecetas() {
     fFuente.addEventListener('change', actualizarFiltros)
     fCategoria.addEventListener('change', actualizarFiltros)
 
-    document.getElementById('btn-export-pdf').addEventListener('click', () => {
-      const fuente = document.getElementById('export-fuente').value
-      exportarRecetasPDF(fuente)
-    })
+    if (fuentesDef.length) {
+      document.getElementById('btn-export-pdf').addEventListener('click', () => {
+        const fuente = document.getElementById('export-fuente').value
+        exportarRecetasPDF(fuente)
+      })
+    }
 
     fPlatillo.addEventListener('change', () => {
       const val = fPlatillo.value
@@ -242,10 +256,10 @@ function limpiarPaso(texto) {
 }
 
 async function exportarRecetasPDF(fuente) {
-  const etiquetas = { carga_eugenio: 'Cocina', barra_nacho: 'Barra' }
-  const etiqueta = etiquetas[fuente] || fuente
-  const tenant_id = await getTenantId()
+  const tenant_id    = await getTenantId()
   const tenantNombre = window._tenantNombre || tenant_id
+  const tenantActual = (window._tenantNombre || '').toLowerCase()
+  const etiqueta     = (FUENTES_POR_TENANT[tenantActual] || []).find(f => f.fuente === fuente)?.etiqueta || fuente
 
   const recetas = (window._recetas || [])
     .filter(r => r.activo !== false && r.fuente === fuente && r.tenant_id === tenant_id)
