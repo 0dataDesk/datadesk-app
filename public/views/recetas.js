@@ -142,11 +142,13 @@ async function cargarDetalleReceta(receta) {
     ] = await Promise.all([
       window._db.from('receta_ingredientes')
         .select('*')
+        .eq('tenant_id', tenant_id)
         .eq('id_receta', receta.id_receta)
         .eq('activo', true)
         .order('orden', { ascending: true, nullsFirst: false }),
       window._db.from('receta_procedimientos')
         .select('*')
+        .eq('tenant_id', tenant_id)
         .eq('id_receta', receta.id_receta)
         .eq('activo', true)
         .order('paso_num'),
