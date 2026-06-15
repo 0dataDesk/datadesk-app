@@ -21,7 +21,7 @@ async function vistaProductos() {
       { data: productos, error: errP },
       { data: unidades,  error: errU }
     ] = await Promise.all([
-      window._db.from('productos').select('*').eq('tenant_id', tenant_id).in('fuente', ['carga_eugenio','barra_nacho']).order('producto'),
+      window._db.from('productos').select('*').eq('tenant_id', tenant_id).eq('activo', true).order('producto'),
       window._db.from('catalogo_unidades').select('*').eq('tenant_id', tenant_id).order('nombre')
     ])
 
@@ -58,9 +58,6 @@ async function vistaProductos() {
       </div>
 
       <div class="filtros-bar">
-        <select id="filtro-fuente" class="filtro-select" disabled>
-          <option value="cocina_barra" selected>Cocina + Barra</option>
-        </select>
         <input type="text" id="insumos-search" placeholder="Buscar insumo..." class="filtro-search" />
         <select id="filtro-grupo" class="filtro-select">
           <option value="">Todos los grupos</option>
@@ -73,15 +70,12 @@ async function vistaProductos() {
     `
 
     const aplicarFiltros = () => {
-      const texto  = document.getElementById('insumos-search')?.value.toLowerCase() || ''
-      const grupo  = document.getElementById('filtro-grupo')?.value || ''
-      const fuentesPermitidas = ['carga_eugenio','barra_nacho']
-
+      const texto = document.getElementById('insumos-search')?.value.toLowerCase() || ''
+      const grupo = document.getElementById('filtro-grupo')?.value || ''
       return window._productos.filter(p => {
-        const matchFuente = fuentesPermitidas.includes(p.fuente)
-        const matchTexto  = !texto  || p.producto?.toLowerCase().includes(texto)
-        const matchGrupo  = !grupo  || p.grupo === grupo
-        return matchFuente && matchTexto && matchGrupo
+        const matchTexto = !texto || p.producto?.toLowerCase().includes(texto)
+        const matchGrupo = !grupo || p.grupo === grupo
+        return matchTexto && matchGrupo
       })
     }
 
