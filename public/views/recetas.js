@@ -25,6 +25,7 @@ async function vistaRecetas() {
       .select('*')
       .eq('tenant_id', tenant_id)
       .eq('activo', true)
+      .neq('tipo_receta', 'config')
       .order('nombre_platillo')
 
     if (errR) throw errR
