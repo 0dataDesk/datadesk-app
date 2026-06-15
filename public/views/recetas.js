@@ -228,23 +228,36 @@ async function cargarDetalleReceta(receta) {
     const esReventa = receta.tipo_receta === 'reventa'
 
     let htmlSabores = ''
-    if (esReventa && receta.id_receta === 'RBE-004') {
-      const { data: sabores } = await window._db
-        .from('productos')
-        .select('producto')
-        .eq('tenant_id', tenant_id)
-        .eq('activo', true)
-        .eq('grupo', 'Bebidas')
-        .eq('fuente', 'menu_charly')
-        .not('id_producto', 'in', '(BEB-001,BEB-025,BEB-026,BEB-031,BEB-037)')
-        .order('producto')
+    if (esReventa) {
+      const filtrosPorReceta = {
+        'RBE-004': () => window._db.from('productos').select('producto')
+          .eq('tenant_id', tenant_id).eq('activo', true).eq('grupo', 'Bebidas').eq('fuente', 'menu_charly')
+          .not('id_producto', 'in', '(BEB-001,BEB-025,BEB-026,BEB-031,BEB-037)')
+          .order('producto'),
+        'RBE-005': () => window._db.from('productos').select('producto')
+          .eq('tenant_id', tenant_id).eq('activo', true)
+          .in('id_producto', ['BEB-031']),
+        'RBE-006': () => window._db.from('productos').select('producto')
+          .eq('tenant_id', tenant_id).eq('activo', true)
+          .in('id_producto', ['BEB-026'])
+      }
 
-      htmlSabores = `
-        <h4>Sabores disponibles</h4>
-        <ul class="procedimiento">
-          ${(sabores || []).map(s => `<li>${s.producto}</li>`).join('')}
-        </ul>
-      `
+      const titulo = {
+        'RBE-004': 'Sabores disponibles',
+        'RBE-005': 'Marca',
+        'RBE-006': 'Marca'
+      }
+
+      const fetcher = filtrosPorReceta[receta.id_receta]
+      if (fetcher) {
+        const { data: opciones } = await fetcher()
+        htmlSabores = `
+          <h4>${titulo[receta.id_receta] || 'Opciones disponibles'}</h4>
+          <ul class="procedimiento">
+            ${(opciones || []).map(s => `<li>${s.producto}</li>`).join('')}
+          </ul>
+        `
+      }
     }
 
     wrap.innerHTML = `
