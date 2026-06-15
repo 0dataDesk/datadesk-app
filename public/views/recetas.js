@@ -224,6 +224,27 @@ async function cargarDetalleReceta(receta) {
       ? `<div class="solicitudes-texto">${receta.notas_revision}</div>`
       : `<p style="color:var(--color-text-muted);font-size:13px">Sin notas adicionales.</p>`
 
+    // ── Reventa: sabores disponibles (solo RBE-004 Refresco) ─────────────
+    const esReventa = receta.tipo_receta === 'reventa'
+
+    let htmlSabores = ''
+    if (esReventa && receta.id_receta === 'RBE-004') {
+      const { data: sabores } = await window._db
+        .from('productos')
+        .select('producto')
+        .eq('tenant_id', tenant_id)
+        .eq('activo', true)
+        .eq('grupo', 'Bebidas')
+        .order('producto')
+
+      htmlSabores = `
+        <h4>Sabores disponibles</h4>
+        <ul class="procedimiento">
+          ${(sabores || []).map(s => `<li>${s.producto}</li>`).join('')}
+        </ul>
+      `
+    }
+
     wrap.innerHTML = `
       <div class="receta-detalle-card">
         <div class="detalle-header">
@@ -234,16 +255,18 @@ async function cargarDetalleReceta(receta) {
           <span class="badge-status ${receta.status || 'pendiente'}">${receta.status || 'pendiente'}</span>
         </div>
 
-        ${hayCantidadFaltante ? `
-        <div class="banner-aviso">
-          ⚠ Esta receta tiene ${ingSinCantidad.length} ingrediente${ingSinCantidad.length > 1 ? 's' : ''} sin cantidad capturada.
-        </div>` : ''}
+        ${!esReventa ? `
+          ${hayCantidadFaltante ? `
+          <div class="banner-aviso">
+            ⚠ Esta receta tiene ${ingSinCantidad.length} ingrediente${ingSinCantidad.length > 1 ? 's' : ''} sin cantidad capturada.
+          </div>` : ''}
 
-        <h4>Ingredientes</h4>
-        ${htmlIngredientes}
+          <h4>Ingredientes</h4>
+          ${htmlIngredientes}
 
-        <h4>Procedimiento</h4>
-        ${htmlPasos}
+          <h4>Procedimiento</h4>
+          ${htmlPasos}
+        ` : htmlSabores}
 
         <h4>Notas adicionales</h4>
         ${htmlNotas}
