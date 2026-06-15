@@ -1,3 +1,16 @@
+const PRIORIDAD_CATEGORIA = {
+  furia: ['Hamburguesas', 'Pollo', 'Salsas', 'Subrecetas', 'Acompañamientos', 'Bebidas', 'Extras', 'Combos'],
+  tita:  ['Panadería Clásica', 'Dulces & Pastelería', 'Laminados Salados', 'Especialidades Regionales',
+          'Bebidas base café', 'Bebidas base matcha', 'Bebidas base taro', 'Bebida chocolate',
+          'Bebidas frescas', 'Tés y tisanas', 'Subrecetas']
+}
+
+function indicePrioridad(tenant, categoria) {
+  const orden = PRIORIDAD_CATEGORIA[tenant] || []
+  const idx = orden.indexOf(categoria)
+  return idx === -1 ? 999 : idx
+}
+
 async function vistaRecetas() {
   const content = document.getElementById('content')
   content.innerHTML = `<p style="color:var(--color-text-muted)">Cargando...</p>`
@@ -251,9 +264,8 @@ async function exportarRecetasPDF(fuente) {
   const tenantActual = (window._tenantConfig?.nombre || '').toLowerCase()
   const etiqueta     = (FUENTES_POR_TENANT[tenantActual] || []).find(f => f.fuente === fuente)?.etiqueta || fuente
 
-  const recetas = (window._recetas || [])
+  let recetas = (window._recetas || [])
     .filter(r => r.activo !== false && r.fuente === fuente && r.tenant_id === tenant_id)
-    .sort((a, b) => a.nombre_platillo.localeCompare(b.nombre_platillo))
 
   if (!recetas.length) { alert('No hay recetas para exportar con esta fuente.'); return }
 
@@ -283,6 +295,21 @@ async function exportarRecetasPDF(fuente) {
     if (!pasosPorReceta[p.id_receta]) pasosPorReceta[p.id_receta] = []
     pasosPorReceta[p.id_receta].push(p)
   })
+
+  recetas = recetas.filter(r => {
+    const tieneIngs  = (ingPorReceta[r.id_receta]   || []).length > 0
+    const tienePasos = (pasosPorReceta[r.id_receta] || []).length > 0
+    return tieneIngs && tienePasos
+  })
+
+  recetas.sort((a, b) => {
+    const pa = indicePrioridad(tenantActual, a.categoria || '')
+    const pb = indicePrioridad(tenantActual, b.categoria || '')
+    if (pa !== pb) return pa - pb
+    return (a.nombre_platillo || '').localeCompare(b.nombre_platillo || '')
+  })
+
+  if (!recetas.length) { alert('No hay recetas con ingredientes y pasos para exportar.'); return }
 
   const fecha = new Date().toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' })
 
