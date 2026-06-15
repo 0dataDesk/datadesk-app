@@ -33,7 +33,7 @@ async function vistaProductos() {
 
     const hayUnidades = window._unidades.length > 0
 
-    const tenantActual = (window._tenantNombre || '').toLowerCase()
+    const tenantActual = (window._tenantConfig?.nombre || '').toLowerCase()
     const fuentesDef   = FUENTES_POR_TENANT[tenantActual] || []
 
     const grupos  = [...new Set(window._productos.map(p => p.grupo).filter(Boolean))].sort()
@@ -190,8 +190,8 @@ async function guardarProducto(idProducto) {
 
 async function exportarInsumosPDF(fuente) {
   const tenant_id    = await getTenantId()
-  const tenantNombre = window._tenantNombre || tenant_id
-  const tenantActual = (window._tenantNombre || '').toLowerCase()
+  const tenantNombre = window._tenantConfig?.nombre || tenant_id
+  const tenantActual = (window._tenantConfig?.nombre || '').toLowerCase()
   const etiqueta     = (FUENTES_POR_TENANT[tenantActual] || []).find(f => f.fuente === fuente)?.etiqueta || fuente
 
   const productos = (window._productos || []).filter(p =>

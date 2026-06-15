@@ -4,7 +4,7 @@ async function vistaRecetas() {
 
   try {
     const tenant_id    = await getTenantId()
-    const tenantActual = (window._tenantNombre || '').toLowerCase()
+    const tenantActual = (window._tenantConfig?.nombre || '').toLowerCase()
     const fuentesDef   = FUENTES_POR_TENANT[tenantActual] || []
 
     const { data: recetas, error: errR } = await window._db
@@ -247,8 +247,8 @@ function limpiarPaso(texto) {
 
 async function exportarRecetasPDF(fuente) {
   const tenant_id    = await getTenantId()
-  const tenantNombre = window._tenantNombre || tenant_id
-  const tenantActual = (window._tenantNombre || '').toLowerCase()
+  const tenantNombre = window._tenantConfig?.nombre || tenant_id
+  const tenantActual = (window._tenantConfig?.nombre || '').toLowerCase()
   const etiqueta     = (FUENTES_POR_TENANT[tenantActual] || []).find(f => f.fuente === fuente)?.etiqueta || fuente
 
   const recetas = (window._recetas || [])
