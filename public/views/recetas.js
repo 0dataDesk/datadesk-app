@@ -235,6 +235,8 @@ async function cargarDetalleReceta(receta) {
         .eq('tenant_id', tenant_id)
         .eq('activo', true)
         .eq('grupo', 'Bebidas')
+        .eq('fuente', 'menu_charly')
+        .not('id_producto', 'in', '(BEB-001,BEB-025,BEB-026,BEB-031,BEB-037)')
         .order('producto')
 
       htmlSabores = `
