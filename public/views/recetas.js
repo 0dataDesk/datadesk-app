@@ -1,13 +1,3 @@
-const FUENTES_POR_TENANT = {
-  tita: [
-    { fuente: 'carga_eugenio', etiqueta: 'Cocina' },
-    { fuente: 'barra_nacho',   etiqueta: 'Barra'  }
-  ],
-  furia: [
-    { fuente: 'menu_charly', etiqueta: 'Menú Charly' }
-  ]
-}
-
 async function vistaRecetas() {
   const content = document.getElementById('content')
   content.innerHTML = `<p style="color:var(--color-text-muted)">Cargando...</p>`
