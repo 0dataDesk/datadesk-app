@@ -17,11 +17,22 @@ async function vistaProductos() {
     const rol        = window._rol || 'operador'
     const puedeEditar = ['admin', 'editor', 'cocina'].includes(rol)
 
+    const tenantActual   = window._tenantActivo || tenant_id
+    const fuentesActivas = (FUENTES_POR_TENANT[tenantActual] || []).map(f => f.fuente)
+
+    let query = window._db.from('productos').select('*').eq('tenant_id', tenant_id).eq('activo', true)
+    if (fuentesActivas.length === 1) {
+      query = query.eq('fuente', fuentesActivas[0])
+    } else if (fuentesActivas.length > 1) {
+      query = query.in('fuente', fuentesActivas)
+    }
+    query = query.order('producto')
+
     const [
       { data: productos, error: errP },
       { data: unidades,  error: errU }
     ] = await Promise.all([
-      window._db.from('productos').select('*').eq('tenant_id', tenant_id).eq('activo', true).eq('fuente', 'menu_charly').order('producto'),
+      query,
       window._db.from('catalogo_unidades').select('*').eq('tenant_id', tenant_id).order('nombre')
     ])
 
