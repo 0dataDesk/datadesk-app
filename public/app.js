@@ -6,6 +6,7 @@ window._db.auth.onAuthStateChange(async (event, session) => {
   if (event === 'SIGNED_OUT') {
     _appMontado = false
     window._tenantConfig = null
+    window._tenantActivo = null
     localStorage.removeItem('datadesk-view')
     await mostrarLogin()
     return
@@ -13,17 +14,62 @@ window._db.auth.onAuthStateChange(async (event, session) => {
 
   if (session) {
     _appMontado = true
-    await mostrarApp(
-      session.user.user_metadata?.rol || null,
-      session.user.email,
-      session.user.user_metadata?.tenant_id || null
-    )
+    const tenants = session.user.user_metadata?.tenants
+    const rol     = session.user.user_metadata?.rol || null
+    const email   = session.user.email
+
+    if (tenants && tenants.length > 1 && !window._tenantActivo) {
+      await mostrarSelectorTenant(tenants, rol, email)
+    } else {
+      const tenantId = window._tenantActivo || session.user.user_metadata?.tenant_id || null
+      window._tenantActivo = tenantId
+      await mostrarApp(rol, email, tenantId)
+    }
   } else {
     await mostrarLogin()
   }
 })
 
 document.addEventListener('visibilitychange', () => {})
+
+async function mostrarSelectorTenant(tenants, rol, email) {
+  const configs = await Promise.all(tenants.map(async t => {
+    const { data } = await window._db.from('tenants')
+      .select('tenant_id, nombre, color_primario, tagline')
+      .eq('tenant_id', t).single()
+    return data || { tenant_id: t, nombre: t, color_primario: '#1e3a5f', tagline: '' }
+  }))
+
+  document.getElementById('app').innerHTML = `
+    <div class="login-wrapper">
+      <div class="login-box">
+        <div class="login-logo">dataDesk<span>.</span></div>
+        <p class="login-tagline">Selecciona un negocio</p>
+        <div style="display:flex;flex-direction:column;gap:12px;margin-top:8px">
+          ${configs.map(cfg => `
+            <button onclick="seleccionarTenant('${cfg.tenant_id}')"
+              style="width:100%;padding:16px;background:${cfg.color_primario};color:#FAF7F2;border:none;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;font-family:var(--font-main);text-align:left">
+              ${cfg.nombre}
+              <small style="display:block;font-size:11px;font-weight:400;opacity:0.7;margin-top:2px">${cfg.tagline}</small>
+            </button>`).join('')}
+        </div>
+        <button onclick="logout().then(()=>location.reload())"
+          style="width:100%;margin-top:16px;padding:10px;background:transparent;border:1px solid var(--color-border);border-radius:10px;color:var(--color-text-muted);font-size:13px;cursor:pointer;font-family:var(--font-main)">
+          Cerrar sesión
+        </button>
+      </div>
+    </div>
+  `
+}
+
+async function seleccionarTenant(tenantId) {
+  window._tenantActivo = tenantId
+  window._tenantConfig = null
+  const { data: { user } } = await window._db.auth.getUser()
+  const rol   = user?.user_metadata?.rol || null
+  const email = user?.email
+  await mostrarApp(rol, email, tenantId)
+}
 
 async function mostrarLogin() {
   const cfg = await getTenantConfig()
@@ -64,6 +110,8 @@ async function mostrarApp(rol, email, tenant_id = null) {
   window._rol   = rol || 'operador'
   window._email = email || null
 
+  const esMultitenant = !!(await getTenants())
+
   document.getElementById('app').innerHTML = `
     <div class="layout">
       <header class="header">
@@ -71,6 +119,7 @@ async function mostrarApp(rol, email, tenant_id = null) {
         <div class="header-user">
           <span class="header-email">${email}</span>
           <span class="header-rol">${rol}</span>
+          ${esMultitenant ? `<button id="cambiar-tenant-btn">Cambiar negocio</button>` : ''}
           <button id="logout-btn">Cerrar sesión</button>
         </div>
       </header>
@@ -99,6 +148,15 @@ async function mostrarApp(rol, email, tenant_id = null) {
   document.getElementById('logout-btn').addEventListener('click', async () => {
     try { await logout() } catch {}
     window.location.reload()
+  })
+
+  document.getElementById('cambiar-tenant-btn')?.addEventListener('click', async () => {
+    window._tenantActivo = null
+    window._tenantConfig = null
+    _appMontado = false
+    const { data: { user } } = await window._db.auth.getUser()
+    const tenants = user?.user_metadata?.tenants || []
+    await mostrarSelectorTenant(tenants, user?.user_metadata?.rol, user?.email)
   })
 
   document.querySelectorAll('[data-view]').forEach(link => {
