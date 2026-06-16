@@ -108,7 +108,7 @@ async function vistaInventario() {
             <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:${colores[c.nivel].bg};border-radius:8px">
               <span style="width:8px;height:8px;border-radius:50%;background:${colores[c.nivel].punto};flex-shrink:0"></span>
               <span style="flex:1;font-size:14px;color:var(--color-text)">${c.producto}</span>
-              <span style="font-size:14px;font-weight:600;color:var(--color-primary)">${Number(c.cantidad).toLocaleString('es-MX')}</span>
+              <span style="font-size:14px;font-weight:600;color:var(--color-primary)">${Math.round(Number(c.cantidad)).toLocaleString('es-MX')}</span>
               <span style="font-size:12px;color:var(--color-text-muted);min-width:28px;text-align:left">${c.unidad || ''}</span>
             </div>`).join('')}
         </div>
@@ -141,7 +141,7 @@ function exportarInventarioPDF() {
     const filas = porGrupo[g]
       .slice()
       .sort((a, b) => a.producto.localeCompare(b.producto))
-      .map(c => `<tr><td style="padding:6px 12px;border-bottom:1px solid #E8DDD5">${c.producto}</td><td style="padding:6px 12px;border-bottom:1px solid #E8DDD5;text-align:right;font-weight:600">${c.cantidad}</td><td style="padding:6px 12px;border-bottom:1px solid #E8DDD5;color:#9B7B6A">${c.unidad}</td><td style="padding:6px 12px;border-bottom:1px solid #E8DDD5;font-size:11px;color:#9B7B6A">${c.notas || ''}</td></tr>`).join('')
+      .map(c => `<tr><td style="padding:6px 12px;border-bottom:1px solid #E8DDD5">${c.producto}</td><td style="padding:6px 12px;border-bottom:1px solid #E8DDD5;text-align:right;font-weight:600">${Math.round(Number(c.cantidad)).toLocaleString('es-MX')}</td><td style="padding:6px 12px;border-bottom:1px solid #E8DDD5;color:#9B7B6A">${c.unidad}</td><td style="padding:6px 12px;border-bottom:1px solid #E8DDD5;font-size:11px;color:#9B7B6A">${c.notas || ''}</td></tr>`).join('')
     return `<h3 style="font-size:13px;text-transform:uppercase;letter-spacing:1px;color:#9B7B6A;margin:20px 0 6px">${g}</h3>
 <table style="width:100%;border-collapse:collapse;background:#fff;margin-bottom:8px">
 <thead><tr><th style="padding:8px 12px;text-align:left;font-size:11px;text-transform:uppercase;color:#9B7B6A;border-bottom:2px solid #E8DDD5">Insumo</th><th style="padding:8px 12px;text-align:right;font-size:11px;text-transform:uppercase;color:#9B7B6A;border-bottom:2px solid #E8DDD5">Cantidad</th><th style="padding:8px 12px;font-size:11px;text-transform:uppercase;color:#9B7B6A;border-bottom:2px solid #E8DDD5">Unidad</th><th style="padding:8px 12px;font-size:11px;text-transform:uppercase;color:#9B7B6A;border-bottom:2px solid #E8DDD5">Notas</th></tr></thead>
@@ -177,7 +177,7 @@ function exportarInventarioExcel() {
   const filas = (window._invConteo || []).map(c => ({
     Grupo: c.grupo,
     Insumo: c.producto,
-    Cantidad: c.cantidad,
+    Cantidad: Math.round(Number(c.cantidad)),
     Unidad: c.unidad,
     Notas: c.notas || ''
   }))
