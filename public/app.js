@@ -153,6 +153,10 @@ async function mostrarApp(rol, email, tenant_id = null) {
     const link = e.target.closest('[data-view]')
     if (!link) return
     e.preventDefault()
+    // Cerrar todos los dropdowns
+    document.querySelectorAll('.nav-grupo-items').forEach(el => el.classList.remove('abierto'))
+    document.querySelectorAll('.nav-grupo-header').forEach(el => el.classList.remove('abierto'))
+    document.querySelectorAll('.nav-grupo-chevron').forEach(el => el.textContent = '▸')
     document.querySelectorAll('[data-view]').forEach(l => l.classList.remove('active'))
     link.classList.add('active')
     const view = link.dataset.view
