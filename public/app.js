@@ -75,6 +75,10 @@ async function mostrarSelectorTenant(tenants, rol, email) {
 async function seleccionarTenant(tenantId) {
   window._tenantActivo = tenantId
   window._tenantConfig = null
+  // Escribir tenant_id en el JWT para que las políticas RLS de Supabase lo lean correctamente.
+  // El usuario multitenant no tiene tenant_id en su metadata — solo tenants[].
+  // Sin este update, auth.jwt()->'user_metadata'->>'tenant_id' es NULL y RLS devuelve vacío.
+  await window._db.auth.updateUser({ data: { tenant_id: tenantId } })
   const { data: { user } } = await window._db.auth.getUser()
   const rol   = user?.user_metadata?.rol || null
   const email = user?.email
