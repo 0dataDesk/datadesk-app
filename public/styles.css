@@ -208,7 +208,7 @@ body {
   box-shadow: 0 2px 6px rgba(43,26,15,0.05);
   display: flex;
   position: relative;
-  z-index: 50;
+  z-index: 100;
 }
 
 .sidebar > ul {
@@ -268,7 +268,7 @@ body {
   border-top: none;
   border-radius: 0 0 var(--radius) var(--radius);
   box-shadow: 0 4px 12px rgba(43,26,15,0.1);
-  z-index: 200;
+  z-index: 300;
   flex-direction: column;
   list-style: none;
   padding: 0;
