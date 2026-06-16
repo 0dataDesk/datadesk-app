@@ -123,10 +123,13 @@ async function mostrarApp(rol, email, tenant_id = null) {
 
   // Ocultar nav items según rol
   const permitidasPorRol = {
-    // admin:  ['inicio','productos','recetas','precios','costeo','pedidos','recepciones'],
-    admin:  ['inicio','productos','recetas','precios','costeo','pedidos','ventas','inventario','cierres'],
-    editor: ['inicio','productos','recetas','inventario'],
-    cocina: ['productos','recetas']
+    superadmin: ['inicio','productos','recetas','precios','costeo','pedidos','ventas','inventario','cierres'],
+    owner:      ['inicio','productos','recetas','ventas','inventario','cierres'],
+    gerente:    ['inicio','productos','recetas','ventas','inventario','cierres'],
+    caja:       ['productos','recetas','ventas'],
+    // legacy
+    admin:      ['inicio','productos','recetas','precios','costeo','pedidos','ventas','inventario','cierres'],
+    editor:     ['inicio','productos','recetas','inventario']
   }
   const visibles = permitidasPorRol[window._rol] || ['inicio','productos','recetas','precios','costeo','pedidos']
   document.querySelectorAll('nav [data-view]').forEach(item => {
@@ -135,7 +138,8 @@ async function mostrarApp(rol, email, tenant_id = null) {
   })
 
   const vistaGuardada = localStorage.getItem('datadesk-view')
-  const vistaInicial  = visibles.includes(vistaGuardada) ? vistaGuardada : (window._rol === 'cocina' ? 'productos' : 'inicio')
+  const defaultVista  = ['caja'].includes(window._rol) ? 'ventas' : 'inicio'
+  const vistaInicial  = visibles.includes(vistaGuardada) ? vistaGuardada : defaultVista
   const linkActivo = document.querySelector(`[data-view="${vistaInicial}"]`)
   if (linkActivo) linkActivo.classList.add('active')
 

@@ -9,8 +9,8 @@ async function vistaInventario() {
       <div class="vista-header"><h2>Inventario</h2></div>
       <div class="filtros-bar">
         <input type="text" id="inv-search" placeholder="Buscar insumo..." class="filtro-search" />
-        <button class="btn-accion btn-aprobar" onclick="exportarInventarioExcel()">Exportar Excel</button>
-        <button class="btn-accion" style="border:1px solid var(--color-border)" onclick="exportarInventarioPDF()">Exportar PDF</button>
+        ${['superadmin','admin','gerente'].includes(window._rol) ? `<button class="btn-accion btn-aprobar" onclick="exportarInventarioExcel()">Exportar Excel</button>` : ''}
+        ${['superadmin','admin','gerente'].includes(window._rol) ? `<button class="btn-accion" style="border:1px solid var(--color-border)" onclick="exportarInventarioPDF()">Exportar PDF</button>` : ''}
       </div>
       <div id="inv-resultado"><p style="color:var(--color-text-muted)">Cargando...</p></div>
     `

@@ -71,10 +71,13 @@ async function renderVentas(container, tenantId) {
 
   window._supaDelete = supaDelete
 
+  const mostrarCierre   = ['superadmin','admin','gerente'].includes(window._rol)
+  const mostrarEliminar = ['superadmin','admin'].includes(window._rol)
+
   let html = `
     <div class="vista-header">
       <h2>Ventas</h2>
-      <button class="btn-accion" onclick="mostrarCierreCaja('${tenantId}')">Cierre de caja</button>
+      ${mostrarCierre ? `<button class="btn-accion" onclick="mostrarCierreCaja('${tenantId}')">Cierre de caja</button>` : ''}
       <button class="btn-accion btn-aprobar" onclick="vistaVentas()">↺ Recargar</button>
     </div>
   `
@@ -114,8 +117,8 @@ async function renderVentas(container, tenantId) {
             <span style="font-size:12px;color:var(--color-text-muted);margin-left:8px">${fmtFecha(v.created_at)}</span>
             <span style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600;margin-left:8px;${badge}">${v.estado}</span>
           </div>
-          <button class="btn-accion" style="background:rgba(184,92,42,0.1);color:#B85C2A;border:1px solid rgba(184,92,42,0.2);font-size:12px;padding:4px 12px"
-            onclick="eliminarVenta('${v.id}','${(v.folio || v.id).replace(/'/g,"\\'")}','${tenantId}')">🗑 Eliminar</button>
+          ${mostrarEliminar ? `<button class="btn-accion" style="background:rgba(184,92,42,0.1);color:#B85C2A;border:1px solid rgba(184,92,42,0.2);font-size:12px;padding:4px 12px"
+            onclick="eliminarVenta('${v.id}','${(v.folio || v.id).replace(/'/g,"\\'")}','${tenantId}')">🗑 Eliminar</button>` : ''}
         </div>
         <div style="font-size:13px;color:var(--color-text-muted);margin-top:6px">
           ${v.tipo_entrega || '—'} · ${v.cliente_nombre || '—'} · ${v.metodo_pago || '—'}
@@ -269,7 +272,9 @@ async function mostrarCierreCaja(tenantId) {
     resultado.innerHTML = html
     document.getElementById('cierre-export-btn').style.display = ''
     document.getElementById('cierre-pdf-btn').style.display = ''
-    document.getElementById('cierre-cerrar-btn').style.display = ''
+    if (['superadmin','admin','gerente'].includes(window._rol)) {
+      document.getElementById('cierre-cerrar-btn').style.display = ''
+    }
   }
 
   document.getElementById('cierre-fecha').addEventListener('change', e => cargarCierre(e.target.value))
