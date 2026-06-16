@@ -321,7 +321,7 @@ async function verDetalleRecepcion(id) {
   ;(productos || []).forEach(p => { prodMap[p.id_producto] = p })
 
   const wrap = document.getElementById('form-recepcion-wrap')
-  const totalMonto = (items || []).reduce((s, i) => s + (i.total || 0), 0)
+  const totalMonto = (items || []).reduce((s, i) => s + (Number(i.cantidad_recibida) * Number(i.costo_unitario || 0)), 0)
   const provNombre = rec.id_proveedor
     ? (window._nombreProv[rec.id_proveedor] || rec.id_proveedor)
     : 'Inventario Inicial'
@@ -351,15 +351,16 @@ async function verDetalleRecepcion(id) {
         </thead>
         <tbody>
           ${(items || []).map(i => {
-            const variacion = i.variacion_pct
+            const total    = Number(i.cantidad_recibida) * Number(i.costo_unitario || 0)
+            const variacion = i.variacion_pct ?? null
             const varColor = variacion === null ? '' : variacion > 5 ? 'color:#B85C2A;font-weight:600' : variacion < -5 ? 'color:#3A8C3E;font-weight:600' : 'color:var(--color-text-muted)'
             return `
               <tr>
                 <td>${prodMap[i.id_producto]?.producto || i.id_producto}</td>
                 <td style="text-align:right">${i.cantidad_recibida} ${prodMap[i.id_producto]?.unidad_medida || i.unidad || ''}</td>
                 <td style="text-align:right;color:var(--color-text-muted)">${i.cantidad_solicitada || '—'}</td>
-                <td style="text-align:right">$${Number(i.costo_unitario).toFixed(2)}</td>
-                <td style="text-align:right;font-weight:600">$${Number(i.total).toFixed(2)}</td>
+                <td style="text-align:right">$${Number(i.costo_unitario || 0).toFixed(2)}</td>
+                <td style="text-align:right;font-weight:600">$${total.toFixed(2)}</td>
                 <td style="text-align:right;${varColor}">${variacion !== null ? variacion + '%' : '—'}</td>
               </tr>`
           }).join('')}
