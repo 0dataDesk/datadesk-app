@@ -183,7 +183,8 @@ async function mostrarApp(rol, email, tenant_id = null) {
     if (view === 'pedidos')     await vistaPedidos()
     if (view === 'ventas')      await vistaVentas()
     if (view === 'inventario')  await vistaInventario()
-    if (view === 'cierres')     await vistaCierres()
+    if (view === 'cierres')      await vistaCierres()
+    if (view === 'recepciones')  await vistaRecepciones()
   })
 
   // Cerrar dropdowns al hacer click fuera del nav
@@ -197,12 +198,12 @@ async function mostrarApp(rol, email, tenant_id = null) {
 
   // Nav agrupado según rol
   const permitidasPorRol = {
-    superadmin: ['inicio','productos','recetas','precios','costeo','pedidos','ventas','inventario','cierres'],
+    superadmin: ['inicio','productos','recetas','precios','costeo','pedidos','ventas','inventario','cierres','recepciones'],
     owner:      ['inicio','productos','recetas','ventas','inventario','cierres'],
     gerente:    ['inicio','productos','recetas','ventas','inventario','cierres'],
     caja:       ['productos','recetas','ventas'],
     // legacy
-    admin:      ['inicio','productos','recetas','precios','costeo','pedidos','ventas','inventario','cierres'],
+    admin:      ['inicio','productos','recetas','precios','costeo','pedidos','ventas','inventario','cierres','recepciones'],
     editor:     ['inicio','productos','recetas','inventario']
   }
   const visibles = permitidasPorRol[window._rol] || ['inicio','productos','recetas','precios','costeo','pedidos']
@@ -210,13 +211,13 @@ async function mostrarApp(rol, email, tenant_id = null) {
   const navGrupos = [
     { label: 'Menú',       vistas: ['productos','recetas'],              roles: ['superadmin','admin','owner','gerente','editor','caja','cocina'] },
     { label: 'Operación',  vistas: ['ventas','inventario','cierres'],    roles: ['superadmin','admin','owner','gerente','editor'] },
-    { label: 'Desarrollo', vistas: ['inicio','precios','costeo','pedidos'], roles: ['superadmin','admin'] }
+    { label: 'Desarrollo', vistas: ['inicio','precios','costeo','pedidos','recepciones'], roles: ['superadmin','admin'] }
   ]
 
   const vistaLabels = {
     inicio: 'Inicio', productos: 'Insumos', recetas: 'Recetas',
     precios: 'Precios', costeo: 'Costeo', pedidos: 'Pedidos',
-    ventas: 'Ventas', inventario: 'Inventario', cierres: 'Cierres'
+    ventas: 'Ventas', inventario: 'Inventario', cierres: 'Cierres', recepciones: 'Recepciones'
   }
 
   let navHtml = ''
