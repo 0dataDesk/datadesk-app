@@ -199,8 +199,8 @@ async function mostrarApp(rol, email, tenant_id = null) {
   // Nav agrupado según rol
   const permitidasPorRol = {
     superadmin: ['inicio','productos','recetas','precios','costeo','pedidos','ventas','inventario','cierres','recepciones'],
-    owner:      ['inicio','productos','recetas','ventas','inventario','cierres'],
-    gerente:    ['inicio','productos','recetas','ventas','inventario','cierres'],
+    owner:      ['inicio','productos','recetas','ventas','inventario','cierres','recepciones'],
+    gerente:    ['inicio','productos','recetas','ventas','inventario','cierres','recepciones'],
     caja:       ['productos','recetas','ventas'],
     // legacy
     admin:      ['inicio','productos','recetas','precios','costeo','pedidos','ventas','inventario','cierres','recepciones'],
@@ -210,8 +210,8 @@ async function mostrarApp(rol, email, tenant_id = null) {
 
   const navGrupos = [
     { label: 'Menú',       vistas: ['productos','recetas'],              roles: ['superadmin','admin','owner','gerente','editor','caja','cocina'] },
-    { label: 'Operación',  vistas: ['ventas','inventario','cierres'],    roles: ['superadmin','admin','owner','gerente','editor'] },
-    { label: 'Desarrollo', vistas: ['inicio','precios','costeo','pedidos','recepciones'], roles: ['superadmin','admin'] }
+    { label: 'Operación',  vistas: ['ventas','inventario','cierres','recepciones'], roles: ['superadmin','admin','owner','gerente','editor'] },
+    { label: 'Desarrollo', vistas: ['inicio','precios','costeo','pedidos'], roles: ['superadmin','admin'] }
   ]
 
   const vistaLabels = {
