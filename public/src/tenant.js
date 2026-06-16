@@ -1,11 +1,19 @@
 async function getTenantId() {
+  console.log('[getTenantId] _tenantActivo:', window._tenantActivo)
   const { data: { user } } = await window._db.auth.getUser()
   if (!user) throw new Error('No hay sesion activa')
-  // Multitenant: usar el tenant activo seleccionado en sesión
+
+  // 1. Multitenant: tenant seleccionado explícitamente
   if (window._tenantActivo) return window._tenantActivo
-  // Single tenant: usar el tenant_id del metadata
+
+  // 2. Single tenant: leer del JWT
   const tenantId = user.user_metadata?.tenant_id
   if (tenantId) return tenantId
+
+  // 3. Si tiene array tenants pero no seleccionó → error descriptivo
+  const tenants = user.user_metadata?.tenants
+  if (tenants?.length) throw new Error('Selecciona un negocio primero')
+
   throw new Error('No hay tenant asignado')
 }
 
