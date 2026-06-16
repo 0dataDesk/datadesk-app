@@ -1,3 +1,13 @@
+window.FUENTES_POR_TENANT = {
+  tita: [
+    { fuente: 'carga_eugenio', etiqueta: 'Cocina' },
+    { fuente: 'barra_nacho',   etiqueta: 'Barra'  }
+  ],
+  furia: [
+    { fuente: 'menu_charly', etiqueta: 'Menú Charly' }
+  ]
+}
+
 let _appMontado = false
 
 window._db.auth.onAuthStateChange(async (event, session) => {
