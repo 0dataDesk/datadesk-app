@@ -246,6 +246,10 @@ async function mostrarApp(rol, email, tenant_id = null) {
       body.classList.add('abierto')
       if (header) header.classList.add('abierto')
       if (chev) chev.textContent = '▾'
+      // Posicionar el dropdown bajo el header (position: fixed)
+      const rect = header.getBoundingClientRect()
+      body.style.top  = rect.bottom + 'px'
+      body.style.left = rect.left + 'px'
     }
   }
 
