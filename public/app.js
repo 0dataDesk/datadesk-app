@@ -125,18 +125,7 @@ async function mostrarApp(rol, email, tenant_id = null) {
       </header>
       <div class="body">
         <nav class="sidebar">
-          <ul>
-            <li><a href="#" data-view="inicio">Inicio</a></li>
-            <li><a href="#" data-view="productos">Insumos</a></li>
-            <li><a href="#" data-view="recetas">Recetas</a></li>
-            <li><a href="#" data-view="precios">Precios</a></li>
-            <li><a href="#" data-view="costeo">Costeo</a></li>
-            <li><a href="#" data-view="pedidos">Pedidos</a></li>
-            <li><a href="#" data-view="ventas">🧾 Ventas</a></li>
-            <li><a href="#" data-view="inventario">Inventario</a></li>
-            <li><a href="#" data-view="cierres">Cierres</a></li>
-            // <li><a href="#" data-view="recepciones">Recepciones</a></li>
-          </ul>
+          <ul></ul>
         </nav>
         <main class="content" id="content">
           <p>Cargando...</p>
@@ -179,7 +168,7 @@ async function mostrarApp(rol, email, tenant_id = null) {
     })
   })
 
-  // Ocultar nav items según rol
+  // Nav agrupado según rol
   const permitidasPorRol = {
     superadmin: ['inicio','productos','recetas','precios','costeo','pedidos','ventas','inventario','cierres'],
     owner:      ['inicio','productos','recetas','ventas','inventario','cierres'],
@@ -190,10 +179,57 @@ async function mostrarApp(rol, email, tenant_id = null) {
     editor:     ['inicio','productos','recetas','inventario']
   }
   const visibles = permitidasPorRol[window._rol] || ['inicio','productos','recetas','precios','costeo','pedidos']
-  document.querySelectorAll('nav [data-view]').forEach(item => {
-    const view = item.getAttribute('data-view')
-    item.closest('li').style.display = visibles.includes(view) ? '' : 'none'
+
+  const navGrupos = [
+    { label: 'Menú',       vistas: ['productos','recetas'],              roles: ['superadmin','admin','owner','gerente','editor','caja','cocina'] },
+    { label: 'Operación',  vistas: ['ventas','inventario','cierres'],    roles: ['superadmin','admin','owner','gerente','editor'] },
+    { label: 'Desarrollo', vistas: ['inicio','precios','costeo','pedidos'], roles: ['superadmin','admin'] }
+  ]
+
+  const vistaLabels = {
+    inicio: 'Inicio', productos: 'Insumos', recetas: 'Recetas',
+    precios: 'Precios', costeo: 'Costeo', pedidos: 'Pedidos',
+    ventas: 'Ventas', inventario: 'Inventario', cierres: 'Cierres'
+  }
+
+  let navHtml = ''
+  let primerGrupoVisible = true
+
+  navGrupos.forEach(grupo => {
+    const vistasPermitidas = grupo.vistas.filter(v =>
+      grupo.roles.includes(window._rol) && visibles.includes(v)
+    )
+    if (!vistasPermitidas.length) return
+
+    const grupoId = `nav-grupo-${grupo.label.toLowerCase().replace(/\s/g,'-')}`
+    const abierto = primerGrupoVisible
+    primerGrupoVisible = false
+
+    navHtml += `
+      <li class="nav-grupo">
+        <div class="nav-grupo-header" onclick="toggleNavGrupo('${grupoId}')">
+          <span>${grupo.label}</span>
+          <span class="nav-grupo-chevron" id="chev-${grupoId}">${abierto ? '▾' : '▸'}</span>
+        </div>
+        <ul class="nav-grupo-items" id="${grupoId}" style="display:${abierto ? 'flex' : 'none'}">
+          ${vistasPermitidas.map(v => `
+            <li><a href="#" data-view="${v}">${vistaLabels[v]}</a></li>
+          `).join('')}
+        </ul>
+      </li>
+    `
   })
+
+  document.querySelector('nav ul').innerHTML = navHtml
+
+  window.toggleNavGrupo = function(grupoId) {
+    const body = document.getElementById(grupoId)
+    const chev = document.getElementById('chev-' + grupoId)
+    if (!body) return
+    const open = body.style.display !== 'none'
+    body.style.display = open ? 'none' : 'flex'
+    if (chev) chev.textContent = open ? '▸' : '▾'
+  }
 
   const vistaGuardada = localStorage.getItem('datadesk-view')
   const defaultVista  = ['caja'].includes(window._rol) ? 'ventas' : 'inicio'
