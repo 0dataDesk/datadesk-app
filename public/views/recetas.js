@@ -151,7 +151,7 @@ async function cargarDetalleReceta(receta) {
         .select('*')
         .eq('tenant_id', tenant_id)
         .eq('id_receta', receta.id_receta)
-        .eq('activo', true)
+        .neq('activo', false)
         .order('paso_num'),
       window._db.from('productos')
         .select('id_producto, unidad_medida')
@@ -318,7 +318,7 @@ async function exportarRecetasPDF(fuente) {
     { data: todosProductos }
   ] = await Promise.all([
     window._db.from('receta_ingredientes').select('*').in('id_receta', ids).eq('activo', true).order('orden', { ascending: true, nullsFirst: false }),
-    window._db.from('receta_procedimientos').select('*').in('id_receta', ids).eq('activo', true).order('paso_num'),
+    window._db.from('receta_procedimientos').select('*').in('id_receta', ids).neq('activo', false).order('paso_num'),
     window._db.from('productos').select('id_producto, unidad_medida').eq('tenant_id', tenant_id).eq('activo', true)
   ])
 
