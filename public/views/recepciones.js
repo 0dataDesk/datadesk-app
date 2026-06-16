@@ -106,7 +106,7 @@ function renderListaRecepciones(lista) {
           ${lista.map(r => `
             <tr style="cursor:pointer" onclick="verDetalleRecepcion('${r.id}')">
               <td>${r.fecha || '—'}</td>
-              <td>${window._nombreProv[r.id_proveedor] || r.id_proveedor}</td>
+              <td>${r.id_proveedor ? (window._nombreProv[r.id_proveedor] || r.id_proveedor) : 'Inventario Inicial'}</td>
               <td>${r.num_remision || '—'}</td>
               <td>${r.num_factura || '—'}</td>
               <td style="font-size:12px;color:var(--color-text-muted)">${r.area_almacenamiento || '—'}</td>
@@ -303,25 +303,35 @@ async function marcarPagado(id) {
 }
 
 async function verDetalleRecepcion(id) {
+  const tenant_id = await getTenantId()
+
   const [
     { data: rec },
-    { data: items }
+    { data: items },
+    { data: productos }
   ] = await Promise.all([
     window._db.from('recepciones').select('*').eq('id', id).single(),
-    window._db.from('recepcion_items').select('*, productos(producto, unidad_medida)').eq('id_recepcion', id)
+    window._db.from('recepcion_items').select('*').eq('id_recepcion', id),
+    window._db.from('productos').select('id_producto, producto, unidad_medida').eq('tenant_id', tenant_id).eq('activo', true)
   ])
 
   if (!rec) return
 
+  const prodMap = {}
+  ;(productos || []).forEach(p => { prodMap[p.id_producto] = p })
+
   const wrap = document.getElementById('form-recepcion-wrap')
   const totalMonto = (items || []).reduce((s, i) => s + (i.total || 0), 0)
+  const provNombre = rec.id_proveedor
+    ? (window._nombreProv[rec.id_proveedor] || rec.id_proveedor)
+    : 'Inventario Inicial'
 
   wrap.innerHTML = `
     <div class="receta-detalle-card" style="margin-bottom:24px">
       <div class="detalle-header">
         <div>
           <h3>Recepción — ${rec.num_remision || rec.id.slice(0,8)}</h3>
-          <p class="detalle-categoria">${window._nombreProv[rec.id_proveedor] || rec.id_proveedor} · ${rec.fecha}</p>
+          <p class="detalle-categoria">${provNombre} · ${rec.fecha}</p>
         </div>
         <span class="badge-status" style="${window._badgeEstatus[rec.estatus] || ''}">
           ${window._iconoEstatus[rec.estatus] || ''} ${rec.estatus?.replace('_',' ')}
@@ -345,8 +355,8 @@ async function verDetalleRecepcion(id) {
             const varColor = variacion === null ? '' : variacion > 5 ? 'color:#B85C2A;font-weight:600' : variacion < -5 ? 'color:#3A8C3E;font-weight:600' : 'color:var(--color-text-muted)'
             return `
               <tr>
-                <td>${i.productos?.producto || i.id_producto}</td>
-                <td style="text-align:right">${i.cantidad_recibida} ${i.productos?.unidad_medida || ''}</td>
+                <td>${prodMap[i.id_producto]?.producto || i.id_producto}</td>
+                <td style="text-align:right">${i.cantidad_recibida} ${prodMap[i.id_producto]?.unidad_medida || i.unidad || ''}</td>
                 <td style="text-align:right;color:var(--color-text-muted)">${i.cantidad_solicitada || '—'}</td>
                 <td style="text-align:right">$${Number(i.costo_unitario).toFixed(2)}</td>
                 <td style="text-align:right;font-weight:600">$${Number(i.total).toFixed(2)}</td>
