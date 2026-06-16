@@ -206,8 +206,6 @@ async function mostrarApp(rol, email, tenant_id = null) {
   }
 
   let navHtml = ''
-  let primerGrupoVisible = true
-
   navGrupos.forEach(grupo => {
     const vistasPermitidas = grupo.vistas.filter(v =>
       grupo.roles.includes(window._rol) && visibles.includes(v)
@@ -215,8 +213,7 @@ async function mostrarApp(rol, email, tenant_id = null) {
     if (!vistasPermitidas.length) return
 
     const grupoId = `nav-grupo-${grupo.label.toLowerCase().replace(/\s/g,'-')}`
-    const abierto = primerGrupoVisible
-    primerGrupoVisible = false
+    const abierto = false
 
     navHtml += `
       <li class="nav-grupo">
@@ -258,8 +255,11 @@ async function mostrarApp(rol, email, tenant_id = null) {
   }
 
   const vistaGuardada = localStorage.getItem('datadesk-view')
-  const defaultVista  = ['caja'].includes(window._rol) ? 'ventas' : 'inicio'
-  const vistaInicial  = visibles.includes(vistaGuardada) ? vistaGuardada : defaultVista
+  const vistaInicial = visibles.includes(vistaGuardada)
+    ? vistaGuardada
+    : visibles.includes('recetas')
+    ? 'recetas'
+    : visibles[0]
   const linkActivo = document.querySelector(`[data-view="${vistaInicial}"]`)
   if (linkActivo) linkActivo.classList.add('active')
 
