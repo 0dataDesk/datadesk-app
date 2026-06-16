@@ -8,8 +8,9 @@ async function vistaProductos() {
     const rol        = window._rol || 'operador'
     const puedeEditar = ['admin', 'editor', 'cocina'].includes(rol)
 
-    const tenantActual   = window._tenantActivo || tenant_id
-    const fuentesActivas = (FUENTES_POR_TENANT[tenantActual] || []).map(f => f.fuente)
+    const tenantActual   = (window._tenantConfig?.nombre || '').toLowerCase()
+    const fuentesDef     = window.FUENTES_POR_TENANT[tenantActual] || []
+    const fuentesActivas = fuentesDef.map(f => f.fuente)
 
     let query = window._db.from('productos').select('*').eq('tenant_id', tenant_id).eq('activo', true)
     if (fuentesActivas.length === 1) {
@@ -34,9 +35,6 @@ async function vistaProductos() {
     window._unidades  = unidades  || []
 
     const hayUnidades = window._unidades.length > 0
-
-    const tenantActual = (window._tenantConfig?.nombre || '').toLowerCase()
-    const fuentesDef   = FUENTES_POR_TENANT[tenantActual] || []
 
     const grupos  = [...new Set(window._productos.map(p => p.grupo).filter(Boolean))].sort()
 
