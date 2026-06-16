@@ -65,58 +65,54 @@ async function vistaInventario() {
         return
       }
 
-      const porGrupo = {}
-      filtrados.forEach(c => {
-        const g = c.grupo
-        if (!porGrupo[g]) porGrupo[g] = []
-        porGrupo[g].push(c)
+      function nivelStock(cantidad, unidad) {
+        const u = (unidad || '').toLowerCase()
+        const n = Number(cantidad)
+        if (n === 0) return 'rojo'
+        if (u === 'pza' || u === 'pzas') return n < 6 ? 'amarillo' : 'verde'
+        return n < 500 ? 'amarillo' : 'verde'
+      }
+
+      const colores = {
+        rojo:     { punto: '#B85C2A', bg: 'rgba(184,92,42,0.08)',  orden: 0, label: 'Sin existencia' },
+        amarillo: { punto: '#C8892A', bg: 'rgba(200,137,42,0.08)', orden: 1, label: 'Stock bajo' },
+        verde:    { punto: '#3A8C3E', bg: 'rgba(76,153,80,0.08)',  orden: 2, label: 'En existencia' }
+      }
+
+      const conNivel = filtrados.map(c => ({
+        ...c,
+        nivel: nivelStock(c.cantidad, c.unidad)
+      })).sort((a, b) => {
+        const oa = colores[a.nivel].orden
+        const ob = colores[b.nivel].orden
+        if (oa !== ob) return oa - ob
+        return a.producto.localeCompare(b.producto)
       })
 
-      const grupos = Object.keys(porGrupo).sort()
+      const resumen = { rojo: 0, amarillo: 0, verde: 0 }
+      conNivel.forEach(c => resumen[c.nivel]++)
 
-      let html = `
-        <div class="precios-nav">
-          ${grupos.map(g => `
-            <button class="precios-nav-pill"
-              onclick="document.getElementById('inv-sec-${g.replace(/\s+/g,'-')}').scrollIntoView({behavior:'smooth',block:'start'})">
-              ${g} (${porGrupo[g].length})
-            </button>`).join('')}
+      const html = `
+        <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:20px">
+          ${['rojo','amarillo','verde'].map(n => `
+            <div style="display:flex;align-items:center;gap:8px;padding:10px 16px;background:${colores[n].bg};border-radius:8px;flex:1;min-width:100px">
+              <span style="width:10px;height:10px;border-radius:50%;background:${colores[n].punto};flex-shrink:0"></span>
+              <div>
+                <div style="font-size:20px;font-weight:700;color:var(--color-primary)">${resumen[n]}</div>
+                <div style="font-size:11px;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:0.5px">${colores[n].label}</div>
+              </div>
+            </div>`).join('')}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:2px">
+          ${conNivel.map(c => `
+            <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:${colores[c.nivel].bg};border-radius:8px">
+              <span style="width:8px;height:8px;border-radius:50%;background:${colores[c.nivel].punto};flex-shrink:0"></span>
+              <span style="flex:1;font-size:14px;color:var(--color-text)">${c.producto}</span>
+              <span style="font-size:14px;font-weight:600;color:var(--color-primary)">${Number(c.cantidad).toLocaleString('es-MX')}</span>
+              <span style="font-size:12px;color:var(--color-text-muted);min-width:28px;text-align:left">${c.unidad || ''}</span>
+            </div>`).join('')}
         </div>
       `
-
-      grupos.forEach((grupo, idx) => {
-        const secId  = `inv-sec-${grupo.replace(/\s+/g,'-')}`
-        const bodyId = `inv-body-${grupo.replace(/\s+/g,'-')}`
-        html += `
-          <div class="precios-seccion" id="${secId}">
-            <div class="precios-seccion-header" onclick="toggleSeccion('${bodyId}')">
-              <span>${grupo} <span class="precios-seccion-count">${porGrupo[grupo].length} insumos</span></span>
-              <span class="precios-seccion-chevron" id="chev-${bodyId}">${idx === 0 ? '▾' : '▸'}</span>
-            </div>
-            <div class="precios-seccion-body" id="${bodyId}" style="display:${idx === 0 ? 'block' : 'none'}">
-              <table class="tabla">
-                <thead>
-                  <tr>
-                    <th>Insumo</th>
-                    <th style="text-align:right">Cantidad</th>
-                    <th>Unidad</th>
-                    <th>Notas</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${porGrupo[grupo].map(c => `
-                    <tr>
-                      <td>${c.producto}</td>
-                      <td style="text-align:right;font-weight:600">${c.cantidad}</td>
-                      <td style="color:var(--color-text-muted)">${c.unidad}</td>
-                      <td style="color:var(--color-text-muted);font-size:12px">${c.notas || ''}</td>
-                    </tr>`).join('')}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        `
-      })
 
       resultado.innerHTML = html
     }
