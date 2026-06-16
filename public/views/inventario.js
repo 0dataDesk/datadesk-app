@@ -15,9 +15,16 @@ async function vistaInventario() {
       <div id="inv-resultado"><p style="color:var(--color-text-muted)">Cargando...</p></div>
     `
 
-    const [{ data: conteo, error: errC }, { data: productos, error: errP }] = await Promise.all([
-      window._db.from('inventario_conteos').select('id_producto, cantidad, unidad, notas, fecha_conteo').eq('tenant_id', tenant_id),
-      window._db.from('productos').select('id_producto, producto, grupo').eq('tenant_id', tenant_id).eq('activo', true)
+    const [{ data: items, error: errC }, { data: productos, error: errP }] = await Promise.all([
+      window._db
+        .from('recepcion_items')
+        .select('id_producto, cantidad_recibida, unidad, notas, recepciones!inner(tenant_id)')
+        .eq('recepciones.tenant_id', tenant_id),
+      window._db
+        .from('productos')
+        .select('id_producto, producto, grupo')
+        .eq('tenant_id', tenant_id)
+        .eq('activo', true)
     ])
 
     if (errC) throw errC
@@ -27,11 +34,16 @@ async function vistaInventario() {
     ;(productos || []).forEach(p => { prodMap[p.id_producto] = p })
 
     const porProducto = {}
-    ;(conteo || []).forEach(c => {
-      const existente = porProducto[c.id_producto]
-      if (!existente || c.fecha_conteo > existente.fecha_conteo) {
-        porProducto[c.id_producto] = c
+    ;(items || []).forEach(c => {
+      if (!porProducto[c.id_producto]) {
+        porProducto[c.id_producto] = {
+          id_producto: c.id_producto,
+          cantidad: 0,
+          unidad: c.unidad,
+          notas: c.notas
+        }
       }
+      porProducto[c.id_producto].cantidad += Number(c.cantidad_recibida)
     })
 
     window._invConteo = Object.values(porProducto).map(c => ({
