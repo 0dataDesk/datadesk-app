@@ -21,7 +21,7 @@ async function vistaProductos() {
       { data: productos, error: errP },
       { data: unidades,  error: errU }
     ] = await Promise.all([
-      window._db.from('productos').select('*').eq('tenant_id', tenant_id).eq('activo', true).order('producto'),
+      window._db.from('productos').select('*').eq('tenant_id', tenant_id).eq('activo', true).eq('fuente', 'menu_charly').order('producto'),
       window._db.from('catalogo_unidades').select('*').eq('tenant_id', tenant_id).order('nombre')
     ])
 
