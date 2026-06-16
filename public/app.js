@@ -148,24 +148,33 @@ async function mostrarApp(rol, email, tenant_id = null) {
     await mostrarSelectorTenant(tenants, user?.user_metadata?.rol, user?.email)
   })
 
-  document.querySelectorAll('[data-view]').forEach(link => {
-    link.addEventListener('click', async (e) => {
-      e.preventDefault()
-      document.querySelectorAll('[data-view]').forEach(l => l.classList.remove('active'))
-      e.target.classList.add('active')
-      const view = e.target.dataset.view
-      localStorage.setItem('datadesk-view', view)
-      if (view === 'inicio')    await mostrarBienvenida()
-      if (view === 'productos') await vistaProductos()
-      if (view === 'recetas')   await vistaRecetas()
-      if (view === 'precios')   await vistaPrecios()
-      if (view === 'costeo')    await vistaCosteo()
-      if (view === 'pedidos')      await vistaPedidos()
-      if (view === 'ventas')       await vistaVentas()
-      if (view === 'inventario')   await vistaInventario()
-      if (view === 'cierres')      await vistaCierres()
-      // if (view === 'recepciones')  await vistaRecepciones()
-    })
+  // Event delegation — cubre links dentro de dropdowns dinámicos
+  document.querySelector('nav').addEventListener('click', async (e) => {
+    const link = e.target.closest('[data-view]')
+    if (!link) return
+    e.preventDefault()
+    document.querySelectorAll('[data-view]').forEach(l => l.classList.remove('active'))
+    link.classList.add('active')
+    const view = link.dataset.view
+    localStorage.setItem('datadesk-view', view)
+    if (view === 'inicio')      await mostrarBienvenida()
+    if (view === 'productos')   await vistaProductos()
+    if (view === 'recetas')     await vistaRecetas()
+    if (view === 'precios')     await vistaPrecios()
+    if (view === 'costeo')      await vistaCosteo()
+    if (view === 'pedidos')     await vistaPedidos()
+    if (view === 'ventas')      await vistaVentas()
+    if (view === 'inventario')  await vistaInventario()
+    if (view === 'cierres')     await vistaCierres()
+  })
+
+  // Cerrar dropdowns al hacer click fuera del nav
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.nav-grupo')) {
+      document.querySelectorAll('.nav-grupo-items').forEach(el => el.classList.remove('abierto'))
+      document.querySelectorAll('.nav-grupo-header').forEach(el => el.classList.remove('abierto'))
+      document.querySelectorAll('.nav-grupo-chevron').forEach(el => el.textContent = '▸')
+    }
   })
 
   // Nav agrupado según rol
@@ -207,11 +216,11 @@ async function mostrarApp(rol, email, tenant_id = null) {
 
     navHtml += `
       <li class="nav-grupo">
-        <div class="nav-grupo-header" onclick="toggleNavGrupo('${grupoId}')">
+        <div class="nav-grupo-header${abierto ? ' abierto' : ''}" onclick="toggleNavGrupo('${grupoId}')">
           <span>${grupo.label}</span>
           <span class="nav-grupo-chevron" id="chev-${grupoId}">${abierto ? '▾' : '▸'}</span>
         </div>
-        <ul class="nav-grupo-items" id="${grupoId}" style="display:${abierto ? 'flex' : 'none'}">
+        <ul class="nav-grupo-items${abierto ? ' abierto' : ''}" id="${grupoId}">
           ${vistasPermitidas.map(v => `
             <li><a href="#" data-view="${v}">${vistaLabels[v]}</a></li>
           `).join('')}
@@ -223,12 +232,21 @@ async function mostrarApp(rol, email, tenant_id = null) {
   document.querySelector('nav ul').innerHTML = navHtml
 
   window.toggleNavGrupo = function(grupoId) {
-    const body = document.getElementById(grupoId)
-    const chev = document.getElementById('chev-' + grupoId)
+    const body   = document.getElementById(grupoId)
+    const chev   = document.getElementById('chev-' + grupoId)
+    const header = body?.previousElementSibling
     if (!body) return
-    const open = body.style.display !== 'none'
-    body.style.display = open ? 'none' : 'flex'
-    if (chev) chev.textContent = open ? '▸' : '▾'
+    const open = body.classList.contains('abierto')
+    // Cerrar todos
+    document.querySelectorAll('.nav-grupo-items').forEach(el => el.classList.remove('abierto'))
+    document.querySelectorAll('.nav-grupo-header').forEach(el => el.classList.remove('abierto'))
+    document.querySelectorAll('.nav-grupo-chevron').forEach(el => el.textContent = '▸')
+    // Abrir el clickeado si estaba cerrado
+    if (!open) {
+      body.classList.add('abierto')
+      if (header) header.classList.add('abierto')
+      if (chev) chev.textContent = '▾'
+    }
   }
 
   const vistaGuardada = localStorage.getItem('datadesk-view')
