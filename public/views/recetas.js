@@ -145,7 +145,7 @@ async function cargarDetalleReceta(receta) {
         .select('*')
         .eq('tenant_id', tenant_id)
         .eq('id_receta', receta.id_receta)
-        .eq('activo', true)
+        .neq('activo', false)
         .order('orden', { ascending: true, nullsFirst: false }),
       window._db.from('receta_procedimientos')
         .select('*')
