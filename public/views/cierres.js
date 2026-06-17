@@ -66,7 +66,7 @@ async function verDetalleCierre(id_cierre, fecha) {
 
   const { data: ventas, error } = await window._db
     .from('ventas')
-    .select('folio, metodo_pago, total, created_at')
+    .select('folio, metodo_pago, total, propina, created_at')
     .eq('tenant_id', tenant_id)
     .eq('id_cierre', id_cierre)
     .order('created_at')
@@ -97,10 +97,10 @@ async function verDetalleCierre(id_cierre, fecha) {
         </tbody>
       </table>
       <table class="tabla">
-        <thead><tr><th>Folio</th><th>Método</th><th style="text-align:right">Total</th><th>Hora</th></tr></thead>
+        <thead><tr><th>Folio</th><th>Método</th><th style="text-align:right">Total</th><th style="text-align:right">Propina</th><th>Hora</th></tr></thead>
         <tbody>
           ${(ventas || []).map(v => `
-            <tr><td>${v.folio || '—'}</td><td>${v.metodo_pago || '—'}</td><td style="text-align:right">$${Number(v.total).toFixed(2)}</td><td style="color:var(--color-text-muted)">${fmtHora(v.created_at)}</td></tr>`).join('')}
+            <tr><td>${v.folio || '—'}</td><td>${v.metodo_pago || '—'}</td><td style="text-align:right">$${Number(v.total).toFixed(2)}</td><td style="text-align:right">${v.propina ? '$' + Number(v.propina).toFixed(2) : '—'}</td><td style="color:var(--color-text-muted)">${fmtHora(v.created_at)}</td></tr>`).join('')}
         </tbody>
       </table>
     </div>
@@ -138,8 +138,8 @@ function exportarCierrePDF() {
     </tbody>
   </table>
   <table>
-    <thead><tr><th>Folio</th><th>Método</th><th style="text-align:right">Total</th><th>Hora</th></tr></thead>
-    <tbody>${(ventas||[]).map(v => `<tr><td>${v.folio||'—'}</td><td>${v.metodo_pago||'—'}</td><td style="text-align:right">$${Number(v.total).toFixed(2)}</td><td>${fmtHora(v.created_at)}</td></tr>`).join('')}</tbody>
+    <thead><tr><th>Folio</th><th>Método</th><th style="text-align:right">Total</th><th style="text-align:right">Propina</th><th>Hora</th></tr></thead>
+    <tbody>${(ventas||[]).map(v => `<tr><td>${v.folio||'—'}</td><td>${v.metodo_pago||'—'}</td><td style="text-align:right">$${Number(v.total).toFixed(2)}</td><td style="text-align:right">${v.propina ? '$' + Number(v.propina).toFixed(2) : '—'}</td><td>${fmtHora(v.created_at)}</td></tr>`).join('')}</tbody>
   </table>
   <div class="footer">Documento generado por dataDesk · ${new Date().toLocaleDateString('es-MX')}</div>
 </body></html>`
