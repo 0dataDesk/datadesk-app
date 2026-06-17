@@ -216,7 +216,7 @@ async function mostrarCierreCaja(tenantId) {
 
     const { data: ventasDia, error } = await window._db
       .from('ventas')
-      .select('folio, metodo_pago, total, monto_efectivo, monto_tarjeta, estado, created_at')
+      .select('folio, metodo_pago, total, monto_efectivo, monto_tarjeta, propina, estado, created_at')
       .eq('tenant_id', tenantId)
       .eq('estado', 'cerrada')
       .is('id_cierre', null)
@@ -257,13 +257,14 @@ async function mostrarCierreCaja(tenantId) {
         </tbody>
       </table>
       <table class="tabla">
-        <thead><tr><th>Folio</th><th>Método</th><th style="text-align:right">Total</th><th>Hora</th></tr></thead>
+        <thead><tr><th>Folio</th><th>Método</th><th style="text-align:right">Total</th><th style="text-align:right">Propina</th><th>Hora</th></tr></thead>
         <tbody>
           ${ventasDia.map(v => `
             <tr>
               <td>${v.folio || '—'}</td>
               <td>${metodoDisplay(v)}</td>
               <td style="text-align:right">$${Number(v.total).toFixed(2)}</td>
+              <td style="text-align:right">${v.propina ? '$' + Number(v.propina).toFixed(2) : '—'}</td>
               <td style="color:var(--color-text-muted)">${fmtHora(v.created_at)}</td>
             </tr>`).join('')}
         </tbody>
@@ -352,8 +353,8 @@ function exportarVentasPDF() {
     </tbody>
   </table>
   <table>
-    <thead><tr><th>Folio</th><th>Método</th><th style="text-align:right">Total</th><th>Hora</th></tr></thead>
-    <tbody>${ventas.map(v => `<tr><td>${v.folio||'—'}</td><td>${metodoDisplay(v)}</td><td style="text-align:right">$${Number(v.total).toFixed(2)}</td><td>${fmtHora(v.created_at)}</td></tr>`).join('')}</tbody>
+    <thead><tr><th>Folio</th><th>Método</th><th style="text-align:right">Total</th><th style="text-align:right">Propina</th><th>Hora</th></tr></thead>
+    <tbody>${ventas.map(v => `<tr><td>${v.folio||'—'}</td><td>${metodoDisplay(v)}</td><td style="text-align:right">$${Number(v.total).toFixed(2)}</td><td style="text-align:right">${v.propina ? '$' + Number(v.propina).toFixed(2) : '—'}</td><td>${fmtHora(v.created_at)}</td></tr>`).join('')}</tbody>
   </table>
   <div class="footer">Documento generado por dataDesk · ${new Date().toLocaleDateString('es-MX')}</div>
 </body></html>`
