@@ -3,6 +3,7 @@ async function vistaCierres() {
   content.innerHTML = `<p style="color:var(--color-text-muted)">Cargando cierres...</p>`
 
   try {
+    await window._db.auth.refreshSession()
     const tenant_id = await getTenantId()
 
     const { data: cierres, error } = await window._db
