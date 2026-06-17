@@ -156,7 +156,6 @@ async function mostrarApp(rol, email, tenant_id = null) {
   document.getElementById('cambiar-tenant-btn')?.addEventListener('click', async () => {
     window._tenantActivo = null
     window._tenantConfig = null
-    _appMontado = false
     const { data: { user } } = await window._db.auth.getUser()
     const tenants = user?.user_metadata?.tenants || []
     await mostrarSelectorTenant(tenants, user?.user_metadata?.rol, user?.email)
