@@ -264,12 +264,12 @@ async function mostrarCierreCaja(tenantId) {
               <td style="text-align:right">${prop ? '$' + prop.toFixed(2) : '—'}</td>
               <td style="text-align:right">$${(d.suma - prop).toFixed(2)}</td>
             </tr>`}).join('')}
-          <tr class="costeo-total">
-            <td><strong>TOTAL</strong></td>
-            <td style="text-align:right"><strong>${ventasDia.length} tickets</strong></td>
-            <td style="text-align:right"><strong>$${totalGeneral.toFixed(2)}</strong></td>
-            <td style="text-align:right"><strong>${propinaTotalVista ? '$' + propinaTotalVista.toFixed(2) : '—'}</strong></td>
-            <td style="text-align:right"><strong>$${ventaNetaTotal.toFixed(2)}</strong></td>
+          <tr style="border-top:2px solid var(--color-primary);font-size:15px;background:var(--color-bg)">
+            <td style="padding:14px 16px"><strong style="font-size:20px;color:var(--color-primary)">TOTAL</strong></td>
+            <td style="text-align:right;padding:14px 16px"><strong style="font-size:20px;color:var(--color-primary)">${ventasDia.length} tickets</strong></td>
+            <td style="text-align:right;padding:14px 16px"><strong style="font-size:20px;color:var(--color-primary)">$${totalGeneral.toFixed(2)}</strong></td>
+            <td style="text-align:right;padding:14px 16px"><strong style="font-size:20px;color:var(--color-primary)">${propinaTotalVista ? '$' + propinaTotalVista.toFixed(2) : '—'}</strong></td>
+            <td style="text-align:right;padding:14px 16px"><strong style="font-size:20px;color:var(--color-primary)">$${ventaNetaTotal.toFixed(2)}</strong></td>
           </tr>
         </tbody>
       </table>
