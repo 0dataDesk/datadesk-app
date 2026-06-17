@@ -8,7 +8,7 @@ async function vistaCierres() {
 
     const { data: cierres, error } = await window._db
       .from('cierres_caja')
-      .select('id, fecha, total_general, num_tickets, desglose_metodo, cerrado_por, created_at')
+      .select('id, fecha, total_general, num_tickets, desglose_metodo, propina_total, cerrado_por, created_at')
       .eq('tenant_id', tenant_id)
       .order('fecha', { ascending: false })
 
@@ -28,22 +28,30 @@ async function vistaCierres() {
               <th>Fecha</th>
               <th style="text-align:right">Tickets</th>
               <th style="text-align:right">Total</th>
+              <th style="text-align:right">Propina</th>
+              <th style="text-align:right">Venta neta</th>
               <th>Cerrado por</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
-            ${cierres.map(c => `
+            ${cierres.map(c => {
+              const prop = Number(c.propina_total) || 0
+              const neta = Number(c.total_general) - prop
+              const tprom = c.num_tickets ? neta / c.num_tickets : 0
+              return `
               <tr>
                 <td>${c.fecha}</td>
                 <td style="text-align:right">${c.num_tickets}</td>
                 <td style="text-align:right;font-weight:600">$${Number(c.total_general).toFixed(2)}</td>
+                <td style="text-align:right">${prop ? '$' + prop.toFixed(2) : '—'}</td>
+                <td style="text-align:right">$${neta.toFixed(2)}<br><span style="font-size:11px;color:var(--color-text-muted)">~$${tprom.toFixed(2)}/ticket</span></td>
                 <td style="color:var(--color-text-muted)">${c.cerrado_por || '—'}</td>
                 <td style="text-align:right">
                   <button class="btn-accion btn-aprobar" style="font-size:11px;padding:4px 10px"
                     onclick="verDetalleCierre('${c.id}','${c.fecha}')">Ver</button>
                 </td>
-              </tr>`).join('')}
+              </tr>`}).join('')}
           </tbody>
         </table>
       </div>

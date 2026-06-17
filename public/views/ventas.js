@@ -237,25 +237,45 @@ async function mostrarCierreCaja(tenantId) {
     const porMetodo = calcularDesglosePorMetodo(ventasDia)
     window._cierrePorMetodo = porMetodo
 
+    const propinaPorMetodo = ventasDia.reduce((acc, v) => {
+      const p = Number(v.propina) || 0
+      if (!p) return acc
+      const m = v.metodo_pago || 'otro'
+      if (!acc[m]) acc[m] = 0
+      acc[m] += p
+      return acc
+    }, {})
+    const propinaTotalVista = ventasDia.reduce((s, v) => s + (Number(v.propina) || 0), 0)
+    const ventaNetaTotal = totalGeneral - propinaTotalVista
+    const ticketPromedio = ventasDia.length ? ventaNetaTotal / ventasDia.length : 0
+
     const fmtHora = iso => new Date(iso).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
 
     const html = `
-      <table class="tabla" style="margin-bottom:14px">
-        <thead><tr><th>Método de pago</th><th style="text-align:right">Tickets</th><th style="text-align:right">Total</th></tr></thead>
+      <table class="tabla" style="margin-bottom:8px">
+        <thead><tr><th>Método de pago</th><th style="text-align:right">Tickets</th><th style="text-align:right">Total</th><th style="text-align:right">Propina</th><th style="text-align:right">Venta neta</th></tr></thead>
         <tbody>
-          ${Object.entries(porMetodo).map(([m, d]) => `
-            <tr>
+          ${Object.entries(porMetodo).map(([m, d]) => {
+            const prop = propinaPorMetodo[m] || 0
+            return `<tr>
               <td>${m}</td>
               <td style="text-align:right">${d.count}</td>
               <td style="text-align:right;font-weight:600">$${d.suma.toFixed(2)}</td>
-            </tr>`).join('')}
+              <td style="text-align:right">${prop ? '$' + prop.toFixed(2) : '—'}</td>
+              <td style="text-align:right">$${(d.suma - prop).toFixed(2)}</td>
+            </tr>`}).join('')}
           <tr class="costeo-total">
             <td><strong>TOTAL</strong></td>
             <td style="text-align:right"><strong>${ventasDia.length} tickets</strong></td>
             <td style="text-align:right"><strong>$${totalGeneral.toFixed(2)}</strong></td>
+            <td style="text-align:right"><strong>${propinaTotalVista ? '$' + propinaTotalVista.toFixed(2) : '—'}</strong></td>
+            <td style="text-align:right"><strong>$${ventaNetaTotal.toFixed(2)}</strong></td>
           </tr>
         </tbody>
       </table>
+      <p style="text-align:right;font-size:13px;color:var(--color-text-muted);margin:0 0 14px">
+        Ticket promedio: <strong style="color:var(--color-text)">$${ticketPromedio.toFixed(2)}</strong>
+      </p>
       <table class="tabla">
         <thead><tr><th>Folio</th><th>Método</th><th style="text-align:right">Total</th><th style="text-align:right">Propina</th><th>Hora</th></tr></thead>
         <tbody>
@@ -291,6 +311,17 @@ async function confirmarCierreDia(fecha, tenantId) {
   const totalGeneral = ventasDia.reduce((s, v) => s + Number(v.total), 0)
   const porMetodo = calcularDesglosePorMetodo(ventasDia)
 
+  const propina_total = ventasDia.reduce((s, v) => s + (Number(v.propina) || 0), 0)
+  const desglose_propina = ventasDia.reduce((acc, v) => {
+    const p = Number(v.propina) || 0
+    if (!p) return acc
+    const metodo = v.metodo_pago || 'otro'
+    if (!acc[metodo]) acc[metodo] = { suma: 0, count: 0 }
+    acc[metodo].suma  += p
+    acc[metodo].count += 1
+    return acc
+  }, {})
+
   const { data: cierre, error: errC } = await window._db
     .from('cierres_caja')
     .insert({
@@ -299,6 +330,8 @@ async function confirmarCierreDia(fecha, tenantId) {
       total_general: totalGeneral,
       num_tickets: ventasDia.length,
       desglose_metodo: porMetodo,
+      propina_total,
+      desglose_propina,
       cerrado_por: window._email || null
     })
     .select().single()
