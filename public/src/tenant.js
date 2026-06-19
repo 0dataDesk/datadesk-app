@@ -48,7 +48,7 @@ async function getTenantConfig(tenant_id_conocido = null) {
   }
   if (!tenant_id) return { nombre: 'dataDesk', tagline: '', color_primario: '#1e3a5f' }
   const { data, error } = await window._db.from('tenants')
-    .select('nombre, tagline, color_primario, insumos_modo, recetas_modo')
+    .select('nombre, tagline, color_primario')
     .eq('tenant_id', tenant_id).single()
   if (error || !data) return { nombre: 'dataDesk', tagline: '', color_primario: '#1e3a5f' }
   window._tenantConfig = data
