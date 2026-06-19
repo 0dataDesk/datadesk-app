@@ -1,3 +1,12 @@
+async function _metaActualizacion() {
+  const meta = { updated_at: new Date().toISOString(), updated_by: null }
+  try {
+    const { data: { user } } = await window._db.auth.getUser()
+    meta.updated_by = user?.email || null
+  } catch (e) { console.error('getUser:', e) }
+  return meta
+}
+
 async function listarProductos(tenant_id) {
   const { data, error } = await window._db
     .from('productos')
@@ -19,9 +28,10 @@ async function buscarProducto(id_producto) {
 }
 
 async function crearProducto(producto) {
+  const meta = await _metaActualizacion()
   const { data, error } = await window._db
     .from('productos')
-    .insert([producto])
+    .insert([{ ...producto, ...meta }])
     .select()
     .single()
   if (error) throw error
@@ -29,9 +39,10 @@ async function crearProducto(producto) {
 }
 
 async function actualizarProducto(id_producto, cambios) {
+  const meta = await _metaActualizacion()
   const { data, error } = await window._db
     .from('productos')
-    .update(cambios)
+    .update({ ...cambios, ...meta })
     .eq('id_producto', id_producto)
     .select()
     .single()
@@ -40,9 +51,10 @@ async function actualizarProducto(id_producto, cambios) {
 }
 
 async function desactivarProducto(id_producto) {
+  const meta = await _metaActualizacion()
   const { data, error } = await window._db
     .from('productos')
-    .update({ activo: false })
+    .update({ activo: false, ...meta })
     .eq('id_producto', id_producto)
     .select()
     .single()

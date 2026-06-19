@@ -1,3 +1,12 @@
+async function _metaActualizacion() {
+  const meta = { updated_at: new Date().toISOString(), updated_by: null }
+  try {
+    const { data: { user } } = await window._db.auth.getUser()
+    meta.updated_by = user?.email || null
+  } catch (e) { console.error('getUser:', e) }
+  return meta
+}
+
 async function listarRecetas(tenant_id) {
   const { data, error } = await window._db
     .from('catalogo_recetas')
@@ -19,9 +28,10 @@ async function buscarReceta(id_receta) {
 }
 
 async function crearReceta(receta) {
+  const meta = await _metaActualizacion()
   const { data, error } = await window._db
     .from('catalogo_recetas')
-    .insert([receta])
+    .insert([{ ...receta, ...meta }])
     .select()
     .single()
   if (error) throw error
@@ -29,9 +39,10 @@ async function crearReceta(receta) {
 }
 
 async function desactivarReceta(id_receta) {
+  const meta = await _metaActualizacion()
   const { data, error } = await window._db
     .from('catalogo_recetas')
-    .update({ activo: false })
+    .update({ activo: false, ...meta })
     .eq('id_receta', id_receta)
     .select()
     .single()
@@ -49,9 +60,10 @@ async function listarIngredientes(id_receta) {
 }
 
 async function crearIngrediente(ingrediente) {
+  const meta = await _metaActualizacion()
   const { data, error } = await window._db
     .from('receta_ingredientes')
-    .insert([ingrediente])
+    .insert([{ ...ingrediente, ...meta }])
     .select()
     .single()
   if (error) throw error
@@ -69,9 +81,10 @@ async function listarProcedimientos(id_receta) {
 }
 
 async function crearProcedimiento(paso) {
+  const meta = await _metaActualizacion()
   const { data, error } = await window._db
     .from('receta_procedimientos')
-    .insert([paso])
+    .insert([{ ...paso, ...meta }])
     .select()
     .single()
   if (error) throw error

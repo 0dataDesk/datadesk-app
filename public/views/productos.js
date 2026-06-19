@@ -173,9 +173,14 @@ async function guardarProducto(idProducto) {
   const unidad    = document.getElementById(`prod-unidad-${idProducto}`)?.value?.trim()
   const tenant_id = await getTenantId()
   if (!nombre) return
+  let updated_by = null
+  try {
+    const { data: { user } } = await window._db.auth.getUser()
+    updated_by = user?.email || null
+  } catch (e) { console.error('getUser:', e) }
   const { error } = await window._db
     .from('productos')
-    .update({ producto: nombre, unidad_medida: unidad || null })
+    .update({ producto: nombre, unidad_medida: unidad || null, updated_by, updated_at: new Date().toISOString() })
     .eq('id_producto', idProducto)
     .eq('tenant_id', tenant_id)
   if (error) alert(`Error: ${error.message}`)

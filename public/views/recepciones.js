@@ -266,14 +266,21 @@ async function guardarRecepcion() {
 
   if (!items.length) { alert('Agrega al menos un insumo'); return }
 
+  let updated_by = null
+  try {
+    const { data: { user } } = await window._db.auth.getUser()
+    updated_by = user?.email || null
+  } catch (e) { console.error('getUser:', e) }
+  const updated_at = new Date().toISOString()
+
   const { data: recepcion, error: errR } = await window._db
     .from('recepciones')
-    .insert({ tenant_id, fecha, id_proveedor, num_remision, area_almacenamiento: area, estatus: 'SIN_FACTURA', created_by: window._email || null })
+    .insert({ tenant_id, fecha, id_proveedor, num_remision, area_almacenamiento: area, estatus: 'SIN_FACTURA', created_by: window._email || null, updated_by, updated_at })
     .select().single()
 
   if (errR) { alert(`Error: ${errR.message}`); return }
 
-  const rows = items.map(it => ({ ...it, id_recepcion: recepcion.id }))
+  const rows = items.map(it => ({ ...it, id_recepcion: recepcion.id, updated_by, updated_at }))
   const { error: errI } = await window._db.from('recepcion_items').insert(rows)
   if (errI) { alert(`Error al guardar items: ${errI.message}`); return }
 
@@ -284,9 +291,14 @@ async function guardarRecepcion() {
 async function registrarFactura(id) {
   const num = prompt('Número de factura:')
   if (!num) return
+  let updated_by = null
+  try {
+    const { data: { user } } = await window._db.auth.getUser()
+    updated_by = user?.email || null
+  } catch (e) { console.error('getUser:', e) }
   const { error } = await window._db
     .from('recepciones')
-    .update({ estatus: 'CON_FACTURA', num_factura: num.trim() })
+    .update({ estatus: 'CON_FACTURA', num_factura: num.trim(), updated_by, updated_at: new Date().toISOString() })
     .eq('id', id)
   if (error) { alert(`Error: ${error.message}`); return }
   await vistaRecepciones()
@@ -294,9 +306,14 @@ async function registrarFactura(id) {
 
 async function marcarPagado(id) {
   if (!confirm('¿Confirmar como pagado?')) return
+  let updated_by = null
+  try {
+    const { data: { user } } = await window._db.auth.getUser()
+    updated_by = user?.email || null
+  } catch (e) { console.error('getUser:', e) }
   const { error } = await window._db
     .from('recepciones')
-    .update({ estatus: 'PAGADO' })
+    .update({ estatus: 'PAGADO', updated_by, updated_at: new Date().toISOString() })
     .eq('id', id)
   if (error) { alert(`Error: ${error.message}`); return }
   await vistaRecepciones()
