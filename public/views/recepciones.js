@@ -374,7 +374,7 @@ async function verDetalleRecepcion(id) {
             return `
               <tr>
                 <td>${prodMap[i.id_producto]?.producto || i.id_producto}</td>
-                <td style="text-align:right">${i.cantidad_recibida} ${prodMap[i.id_producto]?.unidad_medida || i.unidad || ''}</td>
+                <td style="text-align:right">${i.cantidad_recibida} ${prodMap[i.id_producto]?.unidad_medida || ''}</td>
                 <td style="text-align:right;color:var(--color-text-muted)">${i.cantidad_solicitada || '—'}</td>
                 <td style="text-align:right">$${Number(i.costo_unitario || 0).toFixed(2)}</td>
                 <td style="text-align:right;font-weight:600">$${total.toFixed(2)}</td>
