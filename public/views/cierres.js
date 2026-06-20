@@ -74,17 +74,52 @@ async function verDetalleCierre(id_cierre, fecha) {
 
   const { data: ventas, error } = await window._db
     .from('ventas')
-    .select('folio, metodo_pago, total, propina, created_at')
+    .select('id, folio, metodo_pago, total, propina, created_at')
     .eq('tenant_id', tenant_id)
     .eq('id_cierre', id_cierre)
     .order('created_at')
 
   if (error) { wrap.innerHTML = `<p style="color:var(--color-highlight)">Error: ${error.message}</p>`; return }
 
+  const ids = (ventas || []).map(v => v.id)
+  const itemsPorVenta = {}
+  if (ids.length > 0) {
+    const { data: items } = await window._db
+      .from('venta_items')
+      .select('id_venta, nombre, cantidad, importe, modificadores')
+      .eq('tenant_id', tenant_id)
+      .in('id_venta', ids)
+    ;(items || []).forEach(it => {
+      if (!itemsPorVenta[it.id_venta]) itemsPorVenta[it.id_venta] = []
+      itemsPorVenta[it.id_venta].push(it)
+    })
+  }
+
+  function fmtItemsCierre(items) {
+    return items.map(it => {
+      let modsText = ''
+      if (it.modificadores) {
+        const m = it.modificadores
+        const parts = []
+        const sin = (m.ingredientes || []).filter(i => !i.on).map(i => i.nombre)
+        if (sin.length) parts.push('Sin: ' + sin.join(', '))
+        const extras = (m.extras || []).filter(e => (e.qty || 0) > 0).map(e => e.nombre)
+        if (extras.length) parts.push(extras.join(', '))
+        const salsas = (m.salsas || []).map(s => s.nombre)
+        if (salsas.length) parts.push(salsas.join(', '))
+        if (m.nota) parts.push('📝 ' + m.nota)
+        if (parts.length) modsText = `<div style="font-size:11px;color:var(--color-text-muted);margin-left:12px">${parts.join(' · ')}</div>`
+      }
+      return `<div style="padding:3px 0;font-size:13px">${it.nombre} ×${it.cantidad} — <strong>$${it.importe}</strong>${modsText}</div>`
+    }).join('')
+  }
+
   const fmtHora = iso => new Date(iso).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
   const desglose = cierre?.desglose_metodo || {}
 
   window._cierreDetalleActual = { fecha, cierre, ventas: ventas || [] }
+  window._cierreItemsPorVenta = itemsPorVenta
+  window._fmtItemsCierre = fmtItemsCierre
 
   wrap.innerHTML = `
     <div class="receta-card" style="margin-top:16px">
@@ -105,10 +140,22 @@ async function verDetalleCierre(id_cierre, fecha) {
         </tbody>
       </table>
       <table class="tabla">
-        <thead><tr><th>Folio</th><th>Método</th><th style="text-align:right">Total</th><th style="text-align:right">Propina</th><th>Hora</th></tr></thead>
+        <thead><tr><th></th><th>Folio</th><th>Método</th><th style="text-align:right">Total</th><th style="text-align:right">Propina</th><th>Hora</th></tr></thead>
         <tbody>
-          ${(ventas || []).map(v => `
-            <tr><td>${v.folio || '—'}</td><td>${v.metodo_pago || '—'}</td><td style="text-align:right">$${Number(v.total).toFixed(2)}</td><td style="text-align:right">${v.propina ? '$' + Number(v.propina).toFixed(2) : '—'}</td><td style="color:var(--color-text-muted)">${fmtHora(v.created_at)}</td></tr>`).join('')}
+          ${(ventas || []).map(v => {
+            const items = itemsPorVenta[v.id] || []
+            const hasItems = items.length > 0
+            return `
+            <tr style="cursor:${hasItems ? 'pointer' : 'default'}" onclick="${hasItems ? `toggleItemsCierre('items-${v.id}')` : ''}">
+              <td style="color:var(--color-text-muted);font-size:12px;width:20px">${hasItems ? '▶' : ''}</td>
+              <td>${v.folio || '—'}</td>
+              <td>${v.metodo_pago || '—'}</td>
+              <td style="text-align:right">$${Number(v.total).toFixed(2)}</td>
+              <td style="text-align:right">${v.propina ? '$' + Number(v.propina).toFixed(2) : '—'}</td>
+              <td style="color:var(--color-text-muted)">${fmtHora(v.created_at)}</td>
+            </tr>
+            ${hasItems ? `<tr id="items-${v.id}" style="display:none"><td colspan="6" style="padding:8px 12px 12px 32px;background:var(--color-bg-alt,rgba(0,0,0,0.03))">${fmtItemsCierre(items)}</td></tr>` : ''}`
+          }).join('')}
         </tbody>
       </table>
     </div>
@@ -157,4 +204,16 @@ function exportarCierrePDF() {
   ventana.document.close()
   ventana.focus()
   setTimeout(() => ventana.print(), 500)
+}
+
+function toggleItemsCierre(rowId) {
+  const row = document.getElementById(rowId)
+  if (!row) return
+  const visible = row.style.display !== 'none'
+  row.style.display = visible ? 'none' : 'table-row'
+  const trigger = row.previousElementSibling
+  if (trigger) {
+    const arrow = trigger.querySelector('td:first-child')
+    if (arrow) arrow.textContent = visible ? '▶' : '▼'
+  }
 }
