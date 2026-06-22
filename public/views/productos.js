@@ -5,8 +5,9 @@ async function vistaProductos() {
 
   try {
     const tenant_id = await getTenantId()
-    const rol        = window._rol || 'operador'
-    const puedeEditar = ['superadmin', 'owner', 'gerente', 'admin', 'editor', 'cocina'].includes(rol)
+    const rol              = window._rol || 'operador'
+    const puedeEditar      = ['admin', 'editor', 'cocina'].includes(rol)
+    const puedeInvEditar   = ['superadmin', 'owner', 'gerente', 'admin', 'editor'].includes(rol)
 
     const tenantActual   = (window._tenantConfig?.nombre || '').toLowerCase()
     const fuentesDef     = window.FUENTES_POR_TENANT[tenantActual] || []
@@ -88,10 +89,10 @@ async function vistaProductos() {
              ${!p.unidad_medida ? '<span class="badge-faltante" title="Este insumo no tiene unidad definida">⚠ falta unidad</span>' : ''}`
           : (p.unidad_medida || `<span class="badge-faltante">⚠ falta unidad</span>`)}
         </td>
-        ${puedeEditar ? `<td style="text-align:right;white-space:nowrap">
-          <button class="btn-fila btn-guardar-ing" onclick="guardarProducto('${p.id_producto}')">💾</button>
-          <button class="btn-fila" style="margin-left:4px;background:rgba(200,137,42,0.12);color:#c8892a;border:1px solid rgba(200,137,42,0.3);border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer"
-            onclick="toggleInventarioPanel('${p.id_producto}')">⚙ Inventario</button>
+        ${(puedeEditar || puedeInvEditar) ? `<td style="text-align:right;white-space:nowrap">
+          ${puedeEditar ? `<button class="btn-fila btn-guardar-ing" onclick="guardarProducto('${p.id_producto}')">💾</button>` : ''}
+          ${puedeInvEditar ? `<button class="btn-fila" style="margin-left:4px;background:rgba(200,137,42,0.12);color:#c8892a;border:1px solid rgba(200,137,42,0.3);border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer"
+            onclick="toggleInventarioPanel('${p.id_producto}')">⚙ Inventario</button>` : ''}
         </td>` : ''}
       </tr>
       <tr id="inv-panel-${p.id_producto}" style="display:none">

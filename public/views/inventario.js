@@ -8,10 +8,11 @@ async function vistaInventario() {
     content.innerHTML = `
       <div class="vista-header"><h2>Inventario</h2></div>
       <div class="filtros-bar">
-        <input type="text" id="inv-search" placeholder="Buscar insumo..." class="filtro-search" />
+        <input type="text" id="inv-search" placeholder="Buscar insumo..." class="filtro-search" oninput="invRenderizar()" />
         ${['superadmin','admin','gerente'].includes(window._rol) ? `<button class="btn-accion btn-aprobar" onclick="exportarInventarioExcel()">Exportar Excel</button>` : ''}
         ${['superadmin','admin','gerente'].includes(window._rol) ? `<button class="btn-accion" style="border:1px solid var(--color-border)" onclick="exportarInventarioPDF()">Exportar PDF</button>` : ''}
       </div>
+      <div id="inv-grupos-nav" style="display:flex;gap:8px;overflow-x:auto;padding:10px 0 6px;scrollbar-width:none;flex-wrap:nowrap"></div>
       <div id="inv-resultado"><p style="color:var(--color-text-muted)">Cargando...</p></div>
     `
 
@@ -52,13 +53,40 @@ async function vistaInventario() {
       grupo: prodMap[c.id_producto]?.grupo || 'Sin grupo'
     }))
 
-    window.renderInventario = function() {
+    window._invGrupoActivo = 'todos'
+
+    window.invRenderPills = function() {
+      const nav = document.getElementById('inv-grupos-nav')
+      if (!nav) return
+      const grupos = [...new Set(window._invConteo.map(c => c.grupo))]
+      const pillStyle = (activo) => `flex-shrink:0;padding:5px 13px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;border:1.5px solid ${activo ? 'var(--color-primary)' : 'var(--color-border)'};background:${activo ? 'var(--color-primary)' : 'transparent'};color:${activo ? '#fff' : 'var(--color-text)'};white-space:nowrap`
+
+      const todosCap = window._invConteo.filter(c => prodMap[c.id_producto]?.clasificacion_abc).length
+      nav.innerHTML = `<button style="${pillStyle(window._invGrupoActivo==='todos')}" onclick="invFiltrarGrupo('todos')">Todos <span style="opacity:0.7;font-weight:400">${todosCap}/${window._invConteo.length}</span></button>`
+        + grupos.map(g => {
+            const items = window._invConteo.filter(c => c.grupo === g)
+            const cap   = items.filter(c => prodMap[c.id_producto]?.clasificacion_abc).length
+            const activo = window._invGrupoActivo === g
+            return `<button style="${pillStyle(activo)}" onclick="invFiltrarGrupo('${g.replace(/'/g,"\\'")}')">${g} <span style="opacity:0.7;font-weight:400">${cap}/${items.length}</span></button>`
+          }).join('')
+    }
+
+    window.invFiltrarGrupo = function(grupo) {
+      window._invGrupoActivo = grupo
+      document.getElementById('inv-search').value = ''
+      invRenderPills()
+      invRenderizar()
+    }
+
+    window.invRenderizar = window.renderInventario = function() {
       const resultado = document.getElementById('inv-resultado')
       const texto = document.getElementById('inv-search')?.value.toLowerCase() || ''
 
-      const filtrados = window._invConteo.filter(c =>
-        !texto || c.producto.toLowerCase().includes(texto)
-      )
+      const filtrados = window._invConteo.filter(c => {
+        const enGrupo = window._invGrupoActivo === 'todos' || c.grupo === window._invGrupoActivo
+        const enTexto = !texto || c.producto.toLowerCase().includes(texto)
+        return enGrupo && enTexto
+      })
 
       if (!filtrados.length) {
         resultado.innerHTML = `<p style="color:var(--color-text-muted);font-size:13px">Sin resultados.</p>`
@@ -161,8 +189,8 @@ async function vistaInventario() {
       resultado.innerHTML = html
     }
 
-    document.getElementById('inv-search').addEventListener('input', renderInventario)
-    renderInventario()
+    invRenderPills()
+    invRenderizar()
 
   } catch (err) {
     content.innerHTML = `<p style="color:var(--color-highlight)">Error: ${err.message}</p>`
