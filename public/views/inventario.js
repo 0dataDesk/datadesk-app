@@ -33,6 +33,7 @@ async function vistaInventario() {
 
     const prodMap = {}
     ;(productos || []).forEach(p => { prodMap[p.id_producto] = p })
+    window._invProdMap = prodMap
 
     const porProducto = {}
     ;(items || []).forEach(c => {
@@ -61,11 +62,12 @@ async function vistaInventario() {
       const grupos = [...new Set(window._invConteo.map(c => c.grupo))]
       const pillStyle = (activo) => `flex-shrink:0;padding:5px 13px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;border:1.5px solid ${activo ? 'var(--color-primary)' : 'var(--color-border)'};background:${activo ? 'var(--color-primary)' : 'transparent'};color:${activo ? '#fff' : 'var(--color-text)'};white-space:nowrap`
 
-      const todosCap = window._invConteo.filter(c => prodMap[c.id_producto]?.clasificacion_abc).length
+      const pm = window._invProdMap || {}
+      const todosCap = window._invConteo.filter(c => pm[c.id_producto]?.clasificacion_abc).length
       nav.innerHTML = `<button style="${pillStyle(window._invGrupoActivo==='todos')}" onclick="invFiltrarGrupo('todos')">Todos <span style="opacity:0.7;font-weight:400">${todosCap}/${window._invConteo.length}</span></button>`
         + grupos.map(g => {
             const items = window._invConteo.filter(c => c.grupo === g)
-            const cap   = items.filter(c => prodMap[c.id_producto]?.clasificacion_abc).length
+            const cap   = items.filter(c => pm[c.id_producto]?.clasificacion_abc).length
             const activo = window._invGrupoActivo === g
             return `<button style="${pillStyle(activo)}" onclick="invFiltrarGrupo('${g.replace(/'/g,"\\'")}')">${g} <span style="opacity:0.7;font-weight:400">${cap}/${items.length}</span></button>`
           }).join('')
@@ -135,7 +137,7 @@ async function vistaInventario() {
         </div>
         <div style="display:flex;flex-direction:column;gap:2px">
           ${conNivel.map(c => {
-            const p = prodMap[c.id_producto] || {}
+            const p = window._invProdMap?.[c.id_producto] || {}
             return `
             <div>
               <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:${colores[c.nivel].bg};border-radius:8px;cursor:pointer"
