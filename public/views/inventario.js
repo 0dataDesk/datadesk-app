@@ -22,7 +22,7 @@ async function vistaInventario() {
         .eq('recepciones.tenant_id', tenant_id),
       window._db
         .from('productos')
-        .select('id_producto, producto, grupo')
+        .select('id_producto, producto, grupo, unidad_medida, clasificacion_abc, stock_minimo, stock_maximo, merma_porcentaje, dias_entrega')
         .eq('tenant_id', tenant_id)
         .eq('activo', true)
     ])
@@ -92,6 +92,8 @@ async function vistaInventario() {
       const resumen = { rojo: 0, amarillo: 0, verde: 0 }
       conNivel.forEach(c => resumen[c.nivel]++)
 
+      const puedeEditar = ['superadmin','owner','gerente','admin'].includes(window._rol)
+
       const html = `
         <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:20px">
           ${['rojo','amarillo','verde'].map(n => `
@@ -104,13 +106,55 @@ async function vistaInventario() {
             </div>`).join('')}
         </div>
         <div style="display:flex;flex-direction:column;gap:2px">
-          ${conNivel.map(c => `
-            <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:${colores[c.nivel].bg};border-radius:8px">
-              <span style="width:8px;height:8px;border-radius:50%;background:${colores[c.nivel].punto};flex-shrink:0"></span>
-              <span style="flex:1;font-size:14px;color:var(--color-text)">${c.producto}</span>
-              <span style="font-size:14px;font-weight:600;color:var(--color-primary)">${Math.round(Number(c.cantidad)).toLocaleString('es-MX')}</span>
-              <span style="font-size:12px;color:var(--color-text-muted);min-width:28px;text-align:left">${c.unidad || ''}</span>
-            </div>`).join('')}
+          ${conNivel.map(c => {
+            const p = prodMap[c.id_producto] || {}
+            return `
+            <div>
+              <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:${colores[c.nivel].bg};border-radius:8px;cursor:pointer"
+                onclick="${puedeEditar ? `toggleInvPanel('${c.id_producto}')` : ''}">
+                <span style="width:8px;height:8px;border-radius:50%;background:${colores[c.nivel].punto};flex-shrink:0"></span>
+                <span style="flex:1;font-size:14px;color:var(--color-text)">${c.producto}</span>
+                <span style="font-size:11px;color:var(--color-text-muted);background:rgba(0,0,0,0.06);border-radius:4px;padding:2px 6px">${p.clasificacion_abc || '—'}</span>
+                <span style="font-size:14px;font-weight:600;color:var(--color-primary)">${Math.round(Number(c.cantidad)).toLocaleString('es-MX')}</span>
+                <span style="font-size:12px;color:var(--color-text-muted);min-width:28px;text-align:left">${c.unidad || ''}</span>
+                ${puedeEditar ? `<span style="font-size:11px;color:var(--color-text-muted)">⚙</span>` : ''}
+              </div>
+              ${puedeEditar ? `
+              <div id="inv-panel-${c.id_producto}" style="display:none;background:rgba(200,137,42,0.06);border:1px solid rgba(200,137,42,0.2);border-radius:0 0 8px 8px;padding:14px 16px;margin-top:-4px">
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px">
+                  <div>
+                    <label style="font-size:11px;color:var(--color-text-muted);display:block;margin-bottom:4px">Clasificación ABC</label>
+                    <select class="edit-select" id="inv-abc-${c.id_producto}" style="width:100%">
+                      <option value="A"${(p.clasificacion_abc||'A')==='A'?' selected':''}>A — Alta rotación</option>
+                      <option value="B"${p.clasificacion_abc==='B'?' selected':''}>B — Media rotación</option>
+                      <option value="C"${p.clasificacion_abc==='C'?' selected':''}>C — Baja rotación</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style="font-size:11px;color:var(--color-text-muted);display:block;margin-bottom:4px">Stock mínimo (${p.unidad_medida||'u'})</label>
+                    <input type="number" class="edit-input" id="inv-min-${c.id_producto}" value="${p.stock_minimo??''}" min="0" step="any" placeholder="—" style="width:100%">
+                  </div>
+                  <div>
+                    <label style="font-size:11px;color:var(--color-text-muted);display:block;margin-bottom:4px">Stock máximo (${p.unidad_medida||'u'})</label>
+                    <input type="number" class="edit-input" id="inv-max-${c.id_producto}" value="${p.stock_maximo??''}" min="0" step="any" placeholder="—" style="width:100%">
+                  </div>
+                  <div>
+                    <label style="font-size:11px;color:var(--color-text-muted);display:block;margin-bottom:4px">Merma %</label>
+                    <input type="number" class="edit-input" id="inv-merma-${c.id_producto}" value="${p.merma_porcentaje??''}" min="0" max="100" step="0.1" placeholder="—" style="width:100%">
+                  </div>
+                  <div>
+                    <label style="font-size:11px;color:var(--color-text-muted);display:block;margin-bottom:4px">Días de entrega</label>
+                    <input type="number" class="edit-input" id="inv-dias-${c.id_producto}" value="${p.dias_entrega??''}" min="0" step="1" placeholder="—" style="width:100%">
+                  </div>
+                </div>
+                <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+                  <button class="btn-accion btn-aprobar" style="font-size:12px;padding:5px 14px"
+                    onclick="event.stopPropagation();guardarInvInsumo('${c.id_producto}')">Guardar</button>
+                  <span id="inv-msg-${c.id_producto}" style="font-size:12px;color:#3A8C3E"></span>
+                </div>
+              </div>` : ''}
+            </div>`
+          }).join('')}
         </div>
       `
 
@@ -187,4 +231,39 @@ function exportarInventarioExcel() {
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, 'Inventario')
   XLSX.writeFile(wb, `inventario_furia_${fecha}.xlsx`)
+}
+
+window.toggleInvPanel = function(idProducto) {
+  const panel = document.getElementById('inv-panel-' + idProducto)
+  if (!panel) return
+  panel.style.display = panel.style.display === 'none' ? '' : 'none'
+}
+
+window.guardarInvInsumo = async function(idProducto) {
+  const tenant_id = await getTenantId()
+  const msg = document.getElementById('inv-msg-' + idProducto)
+  msg.textContent = 'Guardando…'
+
+  const abc   = document.getElementById('inv-abc-'   + idProducto)?.value || null
+  const min   = document.getElementById('inv-min-'   + idProducto)?.value
+  const max   = document.getElementById('inv-max-'   + idProducto)?.value
+  const merma = document.getElementById('inv-merma-' + idProducto)?.value
+  const dias  = document.getElementById('inv-dias-'  + idProducto)?.value
+
+  const update = {
+    clasificacion_abc:  abc,
+    stock_minimo:       min  !== '' && min  != null ? parseFloat(min)  : null,
+    stock_maximo:       max  !== '' && max  != null ? parseFloat(max)  : null,
+    merma_porcentaje:   merma !== '' && merma != null ? parseFloat(merma) : null,
+    dias_entrega:       dias !== '' && dias != null ? parseInt(dias)   : null,
+  }
+
+  const { error } = await window._db.from('productos')
+    .update(update)
+    .eq('id_producto', idProducto)
+    .eq('tenant_id', tenant_id)
+
+  if (error) { msg.style.color = '#B85C2A'; msg.textContent = 'Error: ' + error.message; return }
+  msg.style.color = '#3A8C3E'; msg.textContent = '✓ Guardado'
+  setTimeout(() => { msg.textContent = '' }, 2000)
 }
