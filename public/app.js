@@ -174,16 +174,18 @@ async function mostrarApp(rol, email, tenant_id = null) {
     link.classList.add('active')
     const view = link.dataset.view
     localStorage.setItem('datadesk-view', view)
-    if (view === 'inicio')      await mostrarBienvenida()
-    if (view === 'productos')   await vistaProductos()
-    if (view === 'recetas')     await vistaRecetas()
-    if (view === 'precios')     await vistaPrecios()
-    if (view === 'costeo')      await vistaCosteo()
-    if (view === 'pedidos')     await vistaPedidos()
-    if (view === 'ventas')      await vistaVentas()
-    if (view === 'inventario')  await vistaInventario()
-    if (view === 'cierres')      await vistaCierres()
-    if (view === 'recepciones')  await vistaRecepciones()
+    if (view === 'inicio')           await mostrarBienvenida()
+    if (view === 'productos')        await vistaProductos()
+    if (view === 'recetas')          await vistaRecetas()
+    if (view === 'precios')          await vistaPrecios()
+    if (view === 'costeo')           await vistaCosteo()
+    if (view === 'pedidos')          await vistaPedidos()
+    if (view === 'ventas')           await vistaVentas()
+    if (view === 'inventario')       await vistaInventario()
+    if (view === 'inventarios')      await vistaInventariosConteo()
+    if (view === 'sugerido')         await vistaSugeridoCompra()
+    if (view === 'cierres')          await vistaCierres()
+    if (view === 'recepciones')      await vistaRecepciones()
   })
 
   // Cerrar dropdowns al hacer click fuera del nav
@@ -197,26 +199,27 @@ async function mostrarApp(rol, email, tenant_id = null) {
 
   // Nav agrupado según rol
   const permitidasPorRol = {
-    superadmin: ['inicio','productos','recetas','precios','costeo','pedidos','ventas','inventario','cierres','recepciones'],
-    owner:      ['inicio','productos','recetas','ventas','inventario','cierres','recepciones'],
-    gerente:    ['inicio','productos','recetas','ventas','inventario','cierres','recepciones'],
+    superadmin: ['inicio','productos','recetas','precios','costeo','pedidos','ventas','inventario','inventarios','sugerido','cierres','recepciones'],
+    owner:      ['inicio','productos','recetas','ventas','inventario','inventarios','sugerido','cierres','recepciones'],
+    gerente:    ['inicio','productos','recetas','ventas','inventario','inventarios','sugerido','cierres','recepciones'],
     caja:       ['productos','recetas','ventas'],
     // legacy
-    admin:      ['inicio','productos','recetas','precios','costeo','pedidos','ventas','inventario','cierres','recepciones'],
+    admin:      ['inicio','productos','recetas','precios','costeo','pedidos','ventas','inventario','inventarios','sugerido','cierres','recepciones'],
     editor:     ['inicio','productos','recetas','inventario']
   }
   const visibles = permitidasPorRol[window._rol] || ['inicio','productos','recetas','precios','costeo','pedidos']
 
   const navGrupos = [
     { label: 'Menú',       vistas: ['productos','recetas'],              roles: ['superadmin','admin','owner','gerente','editor','caja','cocina'] },
-    { label: 'Operación',  vistas: ['ventas','inventario','cierres','recepciones'], roles: ['superadmin','admin','owner','gerente','editor'] },
+    { label: 'Operación',  vistas: ['ventas','inventario','inventarios','sugerido','cierres','recepciones'], roles: ['superadmin','admin','owner','gerente','editor'] },
     { label: 'Desarrollo', vistas: ['inicio','precios','costeo','pedidos'], roles: ['superadmin','admin'] }
   ]
 
   const vistaLabels = {
     inicio: 'Inicio', productos: 'Insumos', recetas: 'Recetas',
     precios: 'Precios', costeo: 'Costeo', pedidos: 'Pedidos',
-    ventas: 'Ventas', inventario: 'Inventario', cierres: 'Cierres', recepciones: 'Recepciones'
+    ventas: 'Ventas', inventario: 'Inventario', inventarios: 'Conteos', sugerido: 'Sugerido de Compra',
+    cierres: 'Cierres', recepciones: 'Recepciones'
   }
 
   let navHtml = ''
@@ -277,16 +280,18 @@ async function mostrarApp(rol, email, tenant_id = null) {
   const linkActivo = document.querySelector(`[data-view="${vistaInicial}"]`)
   if (linkActivo) linkActivo.classList.add('active')
 
-  if (vistaInicial === 'productos')    vistaProductos()
-  else if (vistaInicial === 'recetas') vistaRecetas()
-  else if (vistaInicial === 'precios') vistaPrecios()
-  else if (vistaInicial === 'costeo')  vistaCosteo()
+  if (vistaInicial === 'productos')        vistaProductos()
+  else if (vistaInicial === 'recetas')     vistaRecetas()
+  else if (vistaInicial === 'precios')     vistaPrecios()
+  else if (vistaInicial === 'costeo')      vistaCosteo()
   else if (vistaInicial === 'pedidos')     vistaPedidos()
   else if (vistaInicial === 'ventas')      vistaVentas()
   else if (vistaInicial === 'inventario')  vistaInventario()
+  else if (vistaInicial === 'inventarios') vistaInventariosConteo()
+  else if (vistaInicial === 'sugerido')    vistaSugeridoCompra()
   else if (vistaInicial === 'cierres')     vistaCierres()
-  // else if (vistaInicial === 'recepciones') vistaRecepciones()
-  else                                 mostrarBienvenida()
+  else if (vistaInicial === 'recepciones') vistaRecepciones()
+  else                                     mostrarBienvenida()
 }
 
 async function mostrarBienvenida() {

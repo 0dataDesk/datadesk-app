@@ -88,8 +88,60 @@ async function vistaProductos() {
              ${!p.unidad_medida ? '<span class="badge-faltante" title="Este insumo no tiene unidad definida">⚠ falta unidad</span>' : ''}`
           : (p.unidad_medida || `<span class="badge-faltante">⚠ falta unidad</span>`)}
         </td>
-        ${puedeEditar ? `<td style="text-align:right"><button class="btn-fila btn-guardar-ing"
-          onclick="guardarProducto('${p.id_producto}')">💾</button></td>` : ''}
+        ${puedeEditar ? `<td style="text-align:right;white-space:nowrap">
+          <button class="btn-fila btn-guardar-ing" onclick="guardarProducto('${p.id_producto}')">💾</button>
+          <button class="btn-fila" style="margin-left:4px;background:rgba(200,137,42,0.12);color:#c8892a;border:1px solid rgba(200,137,42,0.3);border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer"
+            onclick="toggleInventarioPanel('${p.id_producto}')">⚙ Inventario</button>
+        </td>` : ''}
+      </tr>
+      <tr id="inv-panel-${p.id_producto}" style="display:none">
+        <td colspan="${puedeEditar ? 4 : 3}" style="padding:0">
+          <div style="background:rgba(200,137,42,0.06);border:1px solid rgba(200,137,42,0.2);border-radius:8px;padding:16px;margin:4px 0">
+            <div style="font-size:11px;font-weight:700;color:var(--color-accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">Control de Inventario</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px">
+              <div>
+                <label style="font-size:11px;color:var(--color-text-muted);display:block;margin-bottom:4px">Clasificación</label>
+                <select class="edit-select" id="inv-abc-${p.id_producto}" style="width:100%">
+                  <option value="A"${(p.clasificacion_abc||'A')==='A'?' selected':''}>A — Alta rotación</option>
+                  <option value="B"${p.clasificacion_abc==='B'?' selected':''}>B — Media rotación</option>
+                  <option value="C"${p.clasificacion_abc==='C'?' selected':''}>C — Baja rotación</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:11px;color:var(--color-text-muted);display:block;margin-bottom:4px">Merma %</label>
+                <input type="number" class="edit-input edit-num" id="inv-merma-${p.id_producto}"
+                  value="${p.merma_porcentaje??0}" min="0" max="100" step="0.1" style="width:100%">
+              </div>
+              <div>
+                <label style="font-size:11px;color:var(--color-text-muted);display:block;margin-bottom:4px">Stock máximo (${p.unidad_medida||'u'})</label>
+                <input type="number" class="edit-input edit-num" id="inv-max-${p.id_producto}"
+                  value="${p.stock_maximo??''}" min="0" step="any" placeholder="—" style="width:100%">
+              </div>
+              <div>
+                <label style="font-size:11px;color:var(--color-text-muted);display:block;margin-bottom:4px">% de alerta</label>
+                <input type="number" class="edit-input edit-num" id="inv-alerta-${p.id_producto}"
+                  value="${p.stock_alerta_porcentaje??30}" min="0" max="100" step="1" style="width:100%">
+              </div>
+              <div>
+                <label style="font-size:11px;color:var(--color-text-muted);display:block;margin-bottom:4px">Días de cobertura</label>
+                <input type="number" class="edit-input edit-num" id="inv-dias-${p.id_producto}"
+                  value="${p.dias_cobertura??3}" min="1" step="1" style="width:100%">
+              </div>
+              <div>
+                <label style="font-size:11px;color:var(--color-text-muted);display:block;margin-bottom:4px">Proveedor preferencial</label>
+                <select class="edit-select" id="inv-prov-${p.id_producto}" style="width:100%">
+                  <option value="">— Ninguno —</option>
+                  ${(window._proveedoresCache||[]).map(pv=>`<option value="${pv.id_proveedor}"${p.id_proveedor_preferencial===pv.id_proveedor?' selected':''}>${pv.nombre}</option>`).join('')}
+                </select>
+              </div>
+            </div>
+            <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+              <button class="btn-accion btn-aprobar" style="font-size:12px;padding:5px 14px"
+                onclick="guardarInventarioProducto('${p.id_producto}')">Guardar inventario</button>
+              <span id="inv-msg-${p.id_producto}" style="font-size:12px;color:#3A8C3E"></span>
+            </div>
+          </div>
+        </td>
       </tr>
     `
 
@@ -148,6 +200,13 @@ async function vistaProductos() {
       })
 
       wrap.innerHTML = html
+    }
+
+    // Cargar proveedores para el panel de inventario
+    if (!window._proveedoresCache) {
+      const { data: provs } = await window._db.from('proveedores')
+        .select('id_proveedor, nombre').eq('tenant_id', tenant_id).eq('activo', true).order('nombre')
+      window._proveedoresCache = provs || []
     }
 
     const onFiltro = () => renderTabla(aplicarFiltros())
@@ -248,6 +307,51 @@ ${grupos.map(g => `
   win.document.write(html)
   win.document.close()
   win.onload = () => win.print()
+}
+
+window.toggleInventarioPanel = function(idProducto) {
+  const panel = document.getElementById(`inv-panel-${idProducto}`)
+  if (!panel) return
+  panel.style.display = panel.style.display === 'none' ? 'table-row' : 'none'
+}
+
+window.guardarInventarioProducto = async function(idProducto) {
+  const tenant_id = await getTenantId()
+  const abc       = document.getElementById(`inv-abc-${idProducto}`)?.value || 'A'
+  const merma     = parseFloat(document.getElementById(`inv-merma-${idProducto}`)?.value) || 0
+  const maxVal    = document.getElementById(`inv-max-${idProducto}`)?.value
+  const alerta    = parseFloat(document.getElementById(`inv-alerta-${idProducto}`)?.value) || 30
+  const dias      = parseInt(document.getElementById(`inv-dias-${idProducto}`)?.value) || 3
+  const provPref  = document.getElementById(`inv-prov-${idProducto}`)?.value || null
+  const msg       = document.getElementById(`inv-msg-${idProducto}`)
+
+  const { error } = await window._db.from('productos').update({
+    clasificacion_abc:       abc,
+    merma_porcentaje:        merma,
+    stock_maximo:            maxVal ? parseFloat(maxVal) : null,
+    stock_alerta_porcentaje: alerta,
+    dias_cobertura:          dias,
+    id_proveedor_preferencial: provPref || null,
+    updated_at: new Date().toISOString()
+  }).eq('id_producto', idProducto).eq('tenant_id', tenant_id)
+
+  if (error) {
+    if (msg) { msg.style.color = '#B85C2A'; msg.textContent = 'Error: ' + error.message }
+  } else {
+    if (msg) {
+      msg.style.color = '#3A8C3E'
+      msg.textContent = '✓ Guardado'
+      setTimeout(() => { if (msg) msg.textContent = '' }, 2000)
+    }
+    // actualizar cache local
+    const prod = (window._productos||[]).find(p => p.id_producto === idProducto)
+    if (prod) {
+      prod.clasificacion_abc = abc; prod.merma_porcentaje = merma
+      prod.stock_maximo = maxVal ? parseFloat(maxVal) : null
+      prod.stock_alerta_porcentaje = alerta; prod.dias_cobertura = dias
+      prod.id_proveedor_preferencial = provPref || null
+    }
+  }
 }
 
 window.toggleSeccion = function(bodyId) {

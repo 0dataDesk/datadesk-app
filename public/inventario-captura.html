@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>Levantamiento de Inventario</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="src/supabase.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #faf8f5;
+      color: #2B1A0F;
+      min-height: 100vh;
+    }
+    .header {
+      background: #1e3a5f;
+      color: #FAF7F2;
+      padding: 16px 20px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .header h1 { font-size: 18px; font-weight: 700; }
+    .header p  { font-size: 12px; opacity: 0.7; margin-top: 2px; }
+    .login-box {
+      max-width: 400px;
+      margin: 40px auto;
+      background: #fff;
+      border-radius: 12px;
+      padding: 28px 24px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+    .login-box h2 { font-size: 20px; margin-bottom: 20px; }
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-size: 13px; color: #666; margin-bottom: 6px; }
+    .field input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; }
+    .btn-primary {
+      width: 100%; padding: 14px; background: #1e3a5f; color: #fff;
+      border: none; border-radius: 10px; font-size: 16px; font-weight: 600;
+      cursor: pointer; margin-top: 4px;
+    }
+    .btn-primary:disabled { opacity: 0.6; }
+    .err { color: #B85C2A; font-size: 13px; margin-top: 8px; }
+
+    .filtros {
+      background: #fff;
+      border-bottom: 1px solid #e8ddd5;
+      padding: 16px 20px;
+    }
+    .filtro-row { display: flex; gap: 12px; flex-wrap: wrap; }
+    .filtro-item { flex: 1; min-width: 130px; }
+    .filtro-item label { display: block; font-size: 11px; color: #9B7B6A; margin-bottom: 5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+    .filtro-item select, .filtro-item input[type="date"], .filtro-item input[type="text"] {
+      width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px;
+      font-size: 15px; background: #faf8f5;
+    }
+
+    .tabla-wrap { padding: 12px 16px 120px; }
+    .insumo-card {
+      background: #fff;
+      border-radius: 10px;
+      border: 1px solid #e8ddd5;
+      padding: 14px 16px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .insumo-info { flex: 1; min-width: 0; }
+    .insumo-nombre { font-size: 16px; font-weight: 600; color: #2B1A0F; }
+    .insumo-meta { font-size: 12px; color: #9B7B6A; margin-top: 2px; }
+    .insumo-qty {
+      width: 90px; flex-shrink: 0;
+      padding: 10px 8px; border: 2px solid #C8892A; border-radius: 8px;
+      font-size: 22px; font-weight: 700; text-align: center; color: #1e3a5f;
+      background: #fffbf5; -webkit-appearance: none;
+    }
+    .insumo-qty:focus { outline: none; border-color: #1e3a5f; }
+
+    .fab-guardar {
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      background: #1e3a5f; color: #fff; border: none; border-radius: 50px;
+      padding: 16px 36px; font-size: 17px; font-weight: 700; cursor: pointer;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.25); white-space: nowrap;
+      min-width: 220px; text-align: center;
+    }
+    .fab-guardar:disabled { opacity: 0.6; }
+
+    .confirm-box {
+      max-width: 400px; margin: 60px auto; text-align: center; padding: 32px 24px;
+      background: #fff; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+    .confirm-icon { font-size: 56px; margin-bottom: 16px; }
+    .confirm-box h2 { font-size: 22px; margin-bottom: 8px; }
+    .confirm-box p { color: #9B7B6A; font-size: 15px; }
+    .btn-nuevo {
+      margin-top: 24px; padding: 14px 28px; background: #1e3a5f; color: #fff;
+      border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer;
+    }
+
+    #estado-info { padding: 12px 20px; background: #fff8ef; border-bottom: 1px solid #e8ddd5; font-size: 13px; color: #9B7B6A; }
+    #estado-info span { font-weight: 600; color: #C8892A; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Levantamiento de Inventario</h1>
+  <p id="header-sub">dataDesk</p>
+</div>
+
+<!-- LOGIN -->
+<div id="vista-login">
+  <div class="login-box">
+    <h2>Iniciar sesión</h2>
+    <div class="field">
+      <label>Correo</label>
+      <input type="email" id="lc-email" placeholder="correo@ejemplo.com" autocomplete="email">
+    </div>
+    <div class="field">
+      <label>Contraseña</label>
+      <input type="password" id="lc-pass" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn-primary" id="lc-btn" onclick="lcLogin()">Entrar</button>
+    <p class="err" id="lc-err"></p>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="vista-app" style="display:none">
+  <div id="estado-info" style="display:none">
+    Levantamiento: <span id="ei-fecha"></span> · Clasificación: <span id="ei-clasif"></span> · Área: <span id="ei-area"></span>
+  </div>
+
+  <div class="filtros" id="filtros-panel">
+    <div class="filtro-row">
+      <div class="filtro-item">
+        <label>Fecha</label>
+        <input type="date" id="lc-fecha">
+      </div>
+      <div class="filtro-item">
+        <label>Clasificación</label>
+        <select id="lc-clasif">
+          <option value="todos">Todos (A+B+C)</option>
+          <option value="A">A — Alta rotación</option>
+          <option value="B">B — Media rotación</option>
+          <option value="C">C — Baja rotación</option>
+        </select>
+      </div>
+      <div class="filtro-item">
+        <label>Área (opcional)</label>
+        <input type="text" id="lc-area" placeholder="Ej. Cámara, Barra">
+      </div>
+    </div>
+    <button class="btn-primary" style="margin-top:14px" onclick="lcCargarInsumos()">Cargar insumos →</button>
+    <p class="err" id="lc-filtros-err"></p>
+  </div>
+
+  <div class="tabla-wrap" id="tabla-wrap" style="display:none">
+    <div id="insumos-lista"></div>
+  </div>
+  <button class="fab-guardar" id="btn-guardar" style="display:none" onclick="lcGuardar()">
+    💾 Guardar inventario
+  </button>
+</div>
+
+<!-- CONFIRM -->
+<div id="vista-confirm" style="display:none">
+  <div class="confirm-box">
+    <div class="confirm-icon">✅</div>
+    <h2>Inventario guardado</h2>
+    <p id="confirm-msg">0 insumos registrados</p>
+    <button class="btn-nuevo" onclick="lcNuevo()">Nuevo levantamiento</button>
+  </div>
+</div>
+
+<script>
+let lcUsuario = null
+let lcTenantId = null
+let lcInsumos  = []
+
+window._db.auth.onAuthStateChange(async (event, session) => {
+  if (session) {
+    lcUsuario   = session.user
+    lcTenantId  = session.user.user_metadata?.tenant_id || null
+    mostrarApp()
+  } else {
+    document.getElementById('vista-login').style.display = ''
+    document.getElementById('vista-app').style.display   = 'none'
+    document.getElementById('vista-confirm').style.display = 'none'
+  }
+})
+
+async function lcLogin() {
+  const email = document.getElementById('lc-email').value.trim()
+  const pass  = document.getElementById('lc-pass').value
+  const btn   = document.getElementById('lc-btn')
+  const err   = document.getElementById('lc-err')
+  err.textContent = ''
+  btn.disabled = true; btn.textContent = 'Entrando...'
+  const { data, error } = await window._db.auth.signInWithPassword({ email, password: pass })
+  if (error) {
+    err.textContent = 'Correo o contraseña incorrectos'
+    btn.disabled = false; btn.textContent = 'Entrar'
+    return
+  }
+  lcUsuario   = data.user
+  lcTenantId  = data.user.user_metadata?.tenant_id || null
+  mostrarApp()
+}
+
+function mostrarApp() {
+  document.getElementById('vista-login').style.display = 'none'
+  document.getElementById('vista-app').style.display   = ''
+  // Fecha default: hoy
+  document.getElementById('lc-fecha').value = new Date().toISOString().split('T')[0]
+  document.getElementById('header-sub').textContent = lcTenantId || 'dataDesk'
+}
+
+async function lcCargarInsumos() {
+  const err = document.getElementById('lc-filtros-err')
+  err.textContent = ''
+  if (!lcTenantId) { err.textContent = 'Sin tenant configurado. Contacta al administrador.'; return }
+
+  const fecha  = document.getElementById('lc-fecha').value
+  const clasif = document.getElementById('lc-clasif').value
+  const area   = document.getElementById('lc-area').value.trim()
+  if (!fecha) { err.textContent = 'Selecciona una fecha'; return }
+
+  let query = window._db.from('productos')
+    .select('id_producto, producto, unidad_medida, clasificacion_abc, grupo')
+    .eq('tenant_id', lcTenantId)
+    .eq('activo', true)
+
+  if (clasif !== 'todos') query = query.eq('clasificacion_abc', clasif)
+
+  query = query.order('clasificacion_abc').order('producto')
+
+  const { data: productos, error: errP } = await query
+  if (errP) { err.textContent = 'Error: ' + errP.message; return }
+
+  lcInsumos = productos || []
+
+  const lista = document.getElementById('insumos-lista')
+  if (!lcInsumos.length) {
+    lista.innerHTML = '<p style="color:#9B7B6A;text-align:center;padding:32px">Sin insumos para mostrar.</p>'
+  } else {
+    lista.innerHTML = lcInsumos.map((p, idx) => `
+      <div class="insumo-card">
+        <div class="insumo-info">
+          <div class="insumo-nombre">${p.producto}</div>
+          <div class="insumo-meta">${p.clasificacion_abc || '—'} · ${p.unidad_medida || '—'} · ${p.grupo || ''}</div>
+        </div>
+        <input type="number" class="insumo-qty" id="qty-${p.id_producto}"
+          placeholder="0" min="0" step="any" inputmode="decimal">
+      </div>
+    `).join('')
+  }
+
+  document.getElementById('filtros-panel').style.display = 'none'
+  document.getElementById('estado-info').style.display   = ''
+  document.getElementById('ei-fecha').textContent   = fecha
+  document.getElementById('ei-clasif').textContent  = clasif
+  document.getElementById('ei-area').textContent    = area || 'sin área'
+  document.getElementById('tabla-wrap').style.display   = ''
+  document.getElementById('btn-guardar').style.display  = ''
+}
+
+async function lcGuardar() {
+  const btn  = document.getElementById('btn-guardar')
+  btn.disabled = true; btn.textContent = 'Guardando...'
+
+  const fecha  = document.getElementById('lc-fecha').value
+  const clasif = document.getElementById('lc-clasif').value
+  const area   = document.getElementById('lc-area').value.trim() || null
+
+  // Crear cabecera inventario
+  const { data: inv, error: errI } = await window._db.from('inventarios').insert({
+    tenant_id:     lcTenantId,
+    fecha,
+    clasificacion: clasif,
+    area,
+    estado:        'completo',
+    creado_por:    lcUsuario?.email || null
+  }).select('id').single()
+
+  if (errI) {
+    alert('Error al guardar inventario: ' + errI.message)
+    btn.disabled = false; btn.textContent = '💾 Guardar inventario'
+    return
+  }
+
+  // Insertar items (solo los que tienen cantidad)
+  const rows = []
+  for (const p of lcInsumos) {
+    const val = document.getElementById(`qty-${p.id_producto}`)?.value
+    if (val === '' || val === null || val === undefined) continue
+    const cant = parseFloat(val)
+    if (isNaN(cant)) continue
+    rows.push({
+      id_inventario:         inv.id,
+      tenant_id:             lcTenantId,
+      id_producto:           p.id_producto,
+      clasificacion_abc_snap: p.clasificacion_abc || null,
+      cantidad_contada:      cant
+    })
+  }
+
+  if (rows.length > 0) {
+    const { error: errRows } = await window._db.from('inventario_items').insert(rows)
+    if (errRows) {
+      alert('Error al guardar items: ' + errRows.message)
+      btn.disabled = false; btn.textContent = '💾 Guardar inventario'
+      return
+    }
+  }
+
+  document.getElementById('confirm-msg').textContent = `${rows.length} insumos registrados`
+  document.getElementById('vista-app').style.display     = 'none'
+  document.getElementById('vista-confirm').style.display = ''
+}
+
+function lcNuevo() {
+  document.getElementById('vista-confirm').style.display = 'none'
+  document.getElementById('vista-app').style.display     = ''
+  document.getElementById('filtros-panel').style.display = ''
+  document.getElementById('estado-info').style.display   = 'none'
+  document.getElementById('tabla-wrap').style.display    = 'none'
+  document.getElementById('btn-guardar').style.display   = 'none'
+  document.getElementById('lc-fecha').value = new Date().toISOString().split('T')[0]
+  lcInsumos = []
+}
+</script>
+</body>
+</html>

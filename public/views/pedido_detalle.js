@@ -19,7 +19,7 @@ async function vistaPedidoDetalle(id_pedido) {
 
   const { data: proveedores } = await window._db
     .from('proveedores')
-    .select('id_proveedor, nombre, telefono, email, contacto')
+    .select('id_proveedor, nombre, telefono, email, contacto, dias_entrega')
     .eq('tenant_id', tenant_id)
 
   const prov       = proveedores?.find(p => p.id_proveedor === pedido.id_proveedor)
@@ -215,6 +215,14 @@ async function exportarPedidoPDF(id_pedido) {
       ${prov?.contacto ? `<div>${prov.contacto}</div>` : ''}
       ${prov?.telefono ? `<div>${prov.telefono}</div>` : ''}
       ${prov?.email    ? `<div>${prov.email}</div>`    : ''}
+      <div style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="font-size:12px;color:var(--color-text-muted)">Días de entrega:</span>
+        <span id="prov-dias-entrega-txt" style="font-size:12px;font-weight:600">${prov?.dias_entrega || '—'}</span>
+        <button onclick="editarDiasEntrega('${prov?.id_proveedor||pedido.id_proveedor}','${(prov?.dias_entrega||'').replace(/'/g,"\\'")}')"
+          style="font-size:11px;padding:2px 8px;border:1px solid var(--color-border);border-radius:6px;background:transparent;cursor:pointer;color:var(--color-text-muted)">
+          ✏ Editar
+        </button>
+      </div>
     </div>
     ${pedido.notas ? `<div class="seccion-bloque"><strong>Notas</strong><div>${pedido.notas}</div></div>` : ''}
   </div>
@@ -251,4 +259,17 @@ async function exportarPedidoPDF(id_pedido) {
   ventana.document.close()
   ventana.focus()
   setTimeout(() => ventana.print(), 500)
+}
+
+window.editarDiasEntrega = async function(idProveedor, valorActual) {
+  const nuevo = prompt('Días de entrega del proveedor\n(ej: lunes, miércoles, viernes)', valorActual || '')
+  if (nuevo === null) return
+  const tenant_id = await getTenantId()
+  const { error } = await window._db.from('proveedores')
+    .update({ dias_entrega: nuevo.trim() || null, updated_at: new Date().toISOString() })
+    .eq('id_proveedor', idProveedor)
+    .eq('tenant_id', tenant_id)
+  if (error) { alert('Error: ' + error.message); return }
+  const el = document.getElementById('prov-dias-entrega-txt')
+  if (el) el.textContent = nuevo.trim() || '—'
 }

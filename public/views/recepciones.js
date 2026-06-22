@@ -363,22 +363,34 @@ async function verDetalleRecepcion(id) {
             <th style="text-align:right">Cant. solicitada</th>
             <th style="text-align:right">Costo unit.</th>
             <th style="text-align:right">Total</th>
-            <th style="text-align:right">Variación</th>
+            <th style="text-align:right">Desv. precio</th>
           </tr>
         </thead>
         <tbody>
           ${(items || []).map(i => {
-            const total    = Number(i.cantidad_recibida) * Number(i.costo_unitario || 0)
-            const variacion = i.variacion_pct ?? null
-            const varColor = variacion === null ? '' : variacion > 5 ? 'color:#B85C2A;font-weight:600' : variacion < -5 ? 'color:#3A8C3E;font-weight:600' : 'color:var(--color-text-muted)'
+            const total = Number(i.cantidad_recibida) * Number(i.costo_unitario || 0)
+            const desv  = i.desviacion_porcentaje ?? i.variacion_pct ?? null
+            let rowStyle = ''
+            let desvHtml = '—'
+            if (desv !== null) {
+              if (desv > 5) {
+                rowStyle = 'background:rgba(184,92,42,0.08)'
+                desvHtml = `<span style="color:#B85C2A;font-weight:700">▲ ${desv}%</span>`
+              } else if (desv >= 1) {
+                rowStyle = 'background:rgba(200,137,42,0.08)'
+                desvHtml = `<span style="color:#c8892a;font-weight:600">▲ ${desv}%</span>`
+              } else {
+                desvHtml = `<span style="color:var(--color-text-muted)">${desv}%</span>`
+              }
+            }
             return `
-              <tr>
+              <tr style="${rowStyle}">
                 <td>${prodMap[i.id_producto]?.producto || i.id_producto}</td>
                 <td style="text-align:right">${i.cantidad_recibida} ${prodMap[i.id_producto]?.unidad_medida || ''}</td>
                 <td style="text-align:right;color:var(--color-text-muted)">${i.cantidad_solicitada || '—'}</td>
                 <td style="text-align:right">$${Number(i.costo_unitario || 0).toFixed(2)}</td>
                 <td style="text-align:right;font-weight:600">$${total.toFixed(2)}</td>
-                <td style="text-align:right;${varColor}">${variacion !== null ? variacion + '%' : '—'}</td>
+                <td style="text-align:right">${desvHtml}</td>
               </tr>`
           }).join('')}
         </tbody>
