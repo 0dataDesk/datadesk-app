@@ -8,86 +8,117 @@
   <script src="src/supabase.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #faf8f5;
-      color: #2B1A0F;
-      min-height: 100vh;
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #faf8f5; color: #2B1A0F; min-height: 100vh; }
+
+    /* HEADER */
+    .app-header {
+      background: #1e3a5f; color: #FAF7F2;
+      padding: 12px 16px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 100;
     }
-    .header {
-      background: #1e3a5f;
-      color: #FAF7F2;
-      padding: 16px 20px;
-      position: sticky;
-      top: 0;
-      z-index: 10;
+    .app-header h1 { font-size: 17px; font-weight: 700; }
+    .app-header small { font-size: 11px; opacity: 0.65; }
+    .badge-borrador {
+      font-size: 11px; font-weight: 700; padding: 3px 9px;
+      border-radius: 20px; background: rgba(200,137,42,0.25); color: #f0b940;
     }
-    .header h1 { font-size: 18px; font-weight: 700; }
-    .header p  { font-size: 12px; opacity: 0.7; margin-top: 2px; }
-    .login-box {
-      max-width: 400px;
-      margin: 40px auto;
-      background: #fff;
-      border-radius: 12px;
-      padding: 28px 24px;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    .badge-completo {
+      font-size: 11px; font-weight: 700; padding: 3px 9px;
+      border-radius: 20px; background: rgba(76,153,80,0.25); color: #4dc361;
     }
-    .login-box h2 { font-size: 20px; margin-bottom: 20px; }
+
+    /* LOGIN */
+    .login-box { max-width: 400px; margin: 48px auto; background: #fff; border-radius: 16px; padding: 28px 24px; box-shadow: 0 2px 16px rgba(0,0,0,0.08); }
+    .login-box h2 { font-size: 20px; font-weight: 700; margin-bottom: 20px; }
     .field { margin-bottom: 14px; }
-    .field label { display: block; font-size: 13px; color: #666; margin-bottom: 6px; }
-    .field input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; }
-    .btn-primary {
-      width: 100%; padding: 14px; background: #1e3a5f; color: #fff;
-      border: none; border-radius: 10px; font-size: 16px; font-weight: 600;
-      cursor: pointer; margin-top: 4px;
-    }
-    .btn-primary:disabled { opacity: 0.6; }
+    .field label { display: block; font-size: 12px; color: #9B7B6A; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .field input { width: 100%; padding: 12px; border: 1.5px solid #ddd; border-radius: 10px; font-size: 16px; background: #faf8f5; }
+    .btn-pri { width: 100%; padding: 14px; background: #1e3a5f; color: #fff; border: none; border-radius: 10px; font-size: 16px; font-weight: 700; cursor: pointer; }
+    .btn-pri:disabled { opacity: 0.5; }
     .err { color: #B85C2A; font-size: 13px; margin-top: 8px; }
 
-    .filtros {
-      background: #fff;
-      border-bottom: 1px solid #e8ddd5;
-      padding: 16px 20px;
-    }
-    .filtro-row { display: flex; gap: 12px; flex-wrap: wrap; }
-    .filtro-item { flex: 1; min-width: 130px; }
-    .filtro-item label { display: block; font-size: 11px; color: #9B7B6A; margin-bottom: 5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+    /* FILTROS */
+    .filtros { background: #fff; border-bottom: 1px solid #e8ddd5; padding: 14px 16px; }
+    .filtro-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .filtro-item { flex: 1; min-width: 120px; }
+    .filtro-item label { display: block; font-size: 11px; color: #9B7B6A; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
     .filtro-item select, .filtro-item input[type="date"], .filtro-item input[type="text"] {
-      width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px;
-      font-size: 15px; background: #faf8f5;
+      width: 100%; padding: 10px 12px; border: 1.5px solid #ddd; border-radius: 8px; font-size: 15px; background: #faf8f5;
     }
 
-    .tabla-wrap { padding: 12px 16px 120px; }
-    .insumo-card {
-      background: #fff;
-      border-radius: 10px;
-      border: 1px solid #e8ddd5;
-      padding: 14px 16px;
-      margin-bottom: 10px;
-      display: flex;
-      align-items: center;
-      gap: 14px;
+    /* BÚSQUEDA */
+    .search-bar {
+      padding: 10px 16px; background: #fff; border-bottom: 1px solid #e8ddd5; position: sticky; top: 49px; z-index: 90;
     }
+    .search-bar input {
+      width: 100%; padding: 10px 14px 10px 36px; border: 1.5px solid #ddd; border-radius: 10px;
+      font-size: 15px; background: #faf8f5; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239B7B6A' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: 10px center;
+    }
+
+    /* GRUPOS NAV */
+    .grupos-nav {
+      display: flex; gap: 8px; overflow-x: auto; padding: 10px 16px;
+      background: #fff; border-bottom: 1px solid #e8ddd5;
+      position: sticky; top: 101px; z-index: 89;
+      scrollbar-width: none;
+    }
+    .grupos-nav::-webkit-scrollbar { display: none; }
+    .grupo-pill {
+      flex-shrink: 0; padding: 6px 14px; border-radius: 20px;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      border: 1.5px solid #ddd; background: #faf8f5; color: #2B1A0F;
+      white-space: nowrap;
+    }
+    .grupo-pill.activo { background: #1e3a5f; color: #fff; border-color: #1e3a5f; }
+
+    /* LISTA */
+    .lista-wrap { padding: 0 0 160px; }
+    .grupo-header {
+      padding: 8px 16px; font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 1px; color: #9B7B6A;
+      background: #f0ebe6; border-top: 1px solid #e8ddd5; border-bottom: 1px solid #e8ddd5;
+      position: sticky; top: 141px; z-index: 88;
+    }
+    .insumo-card {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 16px; border-bottom: 1px solid #f0ebe6;
+      background: #fff;
+    }
+    .insumo-card.capturado { background: #f6fbf6; }
     .insumo-info { flex: 1; min-width: 0; }
-    .insumo-nombre { font-size: 16px; font-weight: 600; color: #2B1A0F; }
-    .insumo-meta { font-size: 12px; color: #9B7B6A; margin-top: 2px; }
+    .insumo-nombre { font-size: 15px; font-weight: 600; }
+    .insumo-meta { font-size: 12px; color: #9B7B6A; margin-top: 1px; }
     .insumo-qty {
-      width: 90px; flex-shrink: 0;
-      padding: 10px 8px; border: 2px solid #C8892A; border-radius: 8px;
+      width: 88px; flex-shrink: 0;
+      padding: 10px 6px; border: 2px solid #C8892A; border-radius: 8px;
       font-size: 22px; font-weight: 700; text-align: center; color: #1e3a5f;
       background: #fffbf5; -webkit-appearance: none;
     }
-    .insumo-qty:focus { outline: none; border-color: #1e3a5f; }
+    .insumo-qty:focus { outline: none; border-color: #1e3a5f; background: #fff; }
+    .insumo-qty.tiene-valor { border-color: #3A8C3E; background: #f6fbf6; }
 
-    .fab-guardar {
-      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-      background: #1e3a5f; color: #fff; border: none; border-radius: 50px;
-      padding: 16px 36px; font-size: 17px; font-weight: 700; cursor: pointer;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.25); white-space: nowrap;
-      min-width: 220px; text-align: center;
+    /* FAB BOTONES */
+    .fab-bar {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      padding: 12px 16px 20px; background: rgba(250,248,245,0.97);
+      border-top: 1px solid #e8ddd5;
+      display: flex; gap: 10px;
     }
-    .fab-guardar:disabled { opacity: 0.6; }
+    .btn-borrador {
+      flex: 1; padding: 14px; background: #fff; color: #1e3a5f;
+      border: 2px solid #1e3a5f; border-radius: 12px;
+      font-size: 15px; font-weight: 700; cursor: pointer;
+    }
+    .btn-cerrar {
+      flex: 2; padding: 14px; background: #1e3a5f; color: #fff;
+      border: none; border-radius: 12px;
+      font-size: 15px; font-weight: 700; cursor: pointer;
+    }
+    .btn-borrador:disabled, .btn-cerrar:disabled { opacity: 0.5; }
 
+    /* CONFIRM */
     .confirm-box {
       max-width: 400px; margin: 60px auto; text-align: center; padding: 32px 24px;
       background: #fff; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);
@@ -95,20 +126,22 @@
     .confirm-icon { font-size: 56px; margin-bottom: 16px; }
     .confirm-box h2 { font-size: 22px; margin-bottom: 8px; }
     .confirm-box p { color: #9B7B6A; font-size: 15px; }
-    .btn-nuevo {
-      margin-top: 24px; padding: 14px 28px; background: #1e3a5f; color: #fff;
-      border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer;
-    }
+    .btn-nuevo { margin-top: 20px; padding: 14px 28px; background: #1e3a5f; color: #fff; border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; }
 
-    #estado-info { padding: 12px 20px; background: #fff8ef; border-bottom: 1px solid #e8ddd5; font-size: 13px; color: #9B7B6A; }
-    #estado-info span { font-weight: 600; color: #C8892A; }
+    /* ESTADO INFO */
+    #estado-info { padding: 8px 16px; background: #fff8ef; border-bottom: 1px solid #e8ddd5; font-size: 12px; color: #9B7B6A; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    #estado-info strong { color: #C8892A; }
+    #conteo-progreso { margin-left: auto; font-size: 12px; font-weight: 700; color: #1e3a5f; }
   </style>
 </head>
 <body>
 
-<div class="header">
-  <h1>Levantamiento de Inventario</h1>
-  <p id="header-sub">dataDesk</p>
+<div class="app-header">
+  <div>
+    <h1>Levantamiento de Inventario</h1>
+    <small id="header-sub">dataDesk</small>
+  </div>
+  <span id="header-badge" style="display:none"></span>
 </div>
 
 <!-- LOGIN -->
@@ -123,17 +156,15 @@
       <label>Contraseña</label>
       <input type="password" id="lc-pass" placeholder="••••••••" autocomplete="current-password">
     </div>
-    <button class="btn-primary" id="lc-btn" onclick="lcLogin()">Entrar</button>
+    <button class="btn-pri" id="lc-btn" onclick="lcLogin()">Entrar</button>
     <p class="err" id="lc-err"></p>
   </div>
 </div>
 
 <!-- APP -->
 <div id="vista-app" style="display:none">
-  <div id="estado-info" style="display:none">
-    Levantamiento: <span id="ei-fecha"></span> · Clasificación: <span id="ei-clasif"></span> · Área: <span id="ei-area"></span>
-  </div>
 
+  <!-- Panel filtros inicial -->
   <div class="filtros" id="filtros-panel">
     <div class="filtro-row">
       <div class="filtro-item">
@@ -150,41 +181,62 @@
         </select>
       </div>
       <div class="filtro-item">
-        <label>Área (opcional)</label>
-        <input type="text" id="lc-area" placeholder="Ej. Cámara, Barra">
+        <label>Área</label>
+        <input type="text" id="lc-area" placeholder="Cámara, Barra…">
       </div>
     </div>
-    <button class="btn-primary" style="margin-top:14px" onclick="lcCargarInsumos()">Cargar insumos →</button>
+    <button class="btn-pri" style="margin-top:14px" onclick="lcCargarInsumos()">Cargar insumos →</button>
     <p class="err" id="lc-filtros-err"></p>
   </div>
 
-  <div class="tabla-wrap" id="tabla-wrap" style="display:none">
+  <!-- Estado activo -->
+  <div id="estado-info" style="display:none">
+    <span id="ei-texto"></span>
+    <span id="conteo-progreso"></span>
+  </div>
+
+  <!-- Búsqueda -->
+  <div class="search-bar" id="search-bar" style="display:none">
+    <input type="search" id="lc-search" placeholder="Buscar insumo…" oninput="lcFiltrar()" autocomplete="off">
+  </div>
+
+  <!-- Pills de grupos -->
+  <div class="grupos-nav" id="grupos-nav" style="display:none"></div>
+
+  <!-- Lista de insumos -->
+  <div class="lista-wrap" id="lista-wrap" style="display:none">
     <div id="insumos-lista"></div>
   </div>
-  <button class="fab-guardar" id="btn-guardar" style="display:none" onclick="lcGuardar()">
-    💾 Guardar inventario
-  </button>
+
+  <!-- Botones fijos -->
+  <div class="fab-bar" id="fab-bar" style="display:none">
+    <button class="btn-borrador" id="btn-borrador" onclick="lcGuardar(false)">💾 Guardar borrador</button>
+    <button class="btn-cerrar"  id="btn-cerrar"  onclick="lcGuardar(true)">✓ Cerrar inventario</button>
+  </div>
+
 </div>
 
 <!-- CONFIRM -->
 <div id="vista-confirm" style="display:none">
   <div class="confirm-box">
-    <div class="confirm-icon">✅</div>
-    <h2>Inventario guardado</h2>
+    <div class="confirm-icon" id="confirm-icon">✅</div>
+    <h2 id="confirm-titulo">Inventario cerrado</h2>
     <p id="confirm-msg">0 insumos registrados</p>
     <button class="btn-nuevo" onclick="lcNuevo()">Nuevo levantamiento</button>
   </div>
 </div>
 
 <script>
-let lcUsuario = null
-let lcTenantId = null
-let lcInsumos  = []
+let lcUsuario      = null
+let lcTenantId     = null
+let lcInsumos      = []        // todos los insumos cargados
+let lcInventarioId = null      // ID del registro inventarios actual (borrador)
+let lcGrupos       = []        // lista de grupos en orden
 
 window._db.auth.onAuthStateChange(async (event, session) => {
   if (session) {
-    lcUsuario   = session.user
-    lcTenantId  = session.user.user_metadata?.tenant_id || null
+    lcUsuario  = session.user
+    lcTenantId = session.user.user_metadata?.tenant_id || null
     mostrarApp()
   } else {
     document.getElementById('vista-login').style.display = ''
@@ -198,31 +250,26 @@ async function lcLogin() {
   const pass  = document.getElementById('lc-pass').value
   const btn   = document.getElementById('lc-btn')
   const err   = document.getElementById('lc-err')
-  err.textContent = ''
-  btn.disabled = true; btn.textContent = 'Entrando...'
+  err.textContent = ''; btn.disabled = true; btn.textContent = 'Entrando…'
   const { data, error } = await window._db.auth.signInWithPassword({ email, password: pass })
-  if (error) {
-    err.textContent = 'Correo o contraseña incorrectos'
-    btn.disabled = false; btn.textContent = 'Entrar'
-    return
-  }
-  lcUsuario   = data.user
-  lcTenantId  = data.user.user_metadata?.tenant_id || null
+  if (error) { err.textContent = 'Correo o contraseña incorrectos'; btn.disabled = false; btn.textContent = 'Entrar'; return }
+  lcUsuario  = data.user
+  lcTenantId = data.user.user_metadata?.tenant_id || null
   mostrarApp()
 }
 
 function mostrarApp() {
   document.getElementById('vista-login').style.display = 'none'
   document.getElementById('vista-app').style.display   = ''
-  // Fecha default: hoy
   document.getElementById('lc-fecha').value = new Date().toISOString().split('T')[0]
   document.getElementById('header-sub').textContent = lcTenantId || 'dataDesk'
 }
 
+// ── Cargar insumos ────────────────────────────────────────────────────────────
 async function lcCargarInsumos() {
   const err = document.getElementById('lc-filtros-err')
   err.textContent = ''
-  if (!lcTenantId) { err.textContent = 'Sin tenant configurado. Contacta al administrador.'; return }
+  if (!lcTenantId) { err.textContent = 'Sin tenant configurado.'; return }
 
   const fecha  = document.getElementById('lc-fecha').value
   const clasif = document.getElementById('lc-clasif').value
@@ -231,106 +278,212 @@ async function lcCargarInsumos() {
 
   let query = window._db.from('productos')
     .select('id_producto, producto, unidad_medida, clasificacion_abc, grupo')
-    .eq('tenant_id', lcTenantId)
-    .eq('activo', true)
+    .eq('tenant_id', lcTenantId).eq('activo', true)
 
   if (clasif !== 'todos') query = query.eq('clasificacion_abc', clasif)
-
-  query = query.order('clasificacion_abc').order('producto')
+  query = query.order('grupo').order('producto')
 
   const { data: productos, error: errP } = await query
   if (errP) { err.textContent = 'Error: ' + errP.message; return }
 
-  lcInsumos = productos || []
+  lcInsumos      = productos || []
+  lcInventarioId = null  // nuevo levantamiento, sin borrador aún
 
-  const lista = document.getElementById('insumos-lista')
-  if (!lcInsumos.length) {
-    lista.innerHTML = '<p style="color:#9B7B6A;text-align:center;padding:32px">Sin insumos para mostrar.</p>'
-  } else {
-    lista.innerHTML = lcInsumos.map((p, idx) => `
-      <div class="insumo-card">
-        <div class="insumo-info">
-          <div class="insumo-nombre">${p.producto}</div>
-          <div class="insumo-meta">${p.clasificacion_abc || '—'} · ${p.unidad_medida || '—'} · ${p.grupo || ''}</div>
-        </div>
-        <input type="number" class="insumo-qty" id="qty-${p.id_producto}"
-          placeholder="0" min="0" step="any" inputmode="decimal">
-      </div>
-    `).join('')
-  }
+  // Grupos únicos en orden
+  lcGrupos = [...new Set(lcInsumos.map(p => p.grupo || 'Sin grupo'))]
 
-  document.getElementById('filtros-panel').style.display = 'none'
-  document.getElementById('estado-info').style.display   = ''
-  document.getElementById('ei-fecha').textContent   = fecha
-  document.getElementById('ei-clasif').textContent  = clasif
-  document.getElementById('ei-area').textContent    = area || 'sin área'
-  document.getElementById('tabla-wrap').style.display   = ''
-  document.getElementById('btn-guardar').style.display  = ''
+  // Mostrar estado
+  document.getElementById('filtros-panel').style.display  = 'none'
+  document.getElementById('estado-info').style.display    = ''
+  document.getElementById('ei-texto').innerHTML =
+    `<strong>${fecha}</strong> · ${clasif} · ${area || 'sin área'}`
+  document.getElementById('search-bar').style.display     = ''
+  document.getElementById('grupos-nav').style.display     = ''
+  document.getElementById('lista-wrap').style.display     = ''
+  document.getElementById('fab-bar').style.display        = ''
+  document.getElementById('header-badge').className       = 'badge-borrador'
+  document.getElementById('header-badge').textContent     = 'BORRADOR'
+  document.getElementById('header-badge').style.display   = ''
+
+  renderGruposNav()
+  renderLista(lcInsumos)
+  actualizarProgreso()
 }
 
-async function lcGuardar() {
-  const btn  = document.getElementById('btn-guardar')
-  btn.disabled = true; btn.textContent = 'Guardando...'
+// ── Render ────────────────────────────────────────────────────────────────────
+function renderGruposNav() {
+  const nav = document.getElementById('grupos-nav')
+  nav.innerHTML = lcGrupos.map(g =>
+    `<button class="grupo-pill" onclick="scrollAGrupo('${g.replace(/'/g,"\\'")}')">${g}</button>`
+  ).join('')
+}
+
+function renderLista(insumos) {
+  const lista = document.getElementById('insumos-lista')
+  if (!insumos.length) {
+    lista.innerHTML = '<p style="color:#9B7B6A;text-align:center;padding:32px">Sin insumos para mostrar.</p>'
+    return
+  }
+
+  // Agrupar
+  const porGrupo = {}
+  insumos.forEach(p => {
+    const g = p.grupo || 'Sin grupo'
+    if (!porGrupo[g]) porGrupo[g] = []
+    porGrupo[g].push(p)
+  })
+
+  lista.innerHTML = Object.entries(porGrupo).map(([grupo, items]) => `
+    <div id="grupo-${grupo.replace(/\s+/g,'-')}">
+      <div class="grupo-header">${grupo} <span style="font-weight:400;opacity:0.7">(${items.length})</span></div>
+      ${items.map(p => `
+        <div class="insumo-card" id="card-${p.id_producto}">
+          <div class="insumo-info">
+            <div class="insumo-nombre">${p.producto}</div>
+            <div class="insumo-meta">${p.unidad_medida || '—'}</div>
+          </div>
+          <input type="number" class="insumo-qty" id="qty-${p.id_producto}"
+            placeholder="—" min="0" step="any" inputmode="decimal"
+            oninput="onQtyChange('${p.id_producto}', this)">
+        </div>
+      `).join('')}
+    </div>
+  `).join('')
+}
+
+function onQtyChange(idProducto, input) {
+  const card = document.getElementById('card-' + idProducto)
+  if (input.value !== '') {
+    input.classList.add('tiene-valor')
+    card.classList.add('capturado')
+  } else {
+    input.classList.remove('tiene-valor')
+    card.classList.remove('capturado')
+  }
+  actualizarProgreso()
+}
+
+function actualizarProgreso() {
+  const total     = lcInsumos.length
+  const capturados = lcInsumos.filter(p => {
+    const v = document.getElementById('qty-' + p.id_producto)?.value
+    return v !== '' && v !== null && v !== undefined && !isNaN(parseFloat(v))
+  }).length
+  document.getElementById('conteo-progreso').textContent = `${capturados} / ${total}`
+}
+
+function scrollAGrupo(grupo) {
+  const el = document.getElementById('grupo-' + grupo.replace(/\s+/g, '-'))
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  // Marcar pill activa
+  document.querySelectorAll('.grupo-pill').forEach(p => {
+    p.classList.toggle('activo', p.textContent.startsWith(grupo))
+  })
+}
+
+function lcFiltrar() {
+  const texto = document.getElementById('lc-search').value.toLowerCase().trim()
+  if (!texto) { renderLista(lcInsumos); return }
+  renderLista(lcInsumos.filter(p => p.producto.toLowerCase().includes(texto)))
+}
+
+// ── Guardar (borrador o cierre) ───────────────────────────────────────────────
+async function lcGuardar(cerrar = false) {
+  const btnB = document.getElementById('btn-borrador')
+  const btnC = document.getElementById('btn-cerrar')
+  btnB.disabled = true; btnC.disabled = true
+  btnB.textContent = 'Guardando…'; btnC.textContent = 'Guardando…'
 
   const fecha  = document.getElementById('lc-fecha').value
   const clasif = document.getElementById('lc-clasif').value
   const area   = document.getElementById('lc-area').value.trim() || null
 
-  // Crear cabecera inventario
-  const { data: inv, error: errI } = await window._db.from('inventarios').insert({
-    tenant_id:     lcTenantId,
-    fecha,
-    clasificacion: clasif,
-    area,
-    estado:        'completo',
-    creado_por:    lcUsuario?.email || null
-  }).select('id').single()
-
-  if (errI) {
-    alert('Error al guardar inventario: ' + errI.message)
-    btn.disabled = false; btn.textContent = '💾 Guardar inventario'
-    return
-  }
-
-  // Insertar items (solo los que tienen cantidad)
-  const rows = []
-  for (const p of lcInsumos) {
-    const val = document.getElementById(`qty-${p.id_producto}`)?.value
-    if (val === '' || val === null || val === undefined) continue
-    const cant = parseFloat(val)
-    if (isNaN(cant)) continue
-    rows.push({
-      id_inventario:         inv.id,
-      tenant_id:             lcTenantId,
-      id_producto:           p.id_producto,
-      clasificacion_abc_snap: p.clasificacion_abc || null,
-      cantidad_contada:      cant
-    })
-  }
-
-  if (rows.length > 0) {
-    const { error: errRows } = await window._db.from('inventario_items').insert(rows)
-    if (errRows) {
-      alert('Error al guardar items: ' + errRows.message)
-      btn.disabled = false; btn.textContent = '💾 Guardar inventario'
-      return
+  try {
+    // Crear borrador si no existe; si existe solo actualizar updated_at
+    if (!lcInventarioId) {
+      const { data: inv, error: errI } = await window._db.from('inventarios').insert({
+        tenant_id:     lcTenantId,
+        fecha,
+        clasificacion: clasif,
+        area,
+        estado:        'borrador',
+        creado_por:    lcUsuario?.email || null
+      }).select('id').single()
+      if (errI) throw errI
+      lcInventarioId = inv.id
     }
-  }
 
-  document.getElementById('confirm-msg').textContent = `${rows.length} insumos registrados`
-  document.getElementById('vista-app').style.display     = 'none'
-  document.getElementById('vista-confirm').style.display = ''
+    // Recoger cantidades
+    const rows = lcInsumos
+      .map(p => {
+        const val = document.getElementById(`qty-${p.id_producto}`)?.value
+        if (val === '' || val == null) return null
+        const cant = parseFloat(val)
+        if (isNaN(cant)) return null
+        return {
+          id_inventario:          lcInventarioId,
+          tenant_id:              lcTenantId,
+          id_producto:            p.id_producto,
+          clasificacion_abc_snap: p.clasificacion_abc || null,
+          cantidad_contada:       cant
+        }
+      })
+      .filter(Boolean)
+
+    // Borrar items anteriores y reinsertar (upsert limpio)
+    await window._db.from('inventario_items')
+      .delete().eq('id_inventario', lcInventarioId)
+
+    if (rows.length > 0) {
+      const { error: errR } = await window._db.from('inventario_items').insert(rows)
+      if (errR) throw errR
+    }
+
+    if (cerrar) {
+      // Marcar como completo
+      const { error: errU } = await window._db.from('inventarios')
+        .update({ estado: 'completo', updated_at: new Date().toISOString() })
+        .eq('id', lcInventarioId)
+      if (errU) throw errU
+
+      document.getElementById('confirm-icon').textContent   = '✅'
+      document.getElementById('confirm-titulo').textContent = 'Inventario cerrado'
+      document.getElementById('confirm-msg').textContent    = `${rows.length} insumos registrados`
+      document.getElementById('vista-app').style.display    = 'none'
+      document.getElementById('vista-confirm').style.display = ''
+    } else {
+      // Solo borrador — mostrar feedback rápido
+      btnB.textContent = '✓ Borrador guardado'
+      btnC.textContent = '✓ Cerrar inventario'
+      setTimeout(() => {
+        btnB.textContent = '💾 Guardar borrador'
+        btnC.textContent = '✓ Cerrar inventario'
+        btnB.disabled = false; btnC.disabled = false
+      }, 1500)
+    }
+
+  } catch (e) {
+    alert('Error: ' + e.message)
+    btnB.disabled = false; btnC.disabled = false
+    btnB.textContent = '💾 Guardar borrador'
+    btnC.textContent = '✓ Cerrar inventario'
+  }
 }
 
+// ── Nuevo levantamiento ───────────────────────────────────────────────────────
 function lcNuevo() {
-  document.getElementById('vista-confirm').style.display = 'none'
-  document.getElementById('vista-app').style.display     = ''
-  document.getElementById('filtros-panel').style.display = ''
-  document.getElementById('estado-info').style.display   = 'none'
-  document.getElementById('tabla-wrap').style.display    = 'none'
-  document.getElementById('btn-guardar').style.display   = 'none'
+  lcInsumos = []; lcInventarioId = null; lcGrupos = []
+  document.getElementById('vista-confirm').style.display  = 'none'
+  document.getElementById('vista-app').style.display      = ''
+  document.getElementById('filtros-panel').style.display  = ''
+  document.getElementById('estado-info').style.display    = 'none'
+  document.getElementById('search-bar').style.display     = 'none'
+  document.getElementById('grupos-nav').style.display     = 'none'
+  document.getElementById('lista-wrap').style.display     = 'none'
+  document.getElementById('fab-bar').style.display        = 'none'
+  document.getElementById('header-badge').style.display   = 'none'
   document.getElementById('lc-fecha').value = new Date().toISOString().split('T')[0]
-  lcInsumos = []
+  document.getElementById('lc-search').value = ''
 }
 </script>
 </body>
