@@ -53,24 +53,41 @@ async function vistaProductos() {
 
       <div class="filtros-bar">
         <input type="text" id="insumos-search" placeholder="Buscar insumo..." class="filtro-search" />
-        <select id="filtro-grupo" class="filtro-select">
-          <option value="">Todos los grupos</option>
-          ${grupos.map(g => `<option value="${g}">${g}</option>`).join('')}
-        </select>
-
       </div>
-
+      <div id="prod-pills-nav" style="display:flex;gap:8px;overflow-x:auto;padding:10px 0 4px;scrollbar-width:none;flex-wrap:nowrap"></div>
       <div id="insumos-lista-wrap"></div>
     `
 
+    window._prodGrupoActivo = 'todos'
+
     const aplicarFiltros = () => {
       const texto = document.getElementById('insumos-search')?.value.toLowerCase() || ''
-      const grupo = document.getElementById('filtro-grupo')?.value || ''
       return window._productos.filter(p => {
         const matchTexto = !texto || p.producto?.toLowerCase().includes(texto)
-        const matchGrupo = !grupo || p.grupo === grupo
+        const matchGrupo = window._prodGrupoActivo === 'todos' || p.grupo === window._prodGrupoActivo
         return matchTexto && matchGrupo
       })
+    }
+
+    const renderPills = () => {
+      const nav = document.getElementById('prod-pills-nav')
+      if (!nav) return
+      const ps = (activo) => `flex-shrink:0;padding:5px 13px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;border:1.5px solid ${activo?'var(--color-primary)':'var(--color-border)'};background:${activo?'var(--color-primary)':'transparent'};color:${activo?'#fff':'var(--color-text)'};white-space:nowrap`
+      const todosConfig = window._productos.filter(p => p.clasificacion_abc).length
+      nav.innerHTML = `<button style="${ps(window._prodGrupoActivo==='todos')}" onclick="prodFiltrarGrupo('todos')">Todos <span style="opacity:0.7;font-weight:400">${todosConfig}/${window._productos.length}</span></button>`
+        + grupos.map(g => {
+            const items  = window._productos.filter(p => p.grupo === g)
+            const config = items.filter(p => p.clasificacion_abc).length
+            const activo = window._prodGrupoActivo === g
+            return `<button style="${ps(activo)}" onclick="prodFiltrarGrupo('${g.replace(/'/g,"\\'")}')">${g} <span style="opacity:0.7;font-weight:400">${config}/${items.length}</span></button>`
+          }).join('')
+    }
+
+    window.prodFiltrarGrupo = function(grupo) {
+      window._prodGrupoActivo = grupo
+      document.getElementById('insumos-search').value = ''
+      renderPills()
+      renderTabla(aplicarFiltros())
     }
 
     const renderFilaProducto = (p) => `
@@ -148,59 +165,23 @@ async function vistaProductos() {
 
     const renderTabla = (filtrados) => {
       const wrap = document.getElementById('insumos-lista-wrap')
-
       if (!filtrados.length) {
         wrap.innerHTML = `<p style="color:var(--color-text-muted);font-size:13px">No hay insumos para mostrar.</p>`
         return
       }
-
-      const porCategoria = {}
-      filtrados.forEach(p => {
-        const cat = p.grupo || 'General'
-        if (!porCategoria[cat]) porCategoria[cat] = []
-        porCategoria[cat].push(p)
-      })
-      const categorias = Object.keys(porCategoria).sort()
-
-      let html = `
-        <div class="precios-nav">
-          ${categorias.map(c => `
-            <button class="precios-nav-pill"
-              onclick="document.getElementById('prod-sec-${c.replace(/\s+/g,'-')}').scrollIntoView({behavior:'smooth',block:'start'})">
-              ${c} (${porCategoria[c].length})
-            </button>`).join('')}
-        </div>
+      wrap.innerHTML = `
+        <table class="tabla">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Insumo</th>
+              <th>Unidad</th>
+              ${(puedeEditar || puedeInvEditar) ? '<th></th>' : ''}
+            </tr>
+          </thead>
+          <tbody>${filtrados.map(p => renderFilaProducto(p)).join('')}</tbody>
+        </table>
       `
-
-      categorias.forEach((cat, idx) => {
-        const secId  = `prod-sec-${cat.replace(/\s+/g, '-')}`
-        const bodyId = `prod-body-${cat.replace(/\s+/g, '-')}`
-        html += `
-          <div class="precios-seccion" id="${secId}">
-            <div class="precios-seccion-header" onclick="toggleSeccion('${bodyId}')">
-              <span>${cat} <span class="precios-seccion-count">${porCategoria[cat].length} insumos</span></span>
-              <span class="precios-seccion-chevron" id="chev-${bodyId}">${idx === 0 ? '▾' : '▸'}</span>
-            </div>
-            <div class="precios-seccion-body" id="${bodyId}" style="display:${idx === 0 ? 'block' : 'none'}">
-              <table class="tabla">
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>Insumo</th>
-                    <th>Unidad</th>
-                    ${puedeEditar ? '<th></th>' : ''}
-                  </tr>
-                </thead>
-                <tbody>
-                  ${porCategoria[cat].map(p => renderFilaProducto(p)).join('')}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        `
-      })
-
-      wrap.innerHTML = html
     }
 
     // Cargar proveedores para el panel de inventario
@@ -211,9 +192,7 @@ async function vistaProductos() {
     }
 
     const onFiltro = () => renderTabla(aplicarFiltros())
-
     document.getElementById('insumos-search').addEventListener('input', onFiltro)
-    document.getElementById('filtro-grupo').addEventListener('change', onFiltro)
     if (fuentesDef.length) {
       document.getElementById('btn-export-pdf').addEventListener('click', () => {
         const fuente = document.getElementById('export-fuente').value
@@ -221,6 +200,7 @@ async function vistaProductos() {
       })
     }
 
+    renderPills()
     renderTabla(aplicarFiltros())
 
   } catch (err) {
