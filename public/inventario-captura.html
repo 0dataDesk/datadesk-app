@@ -254,6 +254,7 @@ function mostrarApp() {
 
 // ── Cargar insumos ────────────────────────────────────────────────────────────
 let lcGrupoActivo = 'todos'
+let lcValores     = {}   // { id_producto: valor } persiste entre cambios de grupo
 
 async function lcCargarInsumos() {
   const err = document.getElementById('lc-filtros-err')
@@ -294,7 +295,9 @@ async function lcCargarInsumos() {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function esCaptured(idProducto) {
-  const v = document.getElementById('qty-' + idProducto)?.value
+  // Primero el DOM (si el input está visible), luego la caché lcValores
+  const input = document.getElementById('qty-' + idProducto)
+  const v = input ? input.value : lcValores[idProducto]
   return v !== '' && v != null && !isNaN(parseFloat(v))
 }
 
@@ -352,6 +355,7 @@ function renderLista(insumos) {
           </div>
           <input type="number" class="insumo-qty${esCaptured(p.id_producto) ? ' tiene-valor' : ''}" id="qty-${p.id_producto}"
             placeholder="—" min="0" step="any" inputmode="decimal"
+            value="${lcValores[p.id_producto] ?? ''}"
             oninput="onQtyChange('${p.id_producto}', '${(p.grupo||'Sin grupo').replace(/'/g,"\\'")}', this)">
         </div>
       `).join('')}
@@ -360,6 +364,7 @@ function renderLista(insumos) {
 }
 
 function onQtyChange(idProducto, grupo, input) {
+  lcValores[idProducto] = input.value
   const card = document.getElementById('card-' + idProducto)
   if (input.value !== '') {
     input.classList.add('tiene-valor'); card.classList.add('capturado')
@@ -387,7 +392,15 @@ function actualizarProgreso() {
   document.getElementById('conteo-progreso').textContent = `${cap} / ${total}`
 }
 
+function guardarValoresDom() {
+  lcInsumos.forEach(p => {
+    const input = document.getElementById('qty-' + p.id_producto)
+    if (input) lcValores[p.id_producto] = input.value
+  })
+}
+
 function filtrarGrupo(grupo) {
+  guardarValoresDom()
   lcGrupoActivo = grupo
   document.getElementById('lc-search').value = ''
   renderGruposNav()
@@ -395,6 +408,7 @@ function filtrarGrupo(grupo) {
 }
 
 function lcFiltrar() {
+  guardarValoresDom()
   renderLista(insumosVisibles())
 }
 
@@ -422,9 +436,10 @@ async function lcGuardar(cerrar = false) {
     }
 
     // Recoger cantidades
+    guardarValoresDom()
     const rows = lcInsumos
       .map(p => {
-        const val = document.getElementById(`qty-${p.id_producto}`)?.value
+        const val = lcValores[p.id_producto]
         if (val === '' || val == null) return null
         const cant = parseFloat(val)
         if (isNaN(cant)) return null
@@ -480,7 +495,7 @@ async function lcGuardar(cerrar = false) {
 
 // ── Nuevo levantamiento ───────────────────────────────────────────────────────
 function lcNuevo() {
-  lcInsumos = []; lcInventarioId = null; lcGrupos = []; lcGrupoActivo = 'todos'
+  lcInsumos = []; lcInventarioId = null; lcGrupos = []; lcGrupoActivo = 'todos'; lcValores = {}
   document.getElementById('vista-confirm').style.display  = 'none'
   document.getElementById('vista-app').style.display      = ''
   document.getElementById('filtros-panel').style.display  = ''
