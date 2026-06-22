@@ -6,7 +6,7 @@ async function vistaProductos() {
   try {
     const tenant_id = await getTenantId()
     const rol        = window._rol || 'operador'
-    const puedeEditar = ['admin', 'editor', 'cocina'].includes(rol)
+    const puedeEditar = ['superadmin', 'owner', 'gerente', 'admin', 'editor', 'cocina'].includes(rol)
 
     const tenantActual   = (window._tenantConfig?.nombre || '').toLowerCase()
     const fuentesDef     = window.FUENTES_POR_TENANT[tenantActual] || []
