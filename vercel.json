@@ -3,6 +3,7 @@
   "buildCommand": "npm run build",
   "outputDirectory": "public",
   "routes": [
+    { "src": "/inventario-captura", "dest": "/inventario-captura.html" },
     { "src": "/(.*)", "dest": "/$1" }
   ]
 }
