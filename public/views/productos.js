@@ -73,13 +73,11 @@ async function vistaProductos() {
       const nav = document.getElementById('prod-pills-nav')
       if (!nav) return
       const ps = (activo) => `flex-shrink:0;padding:5px 13px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;border:1.5px solid ${activo?'var(--color-primary)':'var(--color-border)'};background:${activo?'var(--color-primary)':'transparent'};color:${activo?'#fff':'var(--color-text)'};white-space:nowrap`
-      const todosConfig = window._productos.filter(p => p.clasificacion_abc).length
-      nav.innerHTML = `<button style="${ps(window._prodGrupoActivo==='todos')}" onclick="prodFiltrarGrupo('todos')">Todos <span style="opacity:0.7;font-weight:400">${todosConfig}/${window._productos.length}</span></button>`
+      nav.innerHTML = `<button style="${ps(window._prodGrupoActivo==='todos')}" onclick="prodFiltrarGrupo('todos')">Todos <span style="opacity:0.7;font-weight:400">(${window._productos.length})</span></button>`
         + grupos.map(g => {
             const items  = window._productos.filter(p => p.grupo === g)
-            const config = items.filter(p => p.clasificacion_abc).length
             const activo = window._prodGrupoActivo === g
-            return `<button style="${ps(activo)}" onclick="prodFiltrarGrupo('${g.replace(/'/g,"\\'")}')">${g} <span style="opacity:0.7;font-weight:400">${config}/${items.length}</span></button>`
+            return `<button style="${ps(activo)}" onclick="prodFiltrarGrupo('${g.replace(/'/g,"\\'")}')">${g} <span style="opacity:0.7;font-weight:400">(${items.length})</span></button>`
           }).join('')
     }
 
