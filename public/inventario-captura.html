@@ -171,19 +171,6 @@
         <label>Fecha</label>
         <input type="date" id="lc-fecha">
       </div>
-      <div class="filtro-item">
-        <label>Clasificación</label>
-        <select id="lc-clasif">
-          <option value="todos">Todos (A+B+C)</option>
-          <option value="A">A — Alta rotación</option>
-          <option value="B">B — Media rotación</option>
-          <option value="C">C — Baja rotación</option>
-        </select>
-      </div>
-      <div class="filtro-item">
-        <label>Área</label>
-        <input type="text" id="lc-area" placeholder="Cámara, Barra…">
-      </div>
     </div>
     <button class="btn-pri" style="margin-top:14px" onclick="lcCargarInsumos()">Cargar insumos →</button>
     <p class="err" id="lc-filtros-err"></p>
@@ -266,37 +253,32 @@ function mostrarApp() {
 }
 
 // ── Cargar insumos ────────────────────────────────────────────────────────────
+let lcGrupoActivo = 'todos'
+
 async function lcCargarInsumos() {
   const err = document.getElementById('lc-filtros-err')
   err.textContent = ''
   if (!lcTenantId) { err.textContent = 'Sin tenant configurado.'; return }
 
-  const fecha  = document.getElementById('lc-fecha').value
-  const clasif = document.getElementById('lc-clasif').value
-  const area   = document.getElementById('lc-area').value.trim()
+  const fecha = document.getElementById('lc-fecha').value
   if (!fecha) { err.textContent = 'Selecciona una fecha'; return }
 
-  let query = window._db.from('productos')
+  const { data: productos, error: errP } = await window._db.from('productos')
     .select('id_producto, producto, unidad_medida, clasificacion_abc, grupo')
     .eq('tenant_id', lcTenantId).eq('activo', true)
+    .order('grupo').order('producto')
 
-  if (clasif !== 'todos') query = query.eq('clasificacion_abc', clasif)
-  query = query.order('grupo').order('producto')
-
-  const { data: productos, error: errP } = await query
   if (errP) { err.textContent = 'Error: ' + errP.message; return }
 
   lcInsumos      = productos || []
-  lcInventarioId = null  // nuevo levantamiento, sin borrador aún
+  lcInventarioId = null
+  lcGrupoActivo  = 'todos'
 
-  // Grupos únicos en orden
   lcGrupos = [...new Set(lcInsumos.map(p => p.grupo || 'Sin grupo'))]
 
-  // Mostrar estado
   document.getElementById('filtros-panel').style.display  = 'none'
   document.getElementById('estado-info').style.display    = ''
-  document.getElementById('ei-texto').innerHTML =
-    `<strong>${fecha}</strong> · ${clasif} · ${area || 'sin área'}`
+  document.getElementById('ei-texto').innerHTML           = `<strong>${fecha}</strong>`
   document.getElementById('search-bar').style.display     = ''
   document.getElementById('grupos-nav').style.display     = ''
   document.getElementById('lista-wrap').style.display     = ''
@@ -306,26 +288,47 @@ async function lcCargarInsumos() {
   document.getElementById('header-badge').style.display   = ''
 
   renderGruposNav()
-  renderLista(lcInsumos)
+  renderLista(insumosVisibles())
   actualizarProgreso()
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function esCaptured(idProducto) {
+  const v = document.getElementById('qty-' + idProducto)?.value
+  return v !== '' && v != null && !isNaN(parseFloat(v))
+}
+
+function insumosVisibles() {
+  const texto = document.getElementById('lc-search')?.value.toLowerCase().trim() || ''
+  return lcInsumos.filter(p => {
+    const enGrupo = lcGrupoActivo === 'todos' || (p.grupo || 'Sin grupo') === lcGrupoActivo
+    const enTexto = !texto || p.producto.toLowerCase().includes(texto)
+    return enGrupo && enTexto
+  })
 }
 
 // ── Render ────────────────────────────────────────────────────────────────────
 function renderGruposNav() {
   const nav = document.getElementById('grupos-nav')
-  nav.innerHTML = lcGrupos.map(g =>
-    `<button class="grupo-pill" onclick="scrollAGrupo('${g.replace(/'/g,"\\'")}')">${g}</button>`
-  ).join('')
+  const pills = lcGrupos.map(g => {
+    const total = lcInsumos.filter(p => (p.grupo || 'Sin grupo') === g).length
+    const cap   = lcInsumos.filter(p => (p.grupo || 'Sin grupo') === g && esCaptured(p.id_producto)).length
+    const activo = lcGrupoActivo === g ? ' activo' : ''
+    return `<button class="grupo-pill${activo}" onclick="filtrarGrupo('${g.replace(/'/g,"\\'")}')">${g} <span style="opacity:0.7;font-weight:400">${cap}/${total}</span></button>`
+  })
+  const todosCap   = lcInsumos.filter(p => esCaptured(p.id_producto)).length
+  const todosTotal = lcInsumos.length
+  const activoTodos = lcGrupoActivo === 'todos' ? ' activo' : ''
+  nav.innerHTML = `<button class="grupo-pill${activoTodos}" onclick="filtrarGrupo('todos')">Todos <span style="opacity:0.7;font-weight:400">${todosCap}/${todosTotal}</span></button>` + pills.join('')
 }
 
 function renderLista(insumos) {
   const lista = document.getElementById('insumos-lista')
   if (!insumos.length) {
-    lista.innerHTML = '<p style="color:#9B7B6A;text-align:center;padding:32px">Sin insumos para mostrar.</p>'
+    lista.innerHTML = '<p style="color:#9B7B6A;text-align:center;padding:32px">Sin insumos.</p>'
     return
   }
 
-  // Agrupar
   const porGrupo = {}
   insumos.forEach(p => {
     const g = p.grupo || 'Sin grupo'
@@ -333,58 +336,66 @@ function renderLista(insumos) {
     porGrupo[g].push(p)
   })
 
-  lista.innerHTML = Object.entries(porGrupo).map(([grupo, items]) => `
+  lista.innerHTML = Object.entries(porGrupo).map(([grupo, items]) => {
+    const cap = items.filter(p => esCaptured(p.id_producto)).length
+    return `
     <div id="grupo-${grupo.replace(/\s+/g,'-')}">
-      <div class="grupo-header">${grupo} <span style="font-weight:400;opacity:0.7">(${items.length})</span></div>
+      <div class="grupo-header" id="gh-${grupo.replace(/\s+/g,'-')}">
+        ${grupo}
+        <span id="gc-${grupo.replace(/\s+/g,'-')}" style="float:right;font-size:13px;font-weight:700;color:#1e3a5f">${cap}/${items.length}</span>
+      </div>
       ${items.map(p => `
-        <div class="insumo-card" id="card-${p.id_producto}">
+        <div class="insumo-card${esCaptured(p.id_producto) ? ' capturado' : ''}" id="card-${p.id_producto}">
           <div class="insumo-info">
             <div class="insumo-nombre">${p.producto}</div>
             <div class="insumo-meta">${p.unidad_medida || '—'}</div>
           </div>
-          <input type="number" class="insumo-qty" id="qty-${p.id_producto}"
+          <input type="number" class="insumo-qty${esCaptured(p.id_producto) ? ' tiene-valor' : ''}" id="qty-${p.id_producto}"
             placeholder="—" min="0" step="any" inputmode="decimal"
-            oninput="onQtyChange('${p.id_producto}', this)">
+            oninput="onQtyChange('${p.id_producto}', '${(p.grupo||'Sin grupo').replace(/'/g,"\\'")}', this)">
         </div>
       `).join('')}
-    </div>
-  `).join('')
+    </div>`
+  }).join('')
 }
 
-function onQtyChange(idProducto, input) {
+function onQtyChange(idProducto, grupo, input) {
   const card = document.getElementById('card-' + idProducto)
   if (input.value !== '') {
-    input.classList.add('tiene-valor')
-    card.classList.add('capturado')
+    input.classList.add('tiene-valor'); card.classList.add('capturado')
   } else {
-    input.classList.remove('tiene-valor')
-    card.classList.remove('capturado')
+    input.classList.remove('tiene-valor'); card.classList.remove('capturado')
   }
-  actualizarProgreso()
+  actualizarContadores(grupo)
+}
+
+function actualizarContadores(grupo) {
+  // Contador del grupo
+  const gKey    = grupo.replace(/\s+/g, '-')
+  const items   = lcInsumos.filter(p => (p.grupo || 'Sin grupo') === grupo)
+  const cap     = items.filter(p => esCaptured(p.id_producto)).length
+  const gcEl    = document.getElementById('gc-' + gKey)
+  if (gcEl) gcEl.textContent = `${cap}/${items.length}`
+
+  // Actualizar nav pills (todos y el grupo)
+  renderGruposNav()
 }
 
 function actualizarProgreso() {
-  const total     = lcInsumos.length
-  const capturados = lcInsumos.filter(p => {
-    const v = document.getElementById('qty-' + p.id_producto)?.value
-    return v !== '' && v !== null && v !== undefined && !isNaN(parseFloat(v))
-  }).length
-  document.getElementById('conteo-progreso').textContent = `${capturados} / ${total}`
+  const total    = lcInsumos.length
+  const cap      = lcInsumos.filter(p => esCaptured(p.id_producto)).length
+  document.getElementById('conteo-progreso').textContent = `${cap} / ${total}`
 }
 
-function scrollAGrupo(grupo) {
-  const el = document.getElementById('grupo-' + grupo.replace(/\s+/g, '-'))
-  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  // Marcar pill activa
-  document.querySelectorAll('.grupo-pill').forEach(p => {
-    p.classList.toggle('activo', p.textContent.startsWith(grupo))
-  })
+function filtrarGrupo(grupo) {
+  lcGrupoActivo = grupo
+  document.getElementById('lc-search').value = ''
+  renderGruposNav()
+  renderLista(insumosVisibles())
 }
 
 function lcFiltrar() {
-  const texto = document.getElementById('lc-search').value.toLowerCase().trim()
-  if (!texto) { renderLista(lcInsumos); return }
-  renderLista(lcInsumos.filter(p => p.producto.toLowerCase().includes(texto)))
+  renderLista(insumosVisibles())
 }
 
 // ── Guardar (borrador o cierre) ───────────────────────────────────────────────
@@ -394,18 +405,15 @@ async function lcGuardar(cerrar = false) {
   btnB.disabled = true; btnC.disabled = true
   btnB.textContent = 'Guardando…'; btnC.textContent = 'Guardando…'
 
-  const fecha  = document.getElementById('lc-fecha').value
-  const clasif = document.getElementById('lc-clasif').value
-  const area   = document.getElementById('lc-area').value.trim() || null
+  const fecha = document.getElementById('lc-fecha').value
 
   try {
-    // Crear borrador si no existe; si existe solo actualizar updated_at
     if (!lcInventarioId) {
       const { data: inv, error: errI } = await window._db.from('inventarios').insert({
         tenant_id:     lcTenantId,
         fecha,
-        clasificacion: clasif,
-        area,
+        clasificacion: 'todos',
+        area:          null,
         estado:        'borrador',
         creado_por:    lcUsuario?.email || null
       }).select('id').single()
@@ -472,7 +480,7 @@ async function lcGuardar(cerrar = false) {
 
 // ── Nuevo levantamiento ───────────────────────────────────────────────────────
 function lcNuevo() {
-  lcInsumos = []; lcInventarioId = null; lcGrupos = []
+  lcInsumos = []; lcInventarioId = null; lcGrupos = []; lcGrupoActivo = 'todos'
   document.getElementById('vista-confirm').style.display  = 'none'
   document.getElementById('vista-app').style.display      = ''
   document.getElementById('filtros-panel').style.display  = ''
