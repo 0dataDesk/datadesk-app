@@ -139,11 +139,6 @@ async function vistaProductos() {
                   value="${p.stock_alerta_porcentaje??30}" min="0" max="100" step="1" style="width:100%">
               </div>
               <div>
-                <label style="font-size:11px;color:var(--color-text-muted);display:block;margin-bottom:4px">Días de cobertura</label>
-                <input type="number" class="edit-input edit-num" id="inv-dias-${p.id_producto}"
-                  value="${p.dias_cobertura??3}" min="1" step="1" style="width:100%">
-              </div>
-              <div>
                 <label style="font-size:11px;color:var(--color-text-muted);display:block;margin-bottom:4px">Proveedor preferencial</label>
                 <select class="edit-select" id="inv-prov-${p.id_producto}" style="width:100%">
                   <option value="">— Ninguno —</option>
@@ -300,7 +295,6 @@ window.guardarInventarioProducto = async function(idProducto) {
   const merma     = parseFloat(document.getElementById(`inv-merma-${idProducto}`)?.value) || 0
   const maxVal    = document.getElementById(`inv-max-${idProducto}`)?.value
   const alerta    = parseFloat(document.getElementById(`inv-alerta-${idProducto}`)?.value) || 30
-  const dias      = parseInt(document.getElementById(`inv-dias-${idProducto}`)?.value) || 3
   const provPref  = document.getElementById(`inv-prov-${idProducto}`)?.value || null
   const msg       = document.getElementById(`inv-msg-${idProducto}`)
 
@@ -309,7 +303,7 @@ window.guardarInventarioProducto = async function(idProducto) {
     merma_porcentaje:        merma,
     stock_maximo:            maxVal ? parseFloat(maxVal) : null,
     stock_alerta_porcentaje: alerta,
-    dias_cobertura:          dias,
+    dias_cobertura:          null,
     id_proveedor_preferencial: provPref || null,
     updated_at: new Date().toISOString()
   }).eq('id_producto', idProducto).eq('tenant_id', tenant_id)
@@ -327,7 +321,7 @@ window.guardarInventarioProducto = async function(idProducto) {
     if (prod) {
       prod.clasificacion_abc = abc; prod.merma_porcentaje = merma
       prod.stock_maximo = maxVal ? parseFloat(maxVal) : null
-      prod.stock_alerta_porcentaje = alerta; prod.dias_cobertura = dias
+      prod.stock_alerta_porcentaje = alerta; prod.dias_cobertura = null
       prod.id_proveedor_preferencial = provPref || null
     }
   }
