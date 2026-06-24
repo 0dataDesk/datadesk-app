@@ -191,8 +191,8 @@ async function _iaCargar() {
     ])
 
     const filas = []
-    ;(productos || []).filter(p => idsConMovimiento.has(p.id_producto)).forEach(p => {
-      const id      = p.id_producto
+    idsConMovimiento.forEach(id => {
+      const p       = prodMap[id] || {}
       const inicial = togCto ? (inicialMap[id] ?? null) : null
       const recep   = togRec ? (recepMap[id] || 0) : 0
       const consumo = togCon ? (consumoMap[id] || 0) : 0
