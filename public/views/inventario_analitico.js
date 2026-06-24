@@ -72,10 +72,9 @@ async function _iaCargar() {
     const prodMap = {}
     ;(productos || []).forEach(p => { prodMap[p.id_producto] = p })
 
-    // Queries paralelas
+    // Queries paralelas (recepciones, incidencias, conteos)
     const [
       recItemsRes,
-      consumoRes,
       incidenciasRes,
       ultimoConteoRes,
       conteoDelPeriodoRes
@@ -88,16 +87,6 @@ async function _iaCargar() {
             .eq('recepciones.tenant_id', tenant_id)
             .gte('recepciones.fecha', desde)
             .lte('recepciones.fecha', hasta)
-        : Promise.resolve({ data: [] }),
-
-      // Consumo teórico en rango
-      togCon
-        ? window._db
-            .from('consumo_teorico')
-            .select('id_producto, cantidad_consumida')
-            .eq('tenant_id', tenant_id)
-            .gte('fecha_venta', desde)
-            .lte('fecha_venta', hasta)
         : Promise.resolve({ data: [] }),
 
       // Incidencias en rango
@@ -135,16 +124,33 @@ async function _iaCargar() {
         : Promise.resolve({ data: [] })
     ])
 
+    // Verificar errores en queries paralelas
+    if (recItemsRes.error)    throw new Error(`recepciones: ${recItemsRes.error.message}`)
+    if (incidenciasRes.error) throw new Error(`incidencias: ${incidenciasRes.error.message}`)
+    if (ultimoConteoRes.error)       throw new Error(`inventarios (último): ${ultimoConteoRes.error.message}`)
+    if (conteoDelPeriodoRes.error)   throw new Error(`inventarios (período): ${conteoDelPeriodoRes.error.message}`)
+
+    // Consumo teórico — query separada para que el error sea visible
+    const consumoMap = {}
+    if (togCon) {
+      const { data: consumoData, error: consumoErr } = await window._db
+        .from('consumo_teorico')
+        .select('id_producto, cantidad_consumida')
+        .eq('tenant_id', tenant_id)
+        .gte('fecha_venta', desde)
+        .lte('fecha_venta', hasta)
+      if (consumoErr) throw new Error(`consumo_teorico: ${consumoErr.message}`)
+      ;(consumoData || []).forEach(c => {
+        if (c.id_producto) {
+          consumoMap[c.id_producto] = (consumoMap[c.id_producto] || 0) + Number(c.cantidad_consumida)
+        }
+      })
+    }
+
     // Acumular recepciones
     const recepMap = {}
     ;(recItemsRes.data || []).forEach(r => {
-      recepMap[r.id_producto] = (recepMap[r.id_producto] || 0) + Number(r.cantidad_recibida)
-    })
-
-    // Acumular consumo
-    const consumoMap = {}
-    ;(consumoRes.data || []).forEach(c => {
-      consumoMap[c.id_producto] = (consumoMap[c.id_producto] || 0) + Number(c.cantidad_consumida)
+      if (r.id_producto) recepMap[r.id_producto] = (recepMap[r.id_producto] || 0) + Number(r.cantidad_recibida)
     })
 
     // Acumular incidencias
