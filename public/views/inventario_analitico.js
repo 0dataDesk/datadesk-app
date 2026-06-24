@@ -181,18 +181,18 @@ async function _iaCargar() {
       ;(itemsFin || []).forEach(r => { finalMap[r.id_producto] = Number(r.cantidad_contada) })
     }
 
-    // Unión de todos los id_producto con movimientos en el período
-    const todosIds = new Set([
-      ...Object.keys(recepMap),
-      ...Object.keys(consumoMap),
-      ...Object.keys(incidMap),
-      ...Object.keys(inicialMap),
-      ...Object.keys(finalMap)
+    // Unión de ids con movimiento según toggles activos
+    const idsConMovimiento = new Set([
+      ...(togCto ? Object.keys(inicialMap) : []),
+      ...(togCto ? Object.keys(finalMap)   : []),
+      ...(togRec ? Object.keys(recepMap)   : []),
+      ...(togCon ? Object.keys(consumoMap) : []),
+      ...(togInc ? Object.keys(incidMap)   : []),
     ])
 
     const filas = []
-    todosIds.forEach(id => {
-      const prod    = prodMap[id] || {}
+    ;(productos || []).filter(p => idsConMovimiento.has(p.id_producto)).forEach(p => {
+      const id      = p.id_producto
       const inicial = togCto ? (inicialMap[id] ?? null) : null
       const recep   = togRec ? (recepMap[id] || 0) : 0
       const consumo = togCon ? (consumoMap[id] || 0) : 0
@@ -210,9 +210,9 @@ async function _iaCargar() {
       }
 
       filas.push({
-        nombre: prod.producto || id,
-        unidad: prod.unidad_medida || '',
-        grupo:  prod.grupo || 'Sin clasificar',
+        nombre: p.producto || id,
+        unidad: p.unidad_medida || '',
+        grupo:  p.grupo || 'Sin clasificar',
         inicial,
         recep,
         consumo,
