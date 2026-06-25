@@ -11,7 +11,6 @@ async function vistaInventariosConteo() {
       .select('id, fecha, clasificacion, area, estado, creado_por, created_at')
       .eq('tenant_id', tenant_id)
       .order('fecha', { ascending: false })
-      .order('created_at', { ascending: false })
 
     if (error) throw error
 
