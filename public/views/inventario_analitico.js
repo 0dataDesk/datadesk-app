@@ -3,8 +3,6 @@ async function vistaInventarioAnalitico() {
   const content = document.getElementById('content')
 
   const hoy = new Date()
-  const hace7 = new Date(hoy)
-  hace7.setDate(hoy.getDate() - 7)
   const fmt = d => d.toISOString().slice(0, 10)
 
   content.innerHTML = `
@@ -15,7 +13,7 @@ async function vistaInventarioAnalitico() {
     <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:20px">
       <label style="display:flex;flex-direction:column;gap:4px;font-size:13px">
         Desde
-        <input type="date" id="ia-desde" value="${fmt(hace7)}"
+        <input type="date" id="ia-desde" value="${fmt(hoy)}"
           style="padding:6px 10px;border:1px solid var(--color-border);border-radius:6px;background:var(--color-surface);color:var(--color-text)">
       </label>
       <label style="display:flex;flex-direction:column;gap:4px;font-size:13px">
@@ -99,14 +97,14 @@ async function _iaCargar() {
             .lte('fecha', hasta)
         : Promise.resolve({ data: [] }),
 
-      // Último conteo: inventario completo más reciente ANTES de fecha_desde
+      // Último conteo: inventario completo más reciente con fecha <= desde (incluyendo mismo día)
       togCto
         ? window._db
             .from('inventarios')
             .select('id, fecha')
             .eq('tenant_id', tenant_id)
             .eq('estado', 'completo')
-            .lt('fecha', desde)
+            .lte('fecha', desde)
             .order('fecha', { ascending: false })
             .limit(1)
         : Promise.resolve({ data: [] }),
@@ -139,7 +137,10 @@ async function _iaCargar() {
         .eq('tenant_id', tenant_id)
         .gte('fecha_venta', desde)
         .lte('fecha_venta', hasta)
-      if (consumoErr) throw new Error(`consumo_teorico: ${consumoErr.message}`)
+      if (consumoErr) {
+        console.warn('consumo_teorico:', consumoErr.message)
+        // RLS u otro error — no romper la vista, tratar como 0
+      }
       ;(consumoData || []).forEach(c => {
         if (c.id_producto) {
           consumoMap[c.id_producto] = (consumoMap[c.id_producto] || 0) + Number(c.cantidad_consumida)
@@ -171,8 +172,13 @@ async function _iaCargar() {
     }
 
     // Items del conteo del período (dentro del rango)
+    // Si el inventario encontrado es el mismo que el base y el rango abarca más de un día,
+    // no hay conteo de cierre real: mismo record no puede ser apertura y cierre de un rango.
     const finalMap = {}
-    const invFinal = conteoDelPeriodoRes.data?.[0]
+    let invFinal = conteoDelPeriodoRes.data?.[0] || null
+    if (invFinal && invInicial && invFinal.id === invInicial.id && desde !== hasta) {
+      invFinal = null
+    }
     if (invFinal) {
       const { data: itemsFin } = await window._db
         .from('inventario_items')
