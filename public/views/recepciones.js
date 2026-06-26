@@ -237,30 +237,35 @@ function _actualizarTotalRecepcion() {
   if (wrap) wrap.textContent = `Total recepción: $${total.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
+function _recGlobalDrop() {
+  let drop = document.getElementById('rec-global-drop')
+  if (!drop) {
+    drop = document.createElement('div')
+    drop.id = 'rec-global-drop'
+    drop.style.cssText = [
+      'display:none', 'position:fixed', 'z-index:9999',
+      'background:var(--color-surface,#fff)', 'border:1px solid var(--color-border)',
+      'border-radius:6px', 'max-height:220px', 'overflow-y:auto',
+      'box-shadow:0 4px 16px rgba(0,0,0,0.18)', 'min-width:200px'
+    ].join(';')
+    document.body.appendChild(drop)
+  }
+  return drop
+}
+
 function agregarFilaRecepcion() {
   const i = window._recItemCount++
   const body = document.getElementById('rec-items-body')
   const tr = document.createElement('tr')
   tr.id = `rec-item-${i}`
   tr.innerHTML = `
-    <td style="position:relative">
+    <td>
       <input type="text" class="edit-select" id="rec-buscar-${i}" placeholder="Buscar insumo..."
-        style="width:100%" autocomplete="off"
-        oninput="_filtrarInsumo(${i})"
-        onfocus="_filtrarInsumo(${i})"
-        onblur="_cerrarDropdown(${i})">
+        style="width:100%" autocomplete="off">
       <input type="hidden" id="rec-prod-${i}">
-      <div id="rec-drop-${i}" style="
-        display:none;position:absolute;z-index:9999;left:0;right:0;
-        background:var(--color-surface,#fff);border:1px solid var(--color-border);
-        border-radius:6px;max-height:180px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,0.15);
-        top:calc(100% + 2px)">
-      </div>
     </td>
-    <td><input type="number" class="edit-input edit-num" id="rec-cant-${i}" min="0" step="any" placeholder="0"
-      oninput="_actualizarTotalRecepcion()"></td>
-    <td><input type="number" class="edit-input edit-num" id="rec-costo-${i}" min="0" step="any" placeholder="$0.00"
-      oninput="_actualizarTotalRecepcion()"></td>
+    <td><input type="number" class="edit-input edit-num" id="rec-cant-${i}" min="0" step="any" placeholder="0"></td>
+    <td><input type="number" class="edit-input edit-num" id="rec-costo-${i}" min="0" step="any" placeholder="$0.00"></td>
     <td id="rec-total-item-${i}" style="text-align:right;font-size:13px;color:var(--color-text-muted)">$0.00</td>
     <td>
       ${i > 0 ? `<button class="btn-fila btn-inactivar-ing" style="font-size:16px"
@@ -268,12 +273,23 @@ function agregarFilaRecepcion() {
     </td>
   `
   body.appendChild(tr)
+
+  const inputEl = document.getElementById(`rec-buscar-${i}`)
+  inputEl.addEventListener('input',  () => _filtrarInsumo(i))
+  inputEl.addEventListener('focus',  () => _filtrarInsumo(i))
+  inputEl.addEventListener('blur',   () => _cerrarDropdown(i))
+  inputEl.addEventListener('keydown', (e) => { if (e.key === 'Escape') _cerrarDropdown(i) })
+
+  document.getElementById(`rec-cant-${i}`).addEventListener('input', _actualizarTotalRecepcion)
+  document.getElementById(`rec-costo-${i}`).addEventListener('input', _actualizarTotalRecepcion)
 }
 
 function _filtrarInsumo(idx) {
-  const query = (document.getElementById(`rec-buscar-${idx}`)?.value || '').toLowerCase().trim()
-  const drop  = document.getElementById(`rec-drop-${idx}`)
-  if (!drop) return
+  const inputEl = document.getElementById(`rec-buscar-${idx}`)
+  const query   = (inputEl?.value || '').toLowerCase().trim()
+  const drop    = _recGlobalDrop()
+
+  window._recDropActivo = idx
 
   if (query.length < 2) { drop.style.display = 'none'; return }
 
@@ -281,25 +297,39 @@ function _filtrarInsumo(idx) {
     p.producto.toLowerCase().includes(query)
   ).slice(0, 20)
 
+  drop.innerHTML = ''
+
   if (!resultados.length) {
-    drop.innerHTML = `<div style="padding:10px 14px;color:var(--color-text-muted);font-size:13px">Sin resultados</div>`
+    const noRes = document.createElement('div')
+    noRes.style.cssText = 'padding:10px 14px;color:var(--color-text-muted);font-size:13px'
+    noRes.textContent = 'Sin resultados'
+    drop.appendChild(noRes)
   } else {
-    drop.innerHTML = resultados.map(p => `
-      <div data-id="${p.id_producto}" data-nombre="${p.producto.replace(/"/g,'&quot;')}"
-        style="padding:8px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--color-border,#eee)"
-        onmousedown="event.preventDefault();_seleccionarInsumo(${idx}, '${p.id_producto}', ${JSON.stringify(p.producto).replace(/\//g,'\\/')})">
-        <span style="font-weight:600">${p.producto}</span>
-        <span style="color:var(--color-text-muted);font-size:11px;margin-left:8px">${p.unidad_medida || ''}${p.grupo ? ' · ' + p.grupo : ''}</span>
-      </div>
-    `).join('')
+    resultados.forEach(p => {
+      const item = document.createElement('div')
+      item.style.cssText = 'padding:8px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--color-border,#eee)'
+      item.innerHTML = `<span style="font-weight:600">${p.producto}</span><span style="color:var(--color-text-muted);font-size:11px;margin-left:8px">${p.unidad_medida || ''}${p.grupo ? ' · ' + p.grupo : ''}</span>`
+      item.addEventListener('mouseenter', () => { item.style.background = 'rgba(0,0,0,0.04)' })
+      item.addEventListener('mouseleave', () => { item.style.background = '' })
+      item.addEventListener('mousedown', (e) => {
+        e.preventDefault()
+        _seleccionarInsumo(idx, p.id_producto, p.producto)
+      })
+      drop.appendChild(item)
+    })
   }
+
+  const rect = inputEl.getBoundingClientRect()
+  drop.style.left  = rect.left + 'px'
+  drop.style.top   = (rect.bottom + 2) + 'px'
+  drop.style.width = rect.width + 'px'
   drop.style.display = 'block'
 }
 
 function _seleccionarInsumo(idx, id_producto, nombre) {
   const input  = document.getElementById(`rec-buscar-${idx}`)
   const hidden = document.getElementById(`rec-prod-${idx}`)
-  const drop   = document.getElementById(`rec-drop-${idx}`)
+  const drop   = document.getElementById('rec-global-drop')
   if (input)  input.value  = nombre
   if (hidden) hidden.value = id_producto
   if (drop)   drop.style.display = 'none'
@@ -307,9 +337,9 @@ function _seleccionarInsumo(idx, id_producto, nombre) {
 
 function _cerrarDropdown(idx) {
   setTimeout(() => {
-    const drop = document.getElementById(`rec-drop-${idx}`)
-    if (drop) drop.style.display = 'none'
-  }, 150)
+    const drop = document.getElementById('rec-global-drop')
+    if (drop && window._recDropActivo === idx) drop.style.display = 'none'
+  }, 200)
 }
 
 async function guardarRecepcion() {
