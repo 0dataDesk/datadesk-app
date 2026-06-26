@@ -138,12 +138,15 @@ async function mostrarFormRecepcion() {
   const tenant_id = await getTenantId()
   const hoy = new Date().toISOString().split('T')[0]
 
+  const _fuentesAutorizadas = { furia: ['menu_charly'], tita: ['carga_eugenio', 'barra_nacho'] }
+  const _fuentes = _fuentesAutorizadas[tenant_id] || []
+
   const [
     { data: proveedores, error: errProv },
     { data: productos, error: errProd }
   ] = await Promise.all([
     window._db.from('proveedores').select('id_proveedor, nombre').eq('tenant_id', tenant_id).eq('activo', true).order('nombre'),
-    window._db.from('productos').select('id_producto, producto, unidad_medida, grupo').eq('tenant_id', tenant_id).eq('activo', true).eq('tipo', 'Insumo').order('producto')
+    window._db.from('productos').select('id_producto, producto, unidad_medida, grupo').eq('tenant_id', tenant_id).eq('activo', true).eq('tipo', 'Insumo').in('fuente', _fuentes).order('producto')
   ])
 
   if (errProd) { alert(`Error al cargar insumos: ${errProd.message}`); return }
