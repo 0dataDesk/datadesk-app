@@ -54,7 +54,11 @@ async function vistaProductos() {
       <div class="filtros-bar">
         <input type="text" id="insumos-search" placeholder="Buscar insumo..." class="filtro-search" />
       </div>
-      <div id="prod-pills-nav" style="display:flex;gap:8px;overflow-x:auto;padding:10px 0 4px;scrollbar-width:none;flex-wrap:nowrap"></div>
+      <div id="prod-pills-wrap" style="position:relative;display:flex;align-items:center;gap:0;margin:0 0 4px">
+        <button id="prod-pills-prev" onclick="prodPillsScroll(-1)" style="display:none;flex-shrink:0;background:var(--color-surface,#fff);border:1.5px solid var(--color-border);border-radius:50%;width:28px;height:28px;font-size:14px;cursor:pointer;line-height:1;color:var(--color-text);z-index:2;margin-right:4px">‹</button>
+        <div id="prod-pills-nav" style="display:flex;gap:8px;overflow-x:auto;padding:10px 0 4px;scrollbar-width:none;-ms-overflow-style:none;flex-wrap:nowrap;flex:1;scroll-behavior:smooth"></div>
+        <button id="prod-pills-next" onclick="prodPillsScroll(1)" style="display:none;flex-shrink:0;background:var(--color-surface,#fff);border:1.5px solid var(--color-border);border-radius:50%;width:28px;height:28px;font-size:14px;cursor:pointer;line-height:1;color:var(--color-text);z-index:2;margin-left:4px">›</button>
+      </div>
       <div id="insumos-lista-wrap"></div>
     `
 
@@ -193,8 +197,37 @@ async function vistaProductos() {
       })
     }
 
+    const _actualizarFlechas = () => {
+      const nav  = document.getElementById('prod-pills-nav')
+      const prev = document.getElementById('prod-pills-prev')
+      const next = document.getElementById('prod-pills-next')
+      if (!nav || !prev || !next) return
+      const isMobile = window.matchMedia('(hover:none) and (pointer:coarse)').matches
+      if (isMobile) { prev.style.display = 'none'; next.style.display = 'none'; return }
+      prev.style.display = nav.scrollLeft > 4 ? 'flex' : 'none'
+      next.style.display = nav.scrollLeft + nav.clientWidth < nav.scrollWidth - 4 ? 'flex' : 'none'
+    }
+
+    window.prodPillsScroll = function(dir) {
+      const nav = document.getElementById('prod-pills-nav')
+      if (!nav) return
+      nav.scrollBy({ left: dir * 220, behavior: 'smooth' })
+    }
+
+    const _pillsNav = document.getElementById('prod-pills-nav')
+    if (_pillsNav) {
+      _pillsNav.addEventListener('scroll', _actualizarFlechas)
+      _pillsNav.addEventListener('wheel', (e) => {
+        if (e.deltaY !== 0) { e.preventDefault(); _pillsNav.scrollBy({ left: e.deltaY * 2, behavior: 'smooth' }) }
+      }, { passive: false })
+    }
+
+    const _renderPillsOrig = renderPills
+    renderPills = () => { _renderPillsOrig(); requestAnimationFrame(_actualizarFlechas) }
+
     renderPills()
     renderTabla(aplicarFiltros())
+    requestAnimationFrame(_actualizarFlechas)
 
   } catch (err) {
     content.innerHTML = `<p style="color:var(--color-highlight)">Error: ${err.message}</p>`
