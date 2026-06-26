@@ -192,9 +192,11 @@ async function mostrarFormRecepcion() {
           <thead>
             <tr>
               <th>Insumo</th>
-              <th style="width:110px">Cantidad</th>
-              <th style="width:130px">Costo unitario</th>
-              <th style="width:110px">Total</th>
+              <th style="width:80px">Piezas</th>
+              <th style="width:130px">Contenido/pieza</th>
+              <th style="width:100px">Cantidad total</th>
+              <th style="width:110px">Costo/pieza</th>
+              <th style="width:100px">Total</th>
               <th style="width:40px"></th>
             </tr>
           </thead>
@@ -225,11 +227,18 @@ function _actualizarTotalRecepcion() {
   const filas = document.querySelectorAll('[id^="rec-item-"]')
   let total = 0
   filas.forEach(fila => {
-    const idx   = fila.id.replace('rec-item-', '')
-    const cant  = parseFloat(document.getElementById(`rec-cant-${idx}`)?.value) || 0
-    const costo = parseFloat(document.getElementById(`rec-costo-${idx}`)?.value) || 0
-    const item_total = cant * costo
+    const idx      = fila.id.replace('rec-item-', '')
+    const piezas   = parseFloat(document.getElementById(`rec-piezas-${idx}`)?.value) || 0
+    const contenido = parseFloat(document.getElementById(`rec-contenido-${idx}`)?.value)
+    const cantidad  = (piezas > 0 && !isNaN(contenido) && contenido > 0) ? piezas * contenido : piezas
+    const costo     = parseFloat(document.getElementById(`rec-costo-${idx}`)?.value) || 0
+    const item_total = piezas * costo
+
     total += item_total
+
+    const cantEl = document.getElementById(`rec-cant-${idx}`)
+    if (cantEl) cantEl.value = cantidad > 0 ? cantidad : ''
+
     const td = document.getElementById(`rec-total-item-${idx}`)
     if (td) td.textContent = `$${item_total.toFixed(2)}`
   })
@@ -264,8 +273,22 @@ function agregarFilaRecepcion() {
         style="width:100%" autocomplete="off">
       <input type="hidden" id="rec-prod-${i}">
     </td>
-    <td><input type="number" class="edit-input edit-num" id="rec-cant-${i}" min="0" step="any" placeholder="0"></td>
-    <td><input type="number" class="edit-input edit-num" id="rec-costo-${i}" min="0" step="any" placeholder="$0.00"></td>
+    <td>
+      <input type="number" class="edit-input edit-num" id="rec-piezas-${i}" min="0" step="any"
+        value="1" style="width:64px">
+    </td>
+    <td style="white-space:nowrap">
+      <input type="number" class="edit-input edit-num" id="rec-contenido-${i}" min="0" step="any"
+        placeholder="—" style="width:70px">
+      <span id="rec-unidad-${i}" style="font-size:11px;color:var(--color-text-muted);margin-left:4px"></span>
+    </td>
+    <td>
+      <input type="text" class="edit-input" id="rec-cant-${i}" readonly
+        style="width:80px;text-align:right;background:rgba(0,0,0,0.03);color:var(--color-text-muted)" placeholder="—">
+    </td>
+    <td>
+      <input type="number" class="edit-input edit-num" id="rec-costo-${i}" min="0" step="any" placeholder="$0.00">
+    </td>
     <td id="rec-total-item-${i}" style="text-align:right;font-size:13px;color:var(--color-text-muted)">$0.00</td>
     <td>
       ${i > 0 ? `<button class="btn-fila btn-inactivar-ing" style="font-size:16px"
@@ -280,7 +303,8 @@ function agregarFilaRecepcion() {
   inputEl.addEventListener('blur',   () => _cerrarDropdown(i))
   inputEl.addEventListener('keydown', (e) => { if (e.key === 'Escape') _cerrarDropdown(i) })
 
-  document.getElementById(`rec-cant-${i}`).addEventListener('input', _actualizarTotalRecepcion)
+  document.getElementById(`rec-piezas-${i}`).addEventListener('input', _actualizarTotalRecepcion)
+  document.getElementById(`rec-contenido-${i}`).addEventListener('input', _actualizarTotalRecepcion)
   document.getElementById(`rec-costo-${i}`).addEventListener('input', _actualizarTotalRecepcion)
 }
 
@@ -313,7 +337,7 @@ function _filtrarInsumo(idx) {
       item.addEventListener('mouseleave', () => { item.style.background = '' })
       item.addEventListener('mousedown', (e) => {
         e.preventDefault()
-        _seleccionarInsumo(idx, p.id_producto, p.producto)
+        _seleccionarInsumo(idx, p.id_producto, p.producto, p.unidad_medida)
       })
       drop.appendChild(item)
     })
@@ -326,13 +350,15 @@ function _filtrarInsumo(idx) {
   drop.style.display = 'block'
 }
 
-function _seleccionarInsumo(idx, id_producto, nombre) {
-  const input  = document.getElementById(`rec-buscar-${idx}`)
-  const hidden = document.getElementById(`rec-prod-${idx}`)
-  const drop   = document.getElementById('rec-global-drop')
-  if (input)  input.value  = nombre
-  if (hidden) hidden.value = id_producto
-  if (drop)   drop.style.display = 'none'
+function _seleccionarInsumo(idx, id_producto, nombre, unidad) {
+  const input    = document.getElementById(`rec-buscar-${idx}`)
+  const hidden   = document.getElementById(`rec-prod-${idx}`)
+  const drop     = document.getElementById('rec-global-drop')
+  const unidadEl = document.getElementById(`rec-unidad-${idx}`)
+  if (input)    input.value  = nombre
+  if (hidden)   hidden.value = id_producto
+  if (drop)     drop.style.display = 'none'
+  if (unidadEl) unidadEl.textContent = unidad || ''
 }
 
 function _cerrarDropdown(idx) {
@@ -358,12 +384,14 @@ async function guardarRecepcion() {
   const items = []
 
   for (const fila of filas) {
-    const idx         = fila.id.replace('rec-item-', '')
+    const idx        = fila.id.replace('rec-item-', '')
     const id_producto = document.getElementById(`rec-prod-${idx}`)?.value
-    const cantidad    = parseFloat(document.getElementById(`rec-cant-${idx}`)?.value)
-    const costo       = parseFloat(document.getElementById(`rec-costo-${idx}`)?.value)
-    if (!id_producto || isNaN(cantidad) || cantidad <= 0) continue
-    items.push({ id_producto, cantidad_recibida: cantidad, costo_unitario: isNaN(costo) ? 0 : costo })
+    const piezas     = parseFloat(document.getElementById(`rec-piezas-${idx}`)?.value)
+    const contenido  = parseFloat(document.getElementById(`rec-contenido-${idx}`)?.value)
+    const costo      = parseFloat(document.getElementById(`rec-costo-${idx}`)?.value)
+    if (!id_producto || isNaN(piezas) || piezas <= 0) continue
+    const cantidad_recibida = (!isNaN(contenido) && contenido > 0) ? piezas * contenido : piezas
+    items.push({ id_producto, cantidad_recibida, costo_unitario: isNaN(costo) ? 0 : costo })
   }
 
   if (!items.length) { alert('Agrega al menos un insumo'); return }
