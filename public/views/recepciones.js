@@ -445,15 +445,15 @@ async function guardarRecepcion() {
       .from('recepciones')
       .upload(storagePath, archivoFile, { upsert: true })
     if (uploadErr) {
-      alert(`Error al subir archivo: ${uploadErr.message}`)
-      return
-    }
-    const { data: urlData } = window._db.storage.from('recepciones').getPublicUrl(storagePath)
-    archivo_url = urlData?.publicUrl || null
-    // Si el bucket no es público, usar signed URL en el detalle
-    if (!archivo_url) {
-      const { data: signed } = await window._db.storage.from('recepciones').createSignedUrl(storagePath, 60 * 60 * 24)
-      archivo_url = signed?.signedUrl || null
+      console.warn('Upload archivo fallido:', uploadErr.message)
+      // Continúa guardando la recepción sin archivo
+    } else {
+      const { data: urlData } = window._db.storage.from('recepciones').getPublicUrl(storagePath)
+      archivo_url = urlData?.publicUrl || null
+      if (!archivo_url) {
+        const { data: signed } = await window._db.storage.from('recepciones').createSignedUrl(storagePath, 60 * 60 * 24)
+        archivo_url = signed?.signedUrl || null
+      }
     }
   }
 
