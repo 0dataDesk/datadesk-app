@@ -95,6 +95,7 @@ function renderListaRecepciones(lista) {
           <tr>
             <th>Fecha</th>
             <th>Proveedor</th>
+            <th>Folio</th>
             <th>Remisión</th>
             <th>Factura</th>
             <th>Área</th>
@@ -107,6 +108,7 @@ function renderListaRecepciones(lista) {
             <tr style="cursor:pointer" onclick="verDetalleRecepcion('${r.id}')">
               <td>${r.fecha || '—'}</td>
               <td>${r.id_proveedor ? (window._nombreProv[r.id_proveedor] || r.id_proveedor) : 'Inventario Inicial'}</td>
+              <td>${r.folio || '—'}</td>
               <td>${r.num_remision || '—'}</td>
               <td>${r.num_factura || '—'}</td>
               <td style="font-size:12px;color:var(--color-text-muted)">${r.area_almacenamiento || '—'}</td>
@@ -141,8 +143,11 @@ async function mostrarFormRecepcion() {
     { data: productos }
   ] = await Promise.all([
     window._db.from('proveedores').select('id_proveedor, nombre').eq('tenant_id', tenant_id).eq('activo', true).order('nombre'),
-    window._db.from('productos').select('id_producto, producto, unidad_medida, unidad_compra').eq('tenant_id', tenant_id).eq('activo', true).order('producto')
+    window._db.from('productos').select('id_producto, producto, unidad_medida, unidad_compra, grupo').eq('tenant_id', tenant_id).eq('activo', true).order('producto')
   ])
+
+  window._productos_rec = productos || []
+  window._tenant_id_rec = tenant_id
 
   const wrap = document.getElementById('form-recepcion-wrap')
   wrap.innerHTML = `
@@ -162,12 +167,13 @@ async function mostrarFormRecepcion() {
           </select>
         </div>
         <div class="filtro-cascada-item">
-          <label class="filtro-label">Núm. Remisión</label>
-          <input type="text" id="rec-remision" class="filtro-select" placeholder="Ej. REM-001">
+          <label class="filtro-label">Folio</label>
+          <input type="text" id="rec-folio" class="filtro-select" placeholder="Núm. factura o remisión">
         </div>
         <div class="filtro-cascada-item">
-          <label class="filtro-label">Área de almacenamiento</label>
-          <input type="text" id="rec-area" class="filtro-select" placeholder="Ej. Cámara, Despensa">
+          <label class="filtro-label">Subir archivo</label>
+          <input type="file" id="rec-archivo" class="filtro-select" accept="image/*,.pdf"
+            style="padding:4px;font-size:12px">
         </div>
       </div>
 
@@ -180,27 +186,21 @@ async function mostrarFormRecepcion() {
           <thead>
             <tr>
               <th>Insumo</th>
-              <th style="width:120px">Cantidad</th>
-              <th style="width:120px">Costo unitario</th>
+              <th style="width:110px">Cantidad</th>
+              <th style="width:130px">Costo unitario</th>
+              <th style="width:110px">Total</th>
               <th style="width:40px"></th>
             </tr>
           </thead>
           <tbody id="rec-items-body">
-            <tr id="rec-item-0">
-              <td>
-                <select class="edit-select" id="rec-prod-0" style="width:100%">
-                  <option value="">— Seleccionar insumo —</option>
-                  ${(productos || []).map(p => `<option value="${p.id_producto}" data-unidad="${p.unidad_compra || p.unidad_medida || ''}">${p.producto}</option>`).join('')}
-                </select>
-              </td>
-              <td><input type="number" class="edit-input edit-num" id="rec-cant-0" min="0" step="any" placeholder="0"></td>
-              <td><input type="number" class="edit-input edit-num" id="rec-costo-0" min="0" step="any" placeholder="$0.00"></td>
-              <td></td>
-            </tr>
           </tbody>
         </table>
         <button class="btn-accion" style="margin-top:8px;font-size:12px;border:1px solid var(--color-border)"
-          onclick="agregarFilaRecepcion(${JSON.stringify(productos || []).replace(/"/g, '&quot;')})">+ Agregar insumo</button>
+          onclick="agregarFilaRecepcion()">+ Agregar insumo</button>
+      </div>
+
+      <div id="rec-total-wrap" style="text-align:right;margin-top:12px;font-size:14px;font-weight:600;color:var(--color-primary)">
+        Total recepción: $0.00
       </div>
 
       <div style="display:flex;gap:10px;margin-top:20px">
@@ -211,41 +211,107 @@ async function mostrarFormRecepcion() {
     </div>
   `
 
-  window._recItemCount = 1
-  window._productos_rec = productos || []
+  window._recItemCount = 0
+  agregarFilaRecepcion()
 }
 
-function agregarFilaRecepcion(productos) {
-  const i = window._recItemCount++
-  const opts = (productos || window._productos_rec || [])
-    .map(p => `<option value="${p.id_producto}" data-unidad="${p.unidad_compra || p.unidad_medida || ''}">${p.producto}</option>`)
-    .join('')
+function _actualizarTotalRecepcion() {
+  const filas = document.querySelectorAll('[id^="rec-item-"]')
+  let total = 0
+  filas.forEach(fila => {
+    const idx   = fila.id.replace('rec-item-', '')
+    const cant  = parseFloat(document.getElementById(`rec-cant-${idx}`)?.value) || 0
+    const costo = parseFloat(document.getElementById(`rec-costo-${idx}`)?.value) || 0
+    const item_total = cant * costo
+    total += item_total
+    const td = document.getElementById(`rec-total-item-${idx}`)
+    if (td) td.textContent = `$${item_total.toFixed(2)}`
+  })
+  const wrap = document.getElementById('rec-total-wrap')
+  if (wrap) wrap.textContent = `Total recepción: $${total.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
 
+function agregarFilaRecepcion() {
+  const i = window._recItemCount++
   const body = document.getElementById('rec-items-body')
   const tr = document.createElement('tr')
   tr.id = `rec-item-${i}`
   tr.innerHTML = `
-    <td>
-      <select class="edit-select" id="rec-prod-${i}" style="width:100%">
-        <option value="">— Seleccionar insumo —</option>
-        ${opts}
-      </select>
+    <td style="position:relative">
+      <input type="text" class="edit-select" id="rec-buscar-${i}" placeholder="Buscar insumo..."
+        style="width:100%" autocomplete="off"
+        oninput="_filtrarInsumo(${i})"
+        onfocus="_filtrarInsumo(${i})"
+        onblur="_cerrarDropdown(${i})">
+      <input type="hidden" id="rec-prod-${i}">
+      <div id="rec-drop-${i}" style="
+        display:none;position:absolute;z-index:200;left:0;right:0;
+        background:var(--color-surface,#fff);border:1px solid var(--color-border);
+        border-radius:6px;max-height:180px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,0.15);
+        top:calc(100% + 2px)">
+      </div>
     </td>
-    <td><input type="number" class="edit-input edit-num" id="rec-cant-${i}" min="0" step="any" placeholder="0"></td>
-    <td><input type="number" class="edit-input edit-num" id="rec-costo-${i}" min="0" step="any" placeholder="$0.00"></td>
+    <td><input type="number" class="edit-input edit-num" id="rec-cant-${i}" min="0" step="any" placeholder="0"
+      oninput="_actualizarTotalRecepcion()"></td>
+    <td><input type="number" class="edit-input edit-num" id="rec-costo-${i}" min="0" step="any" placeholder="$0.00"
+      oninput="_actualizarTotalRecepcion()"></td>
+    <td id="rec-total-item-${i}" style="text-align:right;font-size:13px;color:var(--color-text-muted)">$0.00</td>
     <td>
-      <button class="btn-fila btn-inactivar-ing" onclick="this.closest('tr').remove()" style="font-size:16px">×</button>
+      ${i > 0 ? `<button class="btn-fila btn-inactivar-ing" style="font-size:16px"
+        onclick="this.closest('tr').remove();_actualizarTotalRecepcion()">×</button>` : ''}
     </td>
   `
   body.appendChild(tr)
+}
+
+function _filtrarInsumo(idx) {
+  const query = (document.getElementById(`rec-buscar-${idx}`)?.value || '').toLowerCase().trim()
+  const drop  = document.getElementById(`rec-drop-${idx}`)
+  if (!drop) return
+
+  if (query.length < 2) { drop.style.display = 'none'; return }
+
+  const resultados = (window._productos_rec || []).filter(p =>
+    p.producto.toLowerCase().includes(query)
+  ).slice(0, 20)
+
+  if (!resultados.length) {
+    drop.innerHTML = `<div style="padding:10px 14px;color:var(--color-text-muted);font-size:13px">Sin resultados</div>`
+  } else {
+    drop.innerHTML = resultados.map(p => `
+      <div data-id="${p.id_producto}" data-nombre="${p.producto.replace(/"/g,'&quot;')}"
+        style="padding:8px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--color-border,#eee)"
+        onmousedown="_seleccionarInsumo(${idx}, '${p.id_producto}', ${JSON.stringify(p.producto).replace(/\//g,'\\/')})">
+        <span style="font-weight:600">${p.producto}</span>
+        <span style="color:var(--color-text-muted);font-size:11px;margin-left:8px">${p.unidad_medida || ''}${p.grupo ? ' · ' + p.grupo : ''}</span>
+      </div>
+    `).join('')
+  }
+  drop.style.display = 'block'
+}
+
+function _seleccionarInsumo(idx, id_producto, nombre) {
+  const input  = document.getElementById(`rec-buscar-${idx}`)
+  const hidden = document.getElementById(`rec-prod-${idx}`)
+  const drop   = document.getElementById(`rec-drop-${idx}`)
+  if (input)  input.value  = nombre
+  if (hidden) hidden.value = id_producto
+  if (drop)   drop.style.display = 'none'
+}
+
+function _cerrarDropdown(idx) {
+  setTimeout(() => {
+    const drop = document.getElementById(`rec-drop-${idx}`)
+    if (drop) drop.style.display = 'none'
+  }, 150)
 }
 
 async function guardarRecepcion() {
   const tenant_id    = await getTenantId()
   const fecha        = document.getElementById('rec-fecha')?.value
   const id_proveedor = document.getElementById('rec-proveedor')?.value
-  const num_remision = document.getElementById('rec-remision')?.value?.trim() || null
-  const area         = document.getElementById('rec-area')?.value?.trim() || null
+  const folio        = document.getElementById('rec-folio')?.value?.trim() || null
+  const archivoInput = document.getElementById('rec-archivo')
 
   if (!fecha || !id_proveedor) {
     alert('Fecha y proveedor son obligatorios')
@@ -273,9 +339,40 @@ async function guardarRecepcion() {
   } catch (e) { console.error('getUser:', e) }
   const updated_at = new Date().toISOString()
 
+  // Subir archivo si se seleccionó
+  let archivo_url = null
+  const archivoFile = archivoInput?.files?.[0]
+  if (archivoFile) {
+    const ext = archivoFile.name.split('.').pop()
+    const folioPath = folio ? folio.replace(/[^a-zA-Z0-9_\-]/g, '_') : 'sin_folio'
+    const storagePath = `${tenant_id}/${fecha}/${folioPath}.${ext}`
+    const { data: uploadData, error: uploadErr } = await window._db.storage
+      .from('recepciones')
+      .upload(storagePath, archivoFile, { upsert: true })
+    if (uploadErr) {
+      alert(`Error al subir archivo: ${uploadErr.message}`)
+      return
+    }
+    const { data: urlData } = window._db.storage.from('recepciones').getPublicUrl(storagePath)
+    archivo_url = urlData?.publicUrl || null
+    // Si el bucket no es público, usar signed URL en el detalle
+    if (!archivo_url) {
+      const { data: signed } = await window._db.storage.from('recepciones').createSignedUrl(storagePath, 60 * 60 * 24)
+      archivo_url = signed?.signedUrl || null
+    }
+  }
+
   const { data: recepcion, error: errR } = await window._db
     .from('recepciones')
-    .insert({ tenant_id, fecha, id_proveedor, num_remision, area_almacenamiento: area, estatus: 'SIN_FACTURA', created_by: window._email || null, updated_by, updated_at })
+    .insert({
+      tenant_id, fecha, id_proveedor, folio,
+      num_remision: folio, // compatibilidad con campo existente
+      estatus: 'SIN_FACTURA',
+      archivo_url,
+      created_by: window._email || null,
+      updated_by,
+      updated_at
+    })
     .select().single()
 
   if (errR) { alert(`Error: ${errR.message}`); return }
@@ -343,17 +440,38 @@ async function verDetalleRecepcion(id) {
     ? (window._nombreProv[rec.id_proveedor] || rec.id_proveedor)
     : 'Inventario Inicial'
 
+  // Resolver URL del archivo si existe
+  let archivoHtml = ''
+  if (rec.archivo_url) {
+    const esImagen = /\.(png|jpe?g|gif|webp|bmp|svg)(\?|$)/i.test(rec.archivo_url)
+    archivoHtml = `
+      <div style="margin-top:16px;padding:12px;border:1px solid var(--color-border);border-radius:8px">
+        <span style="font-size:12px;font-weight:600;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:1px">
+          Documento adjunto
+        </span>
+        <div style="margin-top:8px;display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap">
+          ${esImagen ? `<img src="${rec.archivo_url}" alt="Documento" style="max-height:200px;border-radius:6px;border:1px solid var(--color-border)">` : ''}
+          <a href="${rec.archivo_url}" target="_blank" rel="noopener"
+            class="btn-accion btn-aprobar" style="font-size:12px;padding:6px 14px;text-decoration:none">
+            Ver documento
+          </a>
+        </div>
+      </div>`
+  }
+
   wrap.innerHTML = `
     <div class="receta-detalle-card" style="margin-bottom:24px">
       <div class="detalle-header">
         <div>
-          <h3>Recepción — ${rec.num_remision || rec.id.slice(0,8)}</h3>
+          <h3>Recepción — ${rec.folio || rec.num_remision || rec.id.slice(0,8)}</h3>
           <p class="detalle-categoria">${provNombre} · ${rec.fecha}</p>
         </div>
         <span class="badge-status" style="${window._badgeEstatus[rec.estatus] || ''}">
           ${window._iconoEstatus[rec.estatus] || ''} ${rec.estatus?.replace('_',' ')}
         </span>
       </div>
+
+      ${archivoHtml}
 
       <table class="tabla" style="margin-top:16px">
         <thead>
