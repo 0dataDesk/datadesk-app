@@ -442,6 +442,7 @@ async function guardarRecepcion() {
       .from('recepciones')
       .upload(storagePath, archivoFile, { upsert: true })
     if (uploadErr) {
+      alert(`Error al subir archivo: ${uploadErr.message}`)
       console.warn('Upload archivo fallido:', uploadErr.message)
     } else {
       // Guardar el path relativo — la signed URL se genera al abrir el detalle
