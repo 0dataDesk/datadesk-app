@@ -251,7 +251,7 @@ function agregarFilaRecepcion() {
         onblur="_cerrarDropdown(${i})">
       <input type="hidden" id="rec-prod-${i}">
       <div id="rec-drop-${i}" style="
-        display:none;position:absolute;z-index:200;left:0;right:0;
+        display:none;position:absolute;z-index:9999;left:0;right:0;
         background:var(--color-surface,#fff);border:1px solid var(--color-border);
         border-radius:6px;max-height:180px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,0.15);
         top:calc(100% + 2px)">
