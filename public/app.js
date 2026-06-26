@@ -72,9 +72,25 @@ async function mostrarSelectorTenant(tenants, rol, email) {
   `
 }
 
+function _limpiarCacheGlobal() {
+  window._productos            = null
+  window._productos_rec        = null
+  window._recetas              = null
+  window._recepciones          = null
+  window._proveedoresCache     = null
+  window._invConteo            = null
+  window._invProdMap           = null
+  window._nombreProv           = null
+  window._sugeridoPorProveedor = null
+  window._sugeridoItemsRef     = null
+  window._cierresData          = null
+  window._tenant_id_rec        = null
+}
+
 async function seleccionarTenant(tenantId) {
   window._tenantActivo = tenantId
   window._tenantConfig = null
+  _limpiarCacheGlobal()
   // Escribir tenant_id en el JWT para que las políticas RLS de Supabase lo lean correctamente.
   // El usuario multitenant no tiene tenant_id en su metadata — solo tenants[].
   // Sin este update, auth.jwt()->'user_metadata'->>'tenant_id' es NULL y RLS devuelve vacío.
@@ -156,6 +172,7 @@ async function mostrarApp(rol, email, tenant_id = null) {
   document.getElementById('cambiar-tenant-btn')?.addEventListener('click', async () => {
     window._tenantActivo = null
     window._tenantConfig = null
+    _limpiarCacheGlobal()
     const { data: { user } } = await window._db.auth.getUser()
     const tenants = user?.user_metadata?.tenants || []
     await mostrarSelectorTenant(tenants, user?.user_metadata?.rol, user?.email)
