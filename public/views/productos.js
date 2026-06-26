@@ -73,7 +73,7 @@ async function vistaProductos() {
       })
     }
 
-    const renderPills = () => {
+    let renderPills = () => {
       const nav = document.getElementById('prod-pills-nav')
       if (!nav) return
       const ps = (activo) => `flex-shrink:0;padding:5px 13px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;border:1.5px solid ${activo?'var(--color-primary)':'var(--color-border)'};background:${activo?'var(--color-primary)':'transparent'};color:${activo?'#fff':'var(--color-text)'};white-space:nowrap`
