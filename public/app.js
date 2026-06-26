@@ -95,6 +95,9 @@ async function seleccionarTenant(tenantId) {
   // El usuario multitenant no tiene tenant_id en su metadata — solo tenants[].
   // Sin este update, auth.jwt()->'user_metadata'->>'tenant_id' es NULL y RLS devuelve vacío.
   await window._db.auth.updateUser({ data: { tenant_id: tenantId } })
+  // Forzar refresh del JWT para que el nuevo tenant_id quede en el access token.
+  // Sin esto, el JWT activo aún tiene las claims viejas y RLS bloquea las queries.
+  await window._db.auth.refreshSession()
   const { data: { user } } = await window._db.auth.getUser()
   const rol   = user?.user_metadata?.rol || null
   const email = user?.email

@@ -139,12 +139,15 @@ async function mostrarFormRecepcion() {
   const hoy = new Date().toISOString().split('T')[0]
 
   const [
-    { data: proveedores },
-    { data: productos }
+    { data: proveedores, error: errProv },
+    { data: productos, error: errProd }
   ] = await Promise.all([
     window._db.from('proveedores').select('id_proveedor, nombre').eq('tenant_id', tenant_id).eq('activo', true).order('nombre'),
     window._db.from('productos').select('id_producto, producto, unidad_medida, unidad_compra, grupo').eq('tenant_id', tenant_id).eq('activo', true).order('producto')
   ])
+
+  if (errProd) { alert(`Error al cargar insumos: ${errProd.message}`); return }
+  if (errProv) { alert(`Error al cargar proveedores: ${errProv.message}`); return }
 
   window._productos_rec = productos || []
   window._tenant_id_rec = tenant_id
