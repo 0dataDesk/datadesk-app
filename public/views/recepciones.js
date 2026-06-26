@@ -207,8 +207,27 @@ async function mostrarFormRecepcion() {
           onclick="agregarFilaRecepcion()">+ Agregar insumo</button>
       </div>
 
-      <div id="rec-total-wrap" style="text-align:right;margin-top:12px;font-size:14px;font-weight:600;color:var(--color-primary)">
-        Total recepción: $0.00
+      <div id="rec-totales-wrap" style="margin-top:16px;display:flex;flex-direction:column;align-items:flex-end;gap:6px;font-size:13px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <span style="color:var(--color-text-muted);width:100px;text-align:right">Subtotal</span>
+          <span id="rec-subtotal-disp" style="font-weight:600;min-width:90px;text-align:right">$0.00</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <span style="color:var(--color-text-muted);width:100px;text-align:right">IEPS %</span>
+          <input type="number" id="rec-ieps-pct" class="edit-input edit-num" min="0" max="100" step="any"
+            placeholder="0" style="width:60px;text-align:right">
+          <span id="rec-ieps-monto-disp" style="color:var(--color-text-muted);min-width:90px;text-align:right">$0.00</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <span style="color:var(--color-text-muted);width:100px;text-align:right">IVA %</span>
+          <input type="number" id="rec-iva-pct" class="edit-input edit-num" min="0" max="100" step="any"
+            placeholder="0" style="width:60px;text-align:right">
+          <span id="rec-iva-monto-disp" style="color:var(--color-text-muted);min-width:90px;text-align:right">$0.00</span>
+        </div>
+        <div style="border-top:1.5px solid var(--color-border);padding-top:8px;display:flex;align-items:center;gap:12px">
+          <span style="font-weight:700;width:100px;text-align:right">Total</span>
+          <span id="rec-total-final-disp" style="font-weight:700;font-size:15px;color:var(--color-primary);min-width:90px;text-align:right">$0.00</span>
+        </div>
       </div>
 
       <div style="display:flex;gap:10px;margin-top:20px">
@@ -221,6 +240,9 @@ async function mostrarFormRecepcion() {
 
   window._recItemCount = 0
   agregarFilaRecepcion()
+
+  document.getElementById('rec-ieps-pct').addEventListener('input', _actualizarTotalRecepcion)
+  document.getElementById('rec-iva-pct').addEventListener('input', _actualizarTotalRecepcion)
 }
 
 function _actualizarTotalRecepcion() {
@@ -242,8 +264,23 @@ function _actualizarTotalRecepcion() {
     const td = document.getElementById(`rec-total-item-${idx}`)
     if (td) td.textContent = `$${item_total.toFixed(2)}`
   })
-  const wrap = document.getElementById('rec-total-wrap')
-  if (wrap) wrap.textContent = `Total recepción: $${total.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  const fmt = (n) => '$' + n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+  const subtotalEl = document.getElementById('rec-subtotal-disp')
+  if (subtotalEl) subtotalEl.textContent = fmt(total)
+
+  const iepsPct  = parseFloat(document.getElementById('rec-ieps-pct')?.value) || 0
+  const ivaPct   = parseFloat(document.getElementById('rec-iva-pct')?.value)  || 0
+  const iepsMonto = total * iepsPct / 100
+  const ivaMonto  = total * ivaPct  / 100
+  const totalFinal = total + iepsMonto + ivaMonto
+
+  const iepsMontoEl = document.getElementById('rec-ieps-monto-disp')
+  const ivaMontoEl  = document.getElementById('rec-iva-monto-disp')
+  const totalFinalEl = document.getElementById('rec-total-final-disp')
+  if (iepsMontoEl)  iepsMontoEl.textContent  = fmt(iepsMonto)
+  if (ivaMontoEl)   ivaMontoEl.textContent   = fmt(ivaMonto)
+  if (totalFinalEl) totalFinalEl.textContent  = fmt(totalFinal)
 }
 
 function _recGlobalDrop() {
@@ -426,13 +463,33 @@ async function guardarRecepcion() {
     }
   }
 
+  // Calcular subtotal = suma(piezas × costo/pieza) para guardar en BD
+  let _subtotalFinal = 0
+  document.querySelectorAll('[id^="rec-item-"]').forEach(fila => {
+    const idx    = fila.id.replace('rec-item-', '')
+    const piezas = parseFloat(document.getElementById(`rec-piezas-${idx}`)?.value) || 0
+    const costo  = parseFloat(document.getElementById(`rec-costo-${idx}`)?.value)  || 0
+    _subtotalFinal += piezas * costo
+  })
+  const _iepsPct   = parseFloat(document.getElementById('rec-ieps-pct')?.value) || null
+  const _ivaPct    = parseFloat(document.getElementById('rec-iva-pct')?.value)  || null
+  const _iepsMonto = _iepsPct ? _subtotalFinal * _iepsPct / 100 : null
+  const _ivaMonto  = _ivaPct  ? _subtotalFinal * _ivaPct  / 100 : null
+  const _totalFinal = _subtotalFinal + (_iepsMonto || 0) + (_ivaMonto || 0)
+
   const { data: recepcion, error: errR } = await window._db
     .from('recepciones')
     .insert({
       tenant_id, fecha, id_proveedor, folio,
-      num_remision: folio, // compatibilidad con campo existente
+      num_remision: folio,
       estatus: 'SIN_FACTURA',
       archivo_url,
+      subtotal:            _subtotalFinal || null,
+      ieps_porcentaje:     _iepsPct,
+      ieps_monto:          _iepsMonto,
+      iva_porcentaje:      _ivaPct,
+      iva_monto:           _ivaMonto,
+      total_con_impuestos: _totalFinal || null,
       created_by: window._email || null,
       updated_by,
       updated_at
