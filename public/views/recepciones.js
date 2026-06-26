@@ -213,16 +213,16 @@ async function mostrarFormRecepcion() {
           <span id="rec-subtotal-disp" style="font-weight:600;min-width:90px;text-align:right">$0.00</span>
         </div>
         <div style="display:flex;align-items:center;gap:12px">
-          <span style="color:var(--color-text-muted);width:100px;text-align:right">IEPS %</span>
-          <input type="number" id="rec-ieps-pct" class="edit-input edit-num" min="0" max="100" step="any"
-            placeholder="0" style="width:60px;text-align:right">
-          <span id="rec-ieps-monto-disp" style="color:var(--color-text-muted);min-width:90px;text-align:right">$0.00</span>
+          <span style="color:var(--color-text-muted);width:100px;text-align:right">IEPS</span>
+          <span style="color:var(--color-text-muted)">$</span>
+          <input type="number" id="rec-ieps-monto" class="edit-input edit-num" min="0" step="any"
+            placeholder="0.00" style="width:90px;text-align:right">
         </div>
         <div style="display:flex;align-items:center;gap:12px">
-          <span style="color:var(--color-text-muted);width:100px;text-align:right">IVA %</span>
-          <input type="number" id="rec-iva-pct" class="edit-input edit-num" min="0" max="100" step="any"
-            placeholder="0" style="width:60px;text-align:right">
-          <span id="rec-iva-monto-disp" style="color:var(--color-text-muted);min-width:90px;text-align:right">$0.00</span>
+          <span style="color:var(--color-text-muted);width:100px;text-align:right">IVA</span>
+          <span style="color:var(--color-text-muted)">$</span>
+          <input type="number" id="rec-iva-monto" class="edit-input edit-num" min="0" step="any"
+            placeholder="0.00" style="width:90px;text-align:right">
         </div>
         <div style="border-top:1.5px solid var(--color-border);padding-top:8px;display:flex;align-items:center;gap:12px">
           <span style="font-weight:700;width:100px;text-align:right">Total</span>
@@ -241,8 +241,8 @@ async function mostrarFormRecepcion() {
   window._recItemCount = 0
   agregarFilaRecepcion()
 
-  document.getElementById('rec-ieps-pct').addEventListener('input', _actualizarTotalRecepcion)
-  document.getElementById('rec-iva-pct').addEventListener('input', _actualizarTotalRecepcion)
+  document.getElementById('rec-ieps-monto').addEventListener('input', _actualizarTotalRecepcion)
+  document.getElementById('rec-iva-monto').addEventListener('input', _actualizarTotalRecepcion)
 }
 
 function _actualizarTotalRecepcion() {
@@ -269,18 +269,12 @@ function _actualizarTotalRecepcion() {
   const subtotalEl = document.getElementById('rec-subtotal-disp')
   if (subtotalEl) subtotalEl.textContent = fmt(total)
 
-  const iepsPct  = parseFloat(document.getElementById('rec-ieps-pct')?.value) || 0
-  const ivaPct   = parseFloat(document.getElementById('rec-iva-pct')?.value)  || 0
-  const iepsMonto = total * iepsPct / 100
-  const ivaMonto  = total * ivaPct  / 100
+  const iepsMonto  = parseFloat(document.getElementById('rec-ieps-monto')?.value) || 0
+  const ivaMonto   = parseFloat(document.getElementById('rec-iva-monto')?.value)  || 0
   const totalFinal = total + iepsMonto + ivaMonto
 
-  const iepsMontoEl = document.getElementById('rec-ieps-monto-disp')
-  const ivaMontoEl  = document.getElementById('rec-iva-monto-disp')
   const totalFinalEl = document.getElementById('rec-total-final-disp')
-  if (iepsMontoEl)  iepsMontoEl.textContent  = fmt(iepsMonto)
-  if (ivaMontoEl)   ivaMontoEl.textContent   = fmt(ivaMonto)
-  if (totalFinalEl) totalFinalEl.textContent  = fmt(totalFinal)
+  if (totalFinalEl) totalFinalEl.textContent = fmt(totalFinal)
 }
 
 function _recGlobalDrop() {
@@ -471,10 +465,8 @@ async function guardarRecepcion() {
     const costo  = parseFloat(document.getElementById(`rec-costo-${idx}`)?.value)  || 0
     _subtotalFinal += piezas * costo
   })
-  const _iepsPct   = parseFloat(document.getElementById('rec-ieps-pct')?.value) || null
-  const _ivaPct    = parseFloat(document.getElementById('rec-iva-pct')?.value)  || null
-  const _iepsMonto = _iepsPct ? _subtotalFinal * _iepsPct / 100 : null
-  const _ivaMonto  = _ivaPct  ? _subtotalFinal * _ivaPct  / 100 : null
+  const _iepsMonto  = parseFloat(document.getElementById('rec-ieps-monto')?.value) || null
+  const _ivaMonto   = parseFloat(document.getElementById('rec-iva-monto')?.value)  || null
   const _totalFinal = _subtotalFinal + (_iepsMonto || 0) + (_ivaMonto || 0)
 
   const { data: recepcion, error: errR } = await window._db
@@ -485,9 +477,9 @@ async function guardarRecepcion() {
       estatus: 'SIN_FACTURA',
       archivo_url,
       subtotal:            _subtotalFinal || null,
-      ieps_porcentaje:     _iepsPct,
+      ieps_porcentaje:     null,
       ieps_monto:          _iepsMonto,
-      iva_porcentaje:      _ivaPct,
+      iva_porcentaje:      null,
       iva_monto:           _ivaMonto,
       total_con_impuestos: _totalFinal || null,
       created_by: window._email || null,
