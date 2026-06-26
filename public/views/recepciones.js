@@ -287,7 +287,7 @@ function _filtrarInsumo(idx) {
     drop.innerHTML = resultados.map(p => `
       <div data-id="${p.id_producto}" data-nombre="${p.producto.replace(/"/g,'&quot;')}"
         style="padding:8px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--color-border,#eee)"
-        onmousedown="_seleccionarInsumo(${idx}, '${p.id_producto}', ${JSON.stringify(p.producto).replace(/\//g,'\\/')})">
+        onmousedown="event.preventDefault();_seleccionarInsumo(${idx}, '${p.id_producto}', ${JSON.stringify(p.producto).replace(/\//g,'\\/')})">
         <span style="font-weight:600">${p.producto}</span>
         <span style="color:var(--color-text-muted);font-size:11px;margin-left:8px">${p.unidad_medida || ''}${p.grupo ? ' · ' + p.grupo : ''}</span>
       </div>
