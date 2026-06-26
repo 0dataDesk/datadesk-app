@@ -422,7 +422,11 @@ async function guardarRecepcion() {
     const costo      = parseFloat(document.getElementById(`rec-costo-${idx}`)?.value)
     if (!id_producto || isNaN(piezas) || piezas <= 0) continue
     const cantidad_recibida = (!isNaN(contenido) && contenido > 0) ? piezas * contenido : piezas
-    items.push({ id_producto, cantidad_recibida, costo_unitario: isNaN(costo) ? 0 : costo })
+    // costo por unidad base: si hay contenido, dividir costo/pieza entre unidades/pieza
+    const costo_unitario = isNaN(costo) ? 0
+      : (!isNaN(contenido) && contenido > 0) ? costo / contenido
+      : costo
+    items.push({ id_producto, cantidad_recibida, costo_unitario })
   }
 
   if (!items.length) { alert('Agrega al menos un insumo'); return }
@@ -439,14 +443,9 @@ async function guardarRecepcion() {
       .upload(storagePath, archivoFile, { upsert: true })
     if (uploadErr) {
       console.warn('Upload archivo fallido:', uploadErr.message)
-      // Continúa guardando la recepción sin archivo
     } else {
-      const { data: urlData } = window._db.storage.from('recepciones').getPublicUrl(storagePath)
-      archivo_url = urlData?.publicUrl || null
-      if (!archivo_url) {
-        const { data: signed } = await window._db.storage.from('recepciones').createSignedUrl(storagePath, 60 * 60 * 24)
-        archivo_url = signed?.signedUrl || null
-      }
+      // Guardar el path relativo — la signed URL se genera al abrir el detalle
+      archivo_url = storagePath
     }
   }
 
@@ -529,29 +528,57 @@ async function verDetalleRecepcion(id) {
   ;(productos || []).forEach(p => { prodMap[p.id_producto] = p })
 
   const wrap = document.getElementById('form-recepcion-wrap')
-  const totalMonto = (items || []).reduce((s, i) => s + (Number(i.cantidad_recibida) * Number(i.costo_unitario || 0)), 0)
+  const subtotalItems = (items || []).reduce((s, i) => s + (Number(i.cantidad_recibida) * Number(i.costo_unitario || 0)), 0)
   const provNombre = rec.id_proveedor
     ? (window._nombreProv[rec.id_proveedor] || rec.id_proveedor)
     : 'Inventario Inicial'
 
-  // Resolver URL del archivo si existe
+  // Generar signed URL fresca si hay archivo (path relativo en BD)
   let archivoHtml = ''
   if (rec.archivo_url) {
-    const esImagen = /\.(png|jpe?g|gif|webp|bmp|svg)(\?|$)/i.test(rec.archivo_url)
-    archivoHtml = `
-      <div style="margin-top:16px;padding:12px;border:1px solid var(--color-border);border-radius:8px">
-        <span style="font-size:12px;font-weight:600;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:1px">
-          Documento adjunto
-        </span>
-        <div style="margin-top:8px;display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap">
-          ${esImagen ? `<img src="${rec.archivo_url}" alt="Documento" style="max-height:200px;border-radius:6px;border:1px solid var(--color-border)">` : ''}
-          <a href="${rec.archivo_url}" target="_blank" rel="noopener"
-            class="btn-accion btn-aprobar" style="font-size:12px;padding:6px 14px;text-decoration:none">
-            Ver documento
-          </a>
-        </div>
-      </div>`
+    let archivoDisplayUrl = null
+    const ext = rec.archivo_url.split('.').pop().toLowerCase().split('?')[0]
+    const esImagen = ['png','jpg','jpeg','gif','webp','bmp','svg'].includes(ext)
+    // Si es un path relativo (no comienza con http), generar signed URL
+    if (!rec.archivo_url.startsWith('http')) {
+      const { data: signed } = await window._db.storage.from('recepciones').createSignedUrl(rec.archivo_url, 60 * 60 * 2)
+      archivoDisplayUrl = signed?.signedUrl || null
+    } else {
+      archivoDisplayUrl = rec.archivo_url
+    }
+    if (archivoDisplayUrl) {
+      archivoHtml = `
+        <div style="margin-top:16px;padding:12px;border:1px solid var(--color-border);border-radius:8px">
+          <span style="font-size:12px;font-weight:600;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:1px">
+            Documento adjunto
+          </span>
+          <div style="margin-top:8px;display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap">
+            ${esImagen ? `<img src="${archivoDisplayUrl}" alt="Documento" style="max-height:200px;border-radius:6px;border:1px solid var(--color-border)">` : ''}
+            <a href="${archivoDisplayUrl}" target="_blank" rel="noopener"
+              class="btn-accion btn-aprobar" style="font-size:12px;padding:6px 14px;text-decoration:none">
+              Ver documento
+            </a>
+          </div>
+        </div>`
+    }
   }
+
+  // Pie de totales con IEPS/IVA si aplica
+  const fmtMXN = (n) => '$' + Number(n).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const subtotalBD = rec.subtotal ?? subtotalItems
+  let totalesHtml = `
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;margin-top:8px;font-size:13px">
+      <div><span style="color:var(--color-text-muted);margin-right:16px">Subtotal</span><span style="font-weight:600">${fmtMXN(subtotalBD)}</span></div>`
+  if (rec.ieps_monto) totalesHtml += `
+      <div><span style="color:var(--color-text-muted);margin-right:16px">IEPS</span><span>${fmtMXN(rec.ieps_monto)}</span></div>`
+  if (rec.iva_monto) totalesHtml += `
+      <div><span style="color:var(--color-text-muted);margin-right:16px">IVA</span><span>${fmtMXN(rec.iva_monto)}</span></div>`
+  if (rec.ieps_monto || rec.iva_monto) totalesHtml += `
+      <div style="border-top:1.5px solid var(--color-border);padding-top:6px;margin-top:2px">
+        <span style="font-weight:700;margin-right:16px">Total</span>
+        <span style="font-weight:700;font-size:15px;color:var(--color-primary)">${fmtMXN(rec.total_con_impuestos ?? subtotalBD)}</span>
+      </div>`
+  totalesHtml += `</div>`
 
   wrap.innerHTML = `
     <div class="receta-detalle-card" style="margin-bottom:24px">
@@ -609,14 +636,16 @@ async function verDetalleRecepcion(id) {
         <tfoot>
           <tr>
             <td colspan="3"></td>
-            <td style="text-align:right;font-weight:600;border-top:2px solid var(--color-border);padding-top:10px">TOTAL</td>
+            <td style="text-align:right;font-weight:600;border-top:2px solid var(--color-border);padding-top:10px">SUBTOTAL</td>
             <td style="text-align:right;font-weight:700;color:var(--color-primary);border-top:2px solid var(--color-border);padding-top:10px">
-              $${totalMonto.toFixed(2)}
+              ${fmtMXN(subtotalItems)}
             </td>
             <td style="border-top:2px solid var(--color-border)"></td>
           </tr>
         </tfoot>
       </table>
+
+      ${totalesHtml}
 
       <div style="margin-top:16px">
         <button class="btn-accion" style="border:1px solid var(--color-border)"
