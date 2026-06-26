@@ -472,7 +472,7 @@ async function guardarRecepcion() {
   const { data: recepcion, error: errR } = await window._db
     .from('recepciones')
     .insert({
-      tenant_id, fecha, id_proveedor, folio,
+      tenant_id, fecha, id_proveedor,
       num_remision: folio,
       estatus: 'SIN_FACTURA',
       archivo_url,
