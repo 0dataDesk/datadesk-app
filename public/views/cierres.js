@@ -74,7 +74,7 @@ async function verDetalleCierre(id_cierre, fecha) {
 
   const { data: ventas, error } = await window._db
     .from('ventas')
-    .select('id, folio, metodo_pago, total, propina, created_at')
+    .select('id, folio, metodo_pago, total, subtotal, descuento_porcentaje, propina, created_at')
     .eq('tenant_id', tenant_id)
     .eq('id_cierre', id_cierre)
     .order('created_at')
@@ -95,8 +95,8 @@ async function verDetalleCierre(id_cierre, fecha) {
     })
   }
 
-  function fmtItemsCierre(items) {
-    return items.map(it => {
+  function fmtItemsCierre(items, venta) {
+    const lineas = items.map(it => {
       let modsText = ''
       if (it.modificadores) {
         const m = it.modificadores
@@ -112,6 +112,27 @@ async function verDetalleCierre(id_cierre, fecha) {
       }
       return `<div style="padding:3px 0;font-size:13px">${it.nombre} ×${it.cantidad} — <strong>$${it.importe}</strong>${modsText}</div>`
     }).join('')
+
+    let descFooter = ''
+    if (venta && venta.descuento_porcentaje > 0) {
+      const sub = Number(venta.subtotal) || 0
+      const pct = Number(venta.descuento_porcentaje)
+      const descMonto = Math.round(sub * pct) / 100
+      descFooter = `
+        <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--color-border);">
+          <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--color-text-muted);">
+            <span>Subtotal</span><span>$${sub.toFixed(2)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:13px;color:#3A8C3E;font-weight:600;">
+            <span>Descuento (${pct}%)</span><span>-$${descMonto.toFixed(2)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:700;margin-top:4px;">
+            <span>Total</span><span>$${Number(venta.total).toFixed(2)}</span>
+          </div>
+        </div>`
+    }
+
+    return lineas + descFooter
   }
 
   const fmtHora = iso => new Date(iso).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
@@ -127,34 +148,51 @@ async function verDetalleCierre(id_cierre, fecha) {
         <h3 style="margin:0">Cierre — ${fecha}</h3>
         <button class="btn-accion" style="border:1px solid var(--color-border)" onclick="exportarCierrePDF()">Exportar PDF</button>
       </div>
+      ${(() => {
+        const ventasConDesc = (ventas || []).filter(v => v.descuento_porcentaje > 0)
+        const montoDesc = ventasConDesc.reduce((s, v) => s + Math.round((Number(v.subtotal)||0) * (Number(v.descuento_porcentaje)||0)) / 100, 0)
+        const subtotalBruto = ventasConDesc.reduce((s, v) => s + (Number(v.subtotal)||0), 0)
+        const filaDesc = ventasConDesc.length > 0
+          ? `<tr style="background:rgba(76,153,80,0.06)">
+               <td style="color:#3A8C3E;font-weight:600">🏷 Descuentos</td>
+               <td style="text-align:right;color:#3A8C3E">${ventasConDesc.length}</td>
+               <td style="text-align:right;color:#3A8C3E;font-weight:600">-$${montoDesc.toFixed(2)}</td>
+               <td style="font-size:11px;color:var(--color-text-muted)" colspan="0">s. bruto $${subtotalBruto.toFixed(2)}</td>
+             </tr>` : ''
+        return `
       <table class="tabla" style="margin-bottom:14px">
-        <thead><tr><th>Método de pago</th><th style="text-align:right">Tickets</th><th style="text-align:right">Total</th></tr></thead>
+        <thead><tr><th>Método de pago</th><th style="text-align:right">Tickets</th><th style="text-align:right">Total</th><th></th></tr></thead>
         <tbody>
           ${Object.entries(desglose).map(([m, d]) => `
-            <tr><td>${m}</td><td style="text-align:right">${d.count}</td><td style="text-align:right;font-weight:600">$${Number(d.suma).toFixed(2)}</td></tr>`).join('')}
+            <tr><td>${m}</td><td style="text-align:right">${d.count}</td><td style="text-align:right;font-weight:600">$${Number(d.suma).toFixed(2)}</td><td></td></tr>`).join('')}
+          ${filaDesc}
           <tr class="costeo-total">
             <td><strong>TOTAL</strong></td>
             <td style="text-align:right"><strong>${cierre?.num_tickets || 0} tickets</strong></td>
             <td style="text-align:right"><strong>$${Number(cierre?.total_general || 0).toFixed(2)}</strong></td>
+            <td></td>
           </tr>
         </tbody>
-      </table>
+      </table>`
+      })()}
       <table class="tabla">
         <thead><tr><th></th><th>Folio</th><th>Método</th><th style="text-align:right">Total</th><th style="text-align:right">Propina</th><th>Hora</th></tr></thead>
         <tbody>
           ${(ventas || []).map(v => {
             const items = itemsPorVenta[v.id] || []
             const hasItems = items.length > 0
+            const descBadge = v.descuento_porcentaje > 0
+              ? ` <span style="font-size:11px;color:#3A8C3E;font-weight:600">-${v.descuento_porcentaje}%</span>` : ''
             return `
             <tr style="cursor:${hasItems ? 'pointer' : 'default'}" onclick="${hasItems ? `toggleItemsCierre('items-${v.id}')` : ''}">
               <td style="color:var(--color-text-muted);font-size:12px;width:20px">${hasItems ? '▶' : ''}</td>
               <td>${v.folio || '—'}</td>
               <td>${v.metodo_pago || '—'}</td>
-              <td style="text-align:right">$${Number(v.total).toFixed(2)}</td>
+              <td style="text-align:right">$${Number(v.total).toFixed(2)}${descBadge}</td>
               <td style="text-align:right">${v.propina ? '$' + Number(v.propina).toFixed(2) : '—'}</td>
               <td style="color:var(--color-text-muted)">${fmtHora(v.created_at)}</td>
             </tr>
-            ${hasItems ? `<tr id="items-${v.id}" style="display:none"><td colspan="6" style="padding:8px 12px 12px 32px;background:var(--color-bg-alt,rgba(0,0,0,0.03))">${fmtItemsCierre(items)}</td></tr>` : ''}`
+            ${hasItems ? `<tr id="items-${v.id}" style="display:none"><td colspan="6" style="padding:8px 12px 12px 32px;background:var(--color-bg-alt,rgba(0,0,0,0.03))">${fmtItemsCierre(items, v)}</td></tr>` : ''}`
           }).join('')}
         </tbody>
       </table>
