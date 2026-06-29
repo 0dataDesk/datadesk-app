@@ -188,13 +188,13 @@ async function vistaCosteo() {
             if (f.cantidad === null) return `<td class="costeo-col-prov costeo-sin-precio" data-label="${p.nombre}">—</td>`
             const costo = f.cantidad * entry.precio_por_unidad_base
             const esMin = p.id_proveedor === mejorProv
-            return `<td class="costeo-col-prov${esMin ? ' costeo-col-min' : ''}" data-label="${p.nombre}">$${costo.toFixed(2)}</td>`
+            return `<td class="costeo-col-prov${esMin ? ' costeo-col-min' : ''}" data-label="${p.nombre}">$${formatNum(costo)}</td>`
           }).join('')
 
           if (mejorCosto !== null) costoTotal += mejorCosto
           else tieneIncompletos = true
 
-          const mejorDisplay  = mejorCosto !== null ? `$${mejorCosto.toFixed(2)}` : '—'
+          const mejorDisplay  = mejorCosto !== null ? `$${formatNum(mejorCosto)}` : '—'
           const claseIncompleta = mejorCosto === null ? ' class="fila-precio-revisar"' : ''
 
           html += `
@@ -216,7 +216,7 @@ async function vistaCosteo() {
             </div>
             <div class="costeo-total">
               <span>Costo total (mejor precio por ingrediente)</span>
-              <strong>$${costoTotal.toFixed(2)} MXN</strong>
+              <strong>$${formatNum(costoTotal)} MXN</strong>
             </div>
             ${tieneIncompletos ? `<p class="costeo-aviso">⚠️ Algunos ingredientes no tienen precio en ningún proveedor o tienen unidades incompatibles — el total es parcial.</p>` : ''}
           </div>

@@ -195,8 +195,8 @@ async function _iaCargar() {
       return a.localeCompare(b)
     })
 
-    const fmtNum = v => v === null ? '—' : Number(v).toFixed(2)
-    const fmtPct = v => v === null ? '—' : v.toFixed(1) + '%'
+    const fmtNum = v => formatNum(v)
+    const fmtPct = v => v === null ? '—' : formatNum(v, 1) + '%'
 
     wrap.innerHTML = `
       <style>

@@ -230,7 +230,7 @@ function renderItemsPedido(preciosPorProv) {
       const presentacion = item.cantidad_unidad
         ? `${item.unidad_precio} × ${item.cantidad_unidad} ${item.unidad_base}`
         : item.unidad_precio
-      const precio = item.precio != null ? `$${Number(item.precio).toFixed(2)}` : '—'
+      const precio = item.precio != null ? `$${formatNum(item.precio)}` : '—'
 
       html += `
         <tr>
@@ -267,14 +267,14 @@ function actualizarSubtotal(idx, precio) {
   const qty = parseFloat(document.getElementById(`qty-${idx}`)?.value) || 0
   const sub = qty * precio
   const subEl = document.getElementById(`sub-${idx}`)
-  if (subEl) subEl.textContent = `$${sub.toFixed(2)}`
+  if (subEl) subEl.textContent = `$${formatNum(sub)}`
 
   let total = 0
   document.querySelectorAll('[id^="sub-"]').forEach(el => {
-    total += parseFloat(el.textContent.replace('$', '')) || 0
+    total += parseFloat(el.textContent.replace(/[$,]/g, '')) || 0
   })
   const totalEl = document.getElementById('total-pedido')
-  if (totalEl) totalEl.textContent = `$${total.toFixed(2)}`
+  if (totalEl) totalEl.textContent = `$${formatNum(total)}`
 }
 
 async function guardarPedido(id_pedido, status) {

@@ -188,7 +188,7 @@ async function vistaPrecios() {
               : '—'
 
             const ppubDisplay = f.precio_por_unidad_base !== null
-              ? `$${Number(f.precio_por_unidad_base).toFixed(4)}/${f.unidad_base}`
+              ? `$${formatNum(f.precio_por_unidad_base, 4)}/${f.unidad_base}`
               : '—'
 
             const presentacion = f.cantidad_unidad !== null && f.unidad_base

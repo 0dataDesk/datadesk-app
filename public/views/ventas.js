@@ -160,7 +160,7 @@ function calcularDesglosePorMetodo(ventasDia) {
 
 function metodoDisplay(v) {
   return (Number(v.monto_efectivo) > 0 && Number(v.monto_tarjeta) > 0)
-    ? `Efectivo $${Number(v.monto_efectivo).toFixed(2)} + Tarjeta $${Number(v.monto_tarjeta).toFixed(2)}`
+    ? `Efectivo $${formatNum(v.monto_efectivo)} + Tarjeta $${formatNum(v.monto_tarjeta)}`
     : (v.metodo_pago || '—')
 }
 function rangoDiaMexico(fecha) {
@@ -268,28 +268,28 @@ async function mostrarCierreCaja(tenantId) {
             return `<tr>
               <td>${m}</td>
               <td style="text-align:right">${d.count}</td>
-              <td style="text-align:right;font-weight:600">$${d.suma.toFixed(2)}</td>
-              <td style="text-align:right">${prop ? '$' + prop.toFixed(2) : '—'}</td>
-              <td style="text-align:right">$${(d.suma - prop).toFixed(2)}</td>
+              <td style="text-align:right;font-weight:600">$${formatNum(d.suma)}</td>
+              <td style="text-align:right">${prop ? '$' + formatNum(prop) : '—'}</td>
+              <td style="text-align:right">$${formatNum(d.suma - prop)}</td>
             </tr>`}).join('')}
           ${ventasConDesc.length > 0 ? `
           <tr style="border-top:1px solid var(--color-border);background:rgba(76,153,80,0.06)">
             <td style="padding:10px 16px;color:#3A8C3E;font-weight:600">🏷 Descuentos</td>
             <td style="text-align:right;padding:10px 16px;color:#3A8C3E">${ventasConDesc.length}</td>
-            <td style="text-align:right;padding:10px 16px;color:#3A8C3E;font-weight:600">-$${montoDescontado.toFixed(2)}</td>
-            <td style="text-align:right;padding:10px 16px;color:var(--color-text-muted);font-size:12px" colspan="2">s. bruto $${subtotalBruto.toFixed(2)}</td>
+            <td style="text-align:right;padding:10px 16px;color:#3A8C3E;font-weight:600">-$${formatNum(montoDescontado)}</td>
+            <td style="text-align:right;padding:10px 16px;color:var(--color-text-muted);font-size:12px" colspan="2">s. bruto $${formatNum(subtotalBruto)}</td>
           </tr>` : ''}
           <tr style="border-top:2px solid var(--color-primary);font-size:15px;background:var(--color-bg)">
             <td style="padding:14px 16px"><strong style="font-size:20px;color:var(--color-primary)">TOTAL</strong></td>
             <td style="text-align:right;padding:14px 16px"><strong style="font-size:20px;color:var(--color-primary)">${ventasDia.length} tickets</strong></td>
-            <td style="text-align:right;padding:14px 16px"><strong style="font-size:20px;color:var(--color-primary)">$${totalGeneral.toFixed(2)}</strong></td>
-            <td style="text-align:right;padding:14px 16px"><strong style="font-size:20px;color:var(--color-primary)">${propinaTotalVista ? '$' + propinaTotalVista.toFixed(2) : '—'}</strong></td>
-            <td style="text-align:right;padding:14px 16px"><strong style="font-size:20px;color:var(--color-primary)">$${ventaNetaTotal.toFixed(2)}</strong></td>
+            <td style="text-align:right;padding:14px 16px"><strong style="font-size:20px;color:var(--color-primary)">$${formatNum(totalGeneral)}</strong></td>
+            <td style="text-align:right;padding:14px 16px"><strong style="font-size:20px;color:var(--color-primary)">${propinaTotalVista ? '$' + formatNum(propinaTotalVista) : '—'}</strong></td>
+            <td style="text-align:right;padding:14px 16px"><strong style="font-size:20px;color:var(--color-primary)">$${formatNum(ventaNetaTotal)}</strong></td>
           </tr>
         </tbody>
       </table>
       <p style="text-align:right;font-size:13px;color:var(--color-text-muted);margin:0 0 14px">
-        Ticket promedio: <strong style="color:var(--color-text)">$${ticketPromedio.toFixed(2)}</strong>
+        Ticket promedio: <strong style="color:var(--color-text)">$${formatNum(ticketPromedio)}</strong>
       </p>
       <table class="tabla">
         <thead><tr><th>Folio</th><th>Método</th><th style="text-align:right">Total</th><th style="text-align:right">Propina</th><th>Hora</th></tr></thead>
@@ -298,8 +298,8 @@ async function mostrarCierreCaja(tenantId) {
             <tr>
               <td>${v.folio || '—'}</td>
               <td>${metodoDisplay(v)}</td>
-              <td style="text-align:right">$${Number(v.total).toFixed(2)}${v.descuento_porcentaje > 0 ? ` <span style="font-size:11px;color:#3A8C3E;font-weight:600">-${v.descuento_porcentaje}%</span>` : ''}</td>
-              <td style="text-align:right">${v.propina ? '$' + Number(v.propina).toFixed(2) : '—'}</td>
+              <td style="text-align:right">$${formatNum(v.total)}${v.descuento_porcentaje > 0 ? ` <span style="font-size:11px;color:#3A8C3E;font-weight:600">-${v.descuento_porcentaje}%</span>` : ''}</td>
+              <td style="text-align:right">${v.propina ? '$' + formatNum(v.propina) : '—'}</td>
               <td style="color:var(--color-text-muted)">${fmtHora(v.created_at)}</td>
             </tr>`).join('')}
         </tbody>
@@ -396,19 +396,19 @@ function exportarVentasPDF() {
   <table>
     <thead><tr><th>Método de pago</th><th style="text-align:right">Tickets</th><th style="text-align:right">Total</th></tr></thead>
     <tbody>
-      ${Object.entries(porMetodo).map(([m, d]) => `<tr><td>${m}</td><td style="text-align:right">${d.count}</td><td style="text-align:right">$${Number(d.suma).toFixed(2)}</td></tr>`).join('')}
+      ${Object.entries(porMetodo).map(([m, d]) => `<tr><td>${m}</td><td style="text-align:right">${d.count}</td><td style="text-align:right">$${formatNum(d.suma)}</td></tr>`).join('')}
       ${(() => {
         const desc = ventas.filter(v => v.descuento_porcentaje > 0)
         if (!desc.length) return ''
         const monto = desc.reduce((s, v) => s + Math.round((Number(v.subtotal)||0) * (Number(v.descuento_porcentaje)||0)) / 100, 0)
-        return `<tr style="color:#3A8C3E"><td>🏷 Descuentos</td><td style="text-align:right">${desc.length}</td><td style="text-align:right">-$${monto.toFixed(2)}</td></tr>`
+        return `<tr style="color:#3A8C3E"><td>🏷 Descuentos</td><td style="text-align:right">${desc.length}</td><td style="text-align:right">-$${formatNum(monto)}</td></tr>`
       })()}
-      <tr class="total-row"><td>TOTAL</td><td style="text-align:right">${ventas.length}</td><td style="text-align:right;color:#C8892A">$${total.toFixed(2)}</td></tr>
+      <tr class="total-row"><td>TOTAL</td><td style="text-align:right">${ventas.length}</td><td style="text-align:right;color:#C8892A">$${formatNum(total)}</td></tr>
     </tbody>
   </table>
   <table>
     <thead><tr><th>Folio</th><th>Método</th><th style="text-align:right">Total</th><th style="text-align:right">Propina</th><th>Hora</th></tr></thead>
-    <tbody>${ventas.map(v => `<tr><td>${v.folio||'—'}</td><td>${metodoDisplay(v)}</td><td style="text-align:right">$${Number(v.total).toFixed(2)}${v.descuento_porcentaje > 0 ? ` <span style="color:#3A8C3E;font-size:10px">-${v.descuento_porcentaje}%</span>` : ''}</td><td style="text-align:right">${v.propina ? '$' + Number(v.propina).toFixed(2) : '—'}</td><td>${fmtHora(v.created_at)}</td></tr>`).join('')}</tbody>
+    <tbody>${ventas.map(v => `<tr><td>${v.folio||'—'}</td><td>${metodoDisplay(v)}</td><td style="text-align:right">$${formatNum(v.total)}${v.descuento_porcentaje > 0 ? ` <span style="color:#3A8C3E;font-size:10px">-${v.descuento_porcentaje}%</span>` : ''}</td><td style="text-align:right">${v.propina ? '$' + formatNum(v.propina) : '—'}</td><td>${fmtHora(v.created_at)}</td></tr>`).join('')}</tbody>
   </table>
   <div class="footer">Documento generado por dataDesk · ${new Date().toLocaleDateString('es-MX')}</div>
 </body></html>`

@@ -261,9 +261,9 @@ function _actualizarTotalRecepcion() {
     if (cantEl) cantEl.value = cantidad > 0 ? cantidad : ''
 
     const td = document.getElementById(`rec-total-item-${idx}`)
-    if (td) td.textContent = `$${item_total.toFixed(2)}`
+    if (td) td.textContent = `$${formatNum(item_total)}`
   })
-  const fmt = (n) => '$' + n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const fmt = (n) => '$' + formatNum(n)
 
   const subtotalEl = document.getElementById('rec-subtotal-disp')
   if (subtotalEl) subtotalEl.textContent = fmt(total)
@@ -627,8 +627,8 @@ async function verDetalleRecepcion(id) {
                 <td>${prodMap[i.id_producto]?.producto || i.id_producto}</td>
                 <td style="text-align:right">${i.cantidad_recibida} ${prodMap[i.id_producto]?.unidad_medida || ''}</td>
                 <td style="text-align:right;color:var(--color-text-muted)">${i.cantidad_solicitada || '—'}</td>
-                <td style="text-align:right">$${Number(i.costo_unitario || 0).toFixed(2)}</td>
-                <td style="text-align:right;font-weight:600">$${total.toFixed(2)}</td>
+                <td style="text-align:right">$${formatNum(i.costo_unitario || 0)}</td>
+                <td style="text-align:right;font-weight:600">$${formatNum(total)}</td>
                 <td style="text-align:right">${desvHtml}</td>
               </tr>`
           }).join('')}

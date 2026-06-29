@@ -158,7 +158,7 @@ async function vistaSugeridoCompra() {
               ${diasEntrega ? `<span style="font-size:11px;color:var(--color-text-muted);margin-left:8px">🗓 ${diasEntrega}</span>` : ''}
             </div>
             <div style="display:flex;gap:8px;align-items:center">
-              <span style="font-size:12px;color:var(--color-text-muted)">Total estimado: <strong>$${totalCosto.toFixed(2)}</strong></span>
+              <span style="font-size:12px;color:var(--color-text-muted)">Total estimado: <strong>$${formatNum(totalCosto)}</strong></span>
               ${provKey !== '__sin_proveedor__'
                 ? `<button class="btn-accion btn-aprobar" style="font-size:11px;padding:4px 12px"
                     onclick="generarPedidoSugerido('${provKey}','${nombre.replace(/'/g,"\\'")}')">Generar pedido</button>`
@@ -180,18 +180,18 @@ async function vistaSugeridoCompra() {
               </thead>
               <tbody>
                 ${items.map(item => {
-                  const pctStr = item.pctActual.toFixed(0) + '%'
+                  const pctStr = formatNum(item.pctActual, 0) + '%'
                   const pctColor = item.enAlerta ? '#B85C2A' : item.pctActual <= 60 ? '#c8892a' : '#3A8C3E'
                   const rowBg = item.enAlerta ? 'background:rgba(184,92,42,0.06)' : ''
                   return `
                     <tr style="${rowBg}">
                       <td>${item.producto}</td>
-                      <td style="text-align:right">${item.stockActual.toFixed(2)} ${item.unidad_medida||''}</td>
+                      <td style="text-align:right">${formatNum(item.stockActual)} ${item.unidad_medida||''}</td>
                       <td style="text-align:right;color:var(--color-text-muted)">${item.stock_maximo} ${item.unidad_medida||''}</td>
                       <td style="text-align:right;font-weight:700;color:${pctColor}">${pctStr}${item.enAlerta?' 🔴':''}</td>
-                      <td style="text-align:right;font-weight:600">${item.cantSugerida.toFixed(2)} ${item.unidad_medida||''}</td>
-                      <td style="text-align:right;color:var(--color-text-muted)">${item.ultimo_costo ? '$'+Number(item.ultimo_costo).toFixed(2) : '—'}</td>
-                      <td style="text-align:right;font-weight:600">$${item.costoTotal.toFixed(2)}</td>
+                      <td style="text-align:right;font-weight:600">${formatNum(item.cantSugerida)} ${item.unidad_medida||''}</td>
+                      <td style="text-align:right;color:var(--color-text-muted)">${item.ultimo_costo ? '$'+formatNum(item.ultimo_costo) : '—'}</td>
+                      <td style="text-align:right;font-weight:600">$${formatNum(item.costoTotal)}</td>
                     </tr>`
                 }).join('')}
               </tbody>
@@ -242,15 +242,15 @@ window.generarPedidoSugerido = async function(idProveedor, nombreProv) {
           ${itemsConCantidad.map((item, idx) => `
             <tr>
               <td>${item.producto}</td>
-              <td style="text-align:right;color:var(--color-text-muted)">${item.cantSugerida.toFixed(2)} ${item.unidad_medida||''}</td>
+              <td style="text-align:right;color:var(--color-text-muted)">${formatNum(item.cantSugerida)} ${item.unidad_medida||''}</td>
               <td style="text-align:right">
                 <input type="number" class="edit-input edit-num" style="text-align:right"
                   id="ped-sug-qty-${idx}" value="${item.cantSugerida.toFixed(2)}" min="0" step="any"
                   data-costo="${item.ultimo_costo||0}"
                   oninput="actualizarSubtotalSugerido()">
               </td>
-              <td style="text-align:right">${item.ultimo_costo ? '$'+Number(item.ultimo_costo).toFixed(2) : '—'}</td>
-              <td style="text-align:right;font-weight:600" id="ped-sug-sub-${idx}">$${item.costoTotal.toFixed(2)}</td>
+              <td style="text-align:right">${item.ultimo_costo ? '$'+formatNum(item.ultimo_costo) : '—'}</td>
+              <td style="text-align:right;font-weight:600" id="ped-sug-sub-${idx}">$${formatNum(item.costoTotal)}</td>
             </tr>`).join('')}
         </tbody>
         <tfoot>
@@ -258,7 +258,7 @@ window.generarPedidoSugerido = async function(idProveedor, nombreProv) {
             <td colspan="3"></td>
             <td style="text-align:right;font-weight:600;border-top:2px solid var(--color-border)">TOTAL</td>
             <td style="text-align:right;font-weight:700;color:var(--color-primary);border-top:2px solid var(--color-border)" id="ped-sug-total">
-              $${itemsConCantidad.reduce((s,i)=>s+i.costoTotal,0).toFixed(2)}
+              $${formatNum(itemsConCantidad.reduce((s,i)=>s+i.costoTotal,0))}
             </td>
           </tr>
         </tfoot>
@@ -286,11 +286,11 @@ window.actualizarSubtotalSugerido = function() {
     const qty = parseFloat(document.getElementById(`ped-sug-qty-${idx}`)?.value) || 0
     const sub = qty * (item.ultimo_costo || 0)
     const subEl = document.getElementById(`ped-sug-sub-${idx}`)
-    if (subEl) subEl.textContent = '$' + sub.toFixed(2)
+    if (subEl) subEl.textContent = '$' + formatNum(sub)
     total += sub
   })
   const totalEl = document.getElementById('ped-sug-total')
-  if (totalEl) totalEl.textContent = '$' + total.toFixed(2)
+  if (totalEl) totalEl.textContent = '$' + formatNum(total)
 }
 
 window.confirmarPedidoSugerido = async function(idProveedor, itemsRef) {

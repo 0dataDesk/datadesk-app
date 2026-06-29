@@ -75,7 +75,7 @@ async function vistaCierres() {
                 const tprom = c.num_tickets ? neta / c.num_tickets : 0
                 const desc  = descPorCierre[c.id]
                 const descHtml = desc
-                  ? `<span style="color:var(--color-highlight,#C0392B);font-weight:600">-$${desc.monto.toFixed(2)}</span><br>
+                  ? `<span style="color:var(--color-highlight,#C0392B);font-weight:600">-$${formatNum(desc.monto)}</span><br>
                      <span style="font-size:11px;color:var(--color-text-muted)">${desc.count} ticket${desc.count > 1 ? 's' : ''}</span>`
                   : '—'
                 return `
@@ -85,11 +85,11 @@ async function vistaCierres() {
                   onclick="verDetalleCierre('${c.id}','${c.fecha}')">
                   <td style="font-weight:600">${c.fecha}</td>
                   <td style="text-align:right">${c.num_tickets}</td>
-                  <td style="text-align:right;font-weight:600">$${Number(c.total_general).toFixed(2)}</td>
-                  <td style="text-align:right">${prop ? '$' + prop.toFixed(2) : '—'}</td>
+                  <td style="text-align:right;font-weight:600">$${formatNum(c.total_general)}</td>
+                  <td style="text-align:right">${prop ? '$' + formatNum(prop) : '—'}</td>
                   <td style="text-align:right">${descHtml}</td>
-                  <td style="text-align:right">$${neta.toFixed(2)}<br>
-                    <span style="font-size:11px;color:var(--color-text-muted)">~$${tprom.toFixed(2)}/ticket</span></td>
+                  <td style="text-align:right">$${formatNum(neta)}<br>
+                    <span style="font-size:11px;color:var(--color-text-muted)">~$${formatNum(tprom)}/ticket</span></td>
                   <td style="color:var(--color-text-muted)">${formatCerradoPor(c.cerrado_por)}</td>
                 </tr>`
               }).join('')}
@@ -169,13 +169,13 @@ async function verDetalleCierre(id_cierre, fecha) {
       descFooter = `
         <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--color-border)">
           <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--color-text-muted)">
-            <span>Subtotal</span><span>$${sub.toFixed(2)}</span>
+            <span>Subtotal</span><span>$${formatNum(sub)}</span>
           </div>
           <div style="display:flex;justify-content:space-between;font-size:13px;color:#3A8C3E;font-weight:600">
-            <span>Descuento (${pct}%)</span><span>-$${descMonto.toFixed(2)}</span>
+            <span>Descuento (${pct}%)</span><span>-$${formatNum(descMonto)}</span>
           </div>
           <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:700;margin-top:4px">
-            <span>Total</span><span>$${Number(venta.total).toFixed(2)}</span>
+            <span>Total</span><span>$${formatNum(venta.total)}</span>
           </div>
         </div>`
     }
@@ -227,21 +227,21 @@ async function verDetalleCierre(id_cierre, fecha) {
               <tr>
                 <td>${m}</td>
                 <td style="text-align:right">${d.count}</td>
-                <td style="text-align:right;font-weight:600">$${Number(d.suma).toFixed(2)}</td>
+                <td style="text-align:right;font-weight:600">$${formatNum(d.suma)}</td>
               </tr>`).join('')}
             ${ventasConDesc.length > 0 ? `
               <tr style="background:rgba(76,153,80,0.06)">
                 <td style="color:#3A8C3E;font-weight:600">🏷 Descuentos</td>
                 <td style="text-align:right;color:#3A8C3E">${ventasConDesc.length}</td>
                 <td style="text-align:right;color:#3A8C3E;font-weight:600">
-                  -$${montoDescTotal.toFixed(2)}<br>
-                  <span style="font-size:11px;font-weight:400">s. bruto $${subtotalBruto.toFixed(2)}</span>
+                  -$${formatNum(montoDescTotal)}<br>
+                  <span style="font-size:11px;font-weight:400">s. bruto $${formatNum(subtotalBruto)}</span>
                 </td>
               </tr>` : ''}
             <tr class="costeo-total">
               <td><strong>TOTAL</strong></td>
               <td style="text-align:right"><strong>${cierre?.num_tickets || 0} tickets</strong></td>
-              <td style="text-align:right"><strong>$${Number(cierre?.total_general || 0).toFixed(2)}</strong></td>
+              <td style="text-align:right"><strong>$${formatNum(cierre?.total_general || 0)}</strong></td>
             </tr>
           </tbody>
         </table>
@@ -270,7 +270,7 @@ async function verDetalleCierre(id_cierre, fecha) {
               const sub      = Number(v.subtotal) || 0
               const descMonto = pct > 0 ? Math.round(sub * pct) / 100 : 0
               const descCell  = pct > 0
-                ? `<span style="color:#3A8C3E;font-weight:600">-$${descMonto.toFixed(2)}</span><br>
+                ? `<span style="color:#3A8C3E;font-weight:600">-$${formatNum(descMonto)}</span><br>
                    <span style="font-size:11px;color:var(--color-text-muted)">${pct}%</span>`
                 : '—'
               return `
@@ -279,9 +279,9 @@ async function verDetalleCierre(id_cierre, fecha) {
                 <td style="color:var(--color-text-muted);font-size:12px">${hasItems ? '▶' : ''}</td>
                 <td>${v.folio || '—'}</td>
                 <td>${v.metodo_pago || '—'}</td>
-                <td style="text-align:right;font-weight:600">$${Number(v.total).toFixed(2)}</td>
+                <td style="text-align:right;font-weight:600">$${formatNum(v.total)}</td>
                 <td style="text-align:right">${descCell}</td>
-                <td style="text-align:right">${v.propina ? '$' + Number(v.propina).toFixed(2) : '—'}</td>
+                <td style="text-align:right">${v.propina ? '$' + formatNum(v.propina) : '—'}</td>
                 <td style="color:var(--color-text-muted)">${fmtHora(v.created_at)}</td>
               </tr>
               ${hasItems
@@ -334,15 +334,15 @@ function exportarCierrePDF() {
     <thead><tr><th>Método de pago</th><th style="text-align:right">Tickets</th><th style="text-align:right">Total</th></tr></thead>
     <tbody>
       ${Object.entries(desglose).map(([m, d]) =>
-        `<tr><td>${m}</td><td style="text-align:right">${d.count}</td><td style="text-align:right">$${Number(d.suma).toFixed(2)}</td></tr>`
+        `<tr><td>${m}</td><td style="text-align:right">${d.count}</td><td style="text-align:right">$${formatNum(d.suma)}</td></tr>`
       ).join('')}
       ${ventasConDesc.length > 0
-        ? `<tr class="desc-row"><td>🏷 Descuentos</td><td style="text-align:right">${ventasConDesc.length}</td><td style="text-align:right">-$${montoDesc.toFixed(2)}</td></tr>`
+        ? `<tr class="desc-row"><td>🏷 Descuentos</td><td style="text-align:right">${ventasConDesc.length}</td><td style="text-align:right">-$${formatNum(montoDesc)}</td></tr>`
         : ''}
       <tr class="total-row">
         <td>TOTAL</td>
         <td style="text-align:right">${cierre.num_tickets}</td>
-        <td style="text-align:right;color:#C8892A">$${Number(cierre.total_general).toFixed(2)}</td>
+        <td style="text-align:right;color:#C8892A">$${formatNum(cierre.total_general)}</td>
       </tr>
     </tbody>
   </table>
@@ -365,11 +365,11 @@ function exportarCierrePDF() {
         return `<tr>
           <td>${v.folio || '—'}</td>
           <td>${v.metodo_pago || '—'}</td>
-          <td style="text-align:right">$${Number(v.total).toFixed(2)}</td>
+          <td style="text-align:right">$${formatNum(v.total)}</td>
           <td style="text-align:right;color:${pct > 0 ? '#3A8C3E' : 'inherit'}">
-            ${pct > 0 ? `-$${descMonto.toFixed(2)} (${pct}%)` : '—'}
+            ${pct > 0 ? `-$${formatNum(descMonto)} (${pct}%)` : '—'}
           </td>
-          <td style="text-align:right">${v.propina ? '$' + Number(v.propina).toFixed(2) : '—'}</td>
+          <td style="text-align:right">${v.propina ? '$' + formatNum(v.propina) : '—'}</td>
           <td>${fmtHora(v.created_at)}</td>
         </tr>`
       }).join('')}
