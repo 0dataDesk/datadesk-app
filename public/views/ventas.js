@@ -218,9 +218,14 @@ function calcularDesglosePorMetodo(ventasDia) {
     const m = (v.metodo_pago || '').toLowerCase()
     if (m === 'mixto' || m === 'dividido' || (Number(v.monto_efectivo) > 0 && Number(v.monto_tarjeta) > 0)) {
       if (Number(v.monto_efectivo) > 0) addMetodo('efectivo', Number(v.monto_efectivo), false)
-      if (Number(v.monto_tarjeta) > 0) addMetodo('tarjeta', Number(v.monto_tarjeta), false)
+      if (Number(v.monto_tarjeta) > 0) {
+        const detalle = Array.isArray(v.pagos_detalle) ? v.pagos_detalle : []
+        const entradaTarjeta = detalle.find(d => d.tipo === 'debito' || d.tipo === 'credito')
+        const tipoTarjeta = entradaTarjeta ? entradaTarjeta.tipo : 'tarjeta'
+        addMetodo(tipoTarjeta, Number(v.monto_tarjeta), false)
+        porMetodo[tipoTarjeta].count++
+      }
       if (Number(v.monto_efectivo) > 0) porMetodo['efectivo'].count++
-      if (Number(v.monto_tarjeta) > 0) porMetodo['tarjeta'].count++
     } else {
       addMetodo(v.metodo_pago || 'Sin método', Number(v.total), true)
     }
@@ -286,7 +291,7 @@ async function mostrarCierreCaja(tenantId) {
 
     const { data: ventasDia, error } = await window._db
       .from('ventas')
-      .select('folio, metodo_pago, total, monto_efectivo, monto_tarjeta, propina, subtotal, descuento_porcentaje, estado, created_at')
+      .select('folio, metodo_pago, total, monto_efectivo, monto_tarjeta, propina, subtotal, descuento_porcentaje, estado, created_at, pagos_detalle')
       .eq('tenant_id', tenantId)
       .eq('estado', 'cerrada')
       .is('id_cierre', null)
