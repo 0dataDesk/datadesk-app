@@ -93,14 +93,6 @@ async function renderVentas(container, tenantId) {
   const totalDia = (ventas || []).reduce((s, v) => s + Number(v.total || 0), 0)
   const ticketProm = ventas.length ? totalDia / ventas.length : 0
 
-  const conteoItems = {}
-  todosItems.forEach(it => {
-    conteoItems[it.nombre] = (conteoItems[it.nombre] || 0) + Number(it.cantidad || 1)
-  })
-  const top3 = Object.entries(conteoItems)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
-
   html += `
     <div class="receta-card" style="margin-bottom:18px">
       <div style="display:flex;gap:32px;flex-wrap:wrap;align-items:flex-start">
@@ -112,14 +104,6 @@ async function renderVentas(container, tenantId) {
           <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-muted)">Ticket promedio</div>
           <div style="font-family:'Bebas Neue',sans-serif;font-size:36px;line-height:1.1;color:var(--color-text)">$${formatNum(ticketProm)}</div>
         </div>
-        ${top3.length ? `
-        <div>
-          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-muted);margin-bottom:6px">Top 3</div>
-          ${top3.map(([ nombre, qty ], i) => `
-            <div style="font-size:13px;color:var(--color-text);line-height:1.6">
-              <span style="color:var(--color-text-muted)">${i + 1}.</span> ${nombre} <span style="font-family:'Bebas Neue',sans-serif;font-size:15px;color:var(--color-primary)">×${qty}</span>
-            </div>`).join('')}
-        </div>` : ''}
       </div>
     </div>
   `
@@ -149,21 +133,21 @@ async function renderVentas(container, tenantId) {
       return `<div style="padding:3px 0;font-size:13px">${it.nombre} ×${it.cantidad} — <strong>$${it.importe}</strong>${modsText}</div>`
     }).join('')
 
-    const propina    = Number(v.propina || 0)
-    const descuento  = Number(v.descuento_porcentaje || 0)
-    const metodoPago = metodoDisplay(v)
+    const propina   = Number(v.propina) || 0
+    const descuento = Number(v.descuento_porcentaje) || 0
+
+    const complemento = (propina || descuento) ? `
+      <div style="margin-top:8px;padding-top:6px;border-top:1px solid var(--color-border);font-size:12px;color:var(--color-text-muted);display:flex;gap:16px;flex-wrap:wrap">
+        ${propina   ? `<span>Propina <strong style="color:var(--color-text)">$${formatNum(propina)}</strong></span>` : ''}
+        ${descuento ? `<span>Descuento <strong style="color:#3A8C3E">-${descuento}%</strong></span>` : ''}
+      </div>` : ''
 
     const panelHtml = `
       <div id="panel-${v.id}" style="display:none;border-top:1px solid var(--color-border);padding-top:10px;margin-top:10px">
-        <div style="margin-bottom:10px">
+        <div>
           ${itemsHtml || '<span style="font-size:12px;color:var(--color-text-muted)">Sin ítems</span>'}
         </div>
-        <div style="font-size:13px;color:var(--color-text-muted);border-top:1px solid var(--color-border);padding-top:8px;display:flex;flex-direction:column;gap:3px">
-          <div style="display:flex;justify-content:space-between"><span>Total</span><strong style="color:var(--color-text)">$${v.total}</strong></div>
-          ${propina   ? `<div style="display:flex;justify-content:space-between"><span>Propina</span><span>$${formatNum(propina)}</span></div>` : ''}
-          ${descuento ? `<div style="display:flex;justify-content:space-between"><span>Descuento</span><span>-${descuento}%</span></div>` : ''}
-          <div style="display:flex;justify-content:space-between"><span>Pago</span><span>${metodoPago}</span></div>
-        </div>
+        ${complemento}
         ${mostrarEliminar ? `
         <div style="margin-top:12px;text-align:right">
           <button class="btn-accion" style="background:rgba(184,92,42,0.1);color:#B85C2A;border:1px solid rgba(184,92,42,0.2);font-size:12px;padding:4px 12px"
