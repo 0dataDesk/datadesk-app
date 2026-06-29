@@ -19,7 +19,6 @@ async function vistaCierres() {
       return
     }
 
-    // Descuentos agrupados por cierre
     const cierreIds = cierres.map(c => c.id)
     const descPorCierre = {}
     const { data: ventasDesc } = await window._db
@@ -35,7 +34,6 @@ async function vistaCierres() {
       descPorCierre[v.id_cierre].monto += Math.round((Number(v.subtotal) || 0) * (Number(v.descuento_porcentaje) || 0)) / 100
     })
 
-    // Nombres cortos de usuarios
     const nombresMap = {}
     try {
       const { data: users } = await window._db.rpc('get_usuarios_nombres')
@@ -48,61 +46,301 @@ async function vistaCierres() {
       return nombresMap[val] || val.split('@')[0]
     }
 
-    window._cierresData    = cierres
-    window._cierresTenant  = tenant_id
-    window._cierresDescMap = descPorCierre
+    window._cierresData             = cierres
+    window._cierresTenant           = tenant_id
+    window._cierresDescMap          = descPorCierre
+    window._cierresFormatCerradoPor = formatCerradoPor
 
+    const periodoPorDefecto = 'Este mes'
+    window._cierresPeriodoActual = periodoPorDefecto
+
+    const periodos = ['Esta semana', 'Este mes', 'Últimos 3 meses', 'Todo']
     content.innerHTML = `
       <div class="vista-header"><h2>Cierres</h2></div>
-      <div id="cierres-lista-wrap">
-        <div class="tabla-wrapper" style="overflow-x:auto">
-          <table class="tabla">
-            <thead>
-              <tr>
-                <th>Fecha</th>
-                <th style="text-align:right">Tickets</th>
-                <th style="text-align:right">Total</th>
-                <th style="text-align:right">Propina</th>
-                <th style="text-align:right">Descuentos</th>
-                <th style="text-align:right">Venta neta</th>
-                <th>Cerrado por</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${cierres.map(c => {
-                const prop  = Number(c.propina_total) || 0
-                const neta  = Number(c.total_general) - prop
-                const tprom = c.num_tickets ? neta / c.num_tickets : 0
-                const desc  = descPorCierre[c.id]
-                const descHtml = desc
-                  ? `<span style="color:var(--color-highlight,#C0392B);font-weight:600">-$${formatNum(desc.monto)}</span><br>
-                     <span style="font-size:11px;color:var(--color-text-muted)">${desc.count} ticket${desc.count > 1 ? 's' : ''}</span>`
-                  : '—'
-                return `
-                <tr style="cursor:pointer;transition:background .12s"
-                  onmouseenter="this.style.background='var(--color-bg-alt,rgba(0,0,0,0.03))'"
-                  onmouseleave="this.style.background=''"
-                  onclick="verDetalleCierre('${c.id}','${c.fecha}')">
-                  <td style="font-weight:600">${c.fecha}</td>
-                  <td style="text-align:right">${c.num_tickets}</td>
-                  <td style="text-align:right;font-weight:600">$${formatNum(c.total_general)}</td>
-                  <td style="text-align:right">${prop ? '$' + formatNum(prop) : '—'}</td>
-                  <td style="text-align:right">${descHtml}</td>
-                  <td style="text-align:right">$${formatNum(neta)}<br>
-                    <span style="font-size:11px;color:var(--color-text-muted)">~$${formatNum(tprom)}/ticket</span></td>
-                  <td style="color:var(--color-text-muted)">${formatCerradoPor(c.cerrado_por)}</td>
-                </tr>`
-              }).join('')}
-            </tbody>
-          </table>
-        </div>
+      <div id="cierres-filtro" style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+        ${periodos.map(p => `
+          <button class="btn-periodo" data-periodo="${p}"
+            onclick="setCierresPeriodo('${p}')"
+            style="padding:5px 14px;border-radius:20px;border:1px solid var(--color-border);cursor:pointer;font-size:13px;
+              background:${p === periodoPorDefecto ? 'var(--color-primary)' : 'transparent'};
+              color:${p === periodoPorDefecto ? '#fff' : 'var(--color-text)'}">
+            ${p}
+          </button>`).join('')}
       </div>
+      <div id="cierres-cabecero"></div>
+      <div id="cierres-lista-wrap"></div>
       <div id="cierre-detalle-wrap" style="display:none"></div>
     `
+
+    await renderCierresVista(periodoPorDefecto)
 
   } catch (err) {
     content.innerHTML = `<p style="color:var(--color-highlight)">Error: ${err.message}</p>`
   }
+}
+
+function _filtrarCierresPorPeriodo(periodo) {
+  const todos = window._cierresData || []
+  if (periodo === 'Todo') return todos
+  const hoy = new Date()
+  let desde
+  if (periodo === 'Esta semana') {
+    const d = new Date(hoy)
+    const day = d.getDay() || 7
+    d.setDate(d.getDate() - (day - 1))
+    desde = d.toISOString().split('T')[0]
+  } else if (periodo === 'Este mes') {
+    desde = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-01`
+  } else if (periodo === 'Últimos 3 meses') {
+    const d = new Date(hoy)
+    d.setMonth(d.getMonth() - 3)
+    desde = d.toISOString().split('T')[0]
+  }
+  return todos.filter(c => c.fecha >= desde)
+}
+
+async function setCierresPeriodo(periodo) {
+  window._cierresPeriodoActual = periodo
+  document.querySelectorAll('.btn-periodo').forEach(btn => {
+    const active = btn.dataset.periodo === periodo
+    btn.style.background = active ? 'var(--color-primary)' : 'transparent'
+    btn.style.color      = active ? '#fff' : 'var(--color-text)'
+  })
+  await renderCierresVista(periodo)
+}
+
+async function renderCierresVista(periodo) {
+  const cierresFiltrados  = _filtrarCierresPorPeriodo(periodo)
+  const descPorCierre     = window._cierresDescMap || {}
+  const formatCerradoPor  = window._cierresFormatCerradoPor || (v => v || '—')
+
+  const CHART_COLORS = { efectivo: '#4A7A3A', debito: '#792c24', credito: '#C8892A', tarjeta: '#9B7B6A' }
+  const MESES_NOMBRES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+  const MESES_CORTOS  = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
+
+  // Métricas acumuladas
+  let ventaTotal = 0, propinaTotal = 0, descTotal = 0, ticketsTotal = 0
+  const metodosSuma = {}
+  cierresFiltrados.forEach(c => {
+    ventaTotal   += Number(c.total_general) || 0
+    propinaTotal += Number(c.propina_total) || 0
+    ticketsTotal += Number(c.num_tickets)   || 0
+    if (descPorCierre[c.id]) descTotal += descPorCierre[c.id].monto
+    Object.entries(c.desglose_metodo || {}).forEach(([m, d]) => {
+      metodosSuma[m] = (metodosSuma[m] || 0) + (Number(d.suma) || 0)
+    })
+  })
+  const ventaNeta  = ventaTotal - propinaTotal
+  const ticketProm = ticketsTotal ? ventaNeta / ticketsTotal : 0
+  const metodosEntries   = Object.entries(metodosSuma)
+  const totalMetodosSum  = metodosEntries.reduce((s, [, v]) => s + v, 0)
+
+  // — Cabecero —
+  const cabeceroEl = document.getElementById('cierres-cabecero')
+  if (cabeceroEl) {
+    if (cierresFiltrados.length === 0) {
+      cabeceroEl.innerHTML = ''
+    } else {
+      cabeceroEl.innerHTML = `
+        <div class="receta-card" style="margin-bottom:18px">
+          <div style="display:flex;gap:32px;flex-wrap:wrap;align-items:flex-start">
+            <div style="display:flex;flex-direction:column;gap:14px">
+              <div>
+                <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-muted)">Venta total</div>
+                <div style="font-family:'Bebas Neue',sans-serif;font-size:34px;line-height:1.1;color:var(--color-primary)">$${formatNum(ventaTotal)}</div>
+              </div>
+              <div style="display:flex;gap:24px;flex-wrap:wrap">
+                <div>
+                  <div style="font-size:11px;color:var(--color-text-muted)">Propina total</div>
+                  <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--color-text)">$${formatNum(propinaTotal)}</div>
+                </div>
+                <div>
+                  <div style="font-size:11px;color:var(--color-text-muted)">Descuentos</div>
+                  <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:#3A8C3E">$${formatNum(descTotal)}</div>
+                </div>
+              </div>
+              <div style="display:flex;gap:24px;flex-wrap:wrap">
+                <div>
+                  <div style="font-size:11px;color:var(--color-text-muted)">Tickets</div>
+                  <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--color-text)">${ticketsTotal}</div>
+                </div>
+                <div>
+                  <div style="font-size:11px;color:var(--color-text-muted)">Ticket promedio</div>
+                  <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--color-text)">$${formatNum(ticketProm)}</div>
+                </div>
+              </div>
+            </div>
+            ${metodosEntries.length > 0 ? `
+            <div style="display:flex;flex-direction:column;align-items:center;gap:10px">
+              <canvas id="cierre-chart-metodos" width="200" height="200"></canvas>
+              <div style="display:flex;flex-direction:column;gap:4px;font-size:12px">
+                ${metodosEntries.map(([m, suma]) => {
+                  const pct   = totalMetodosSum ? Math.round(suma / totalMetodosSum * 100) : 0
+                  const color = CHART_COLORS[m] || '#9B7B6A'
+                  return `<div style="display:flex;align-items:center;gap:6px">
+                    <span style="color:${color};font-size:16px;line-height:1">●</span>
+                    <span>${m.charAt(0).toUpperCase() + m.slice(1)} ${pct}% ($${formatNum(suma)})</span>
+                  </div>`
+                }).join('')}
+              </div>
+            </div>` : ''}
+          </div>
+        </div>
+      `
+
+      if (metodosEntries.length > 0) {
+        const buildChart = () => {
+          const canvas = document.getElementById('cierre-chart-metodos')
+          if (!canvas) return
+          if (window._cierresChart) { window._cierresChart.destroy(); window._cierresChart = null }
+          window._cierresChart = new window.Chart(canvas, {
+            type: 'pie',
+            data: {
+              labels: metodosEntries.map(([m]) => m.charAt(0).toUpperCase() + m.slice(1)),
+              datasets: [{
+                data: metodosEntries.map(([, v]) => v),
+                backgroundColor: metodosEntries.map(([m]) => CHART_COLORS[m] || '#9B7B6A'),
+                borderWidth: 0
+              }]
+            },
+            options: { plugins: { legend: { display: false } }, animation: false }
+          })
+        }
+        if (window.Chart) {
+          buildChart()
+        } else {
+          const s = document.createElement('script')
+          s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js'
+          s.onload = buildChart
+          document.head.appendChild(s)
+        }
+      }
+    }
+  }
+
+  // — Lista agrupada mes → semana —
+  const listaEl = document.getElementById('cierres-lista-wrap')
+  if (!listaEl) return
+
+  if (cierresFiltrados.length === 0) {
+    listaEl.innerHTML = `<p style="color:var(--color-text-muted)">Sin cierres en este período.</p>`
+    return
+  }
+
+  function getLunes(fechaStr) {
+    const d = new Date(fechaStr + 'T12:00:00')
+    const day = d.getDay() || 7
+    d.setDate(d.getDate() - (day - 1))
+    return d.toISOString().split('T')[0]
+  }
+
+  function semLabel(lunesStr) {
+    const lun = new Date(lunesStr + 'T12:00:00')
+    const dom = new Date(lun); dom.setDate(dom.getDate() + 6)
+    const sufijo = dom.getMonth() !== lun.getMonth()
+      ? `${MESES_CORTOS[dom.getMonth()]}`
+      : MESES_CORTOS[lun.getMonth()]
+    return `Semana del ${lun.getDate()} al ${dom.getDate()} ${sufijo}`
+  }
+
+  // Agrupar por mes
+  const porMes = {}
+  cierresFiltrados.forEach(c => {
+    const mes = c.fecha.slice(0, 7)
+    if (!porMes[mes]) porMes[mes] = []
+    porMes[mes].push(c)
+  })
+  const meses = Object.keys(porMes).sort().reverse()
+
+  let html = ''
+  meses.forEach((mes, mesIdx) => {
+    const ciMes   = porMes[mes]
+    const totMes  = ciMes.reduce((s, c) => s + (Number(c.total_general) || 0), 0)
+    const [year, month] = mes.split('-')
+    const mesLabel = `${MESES_NOMBRES[Number(month) - 1]} ${year}`
+    const mesOpen  = mesIdx === 0
+    const mesId    = `mes-${mes}`
+
+    // Agrupar por semana
+    const porSemana = {}
+    ciMes.forEach(c => {
+      const lunes = getLunes(c.fecha)
+      if (!porSemana[lunes]) porSemana[lunes] = []
+      porSemana[lunes].push(c)
+    })
+    const semanas = Object.keys(porSemana).sort().reverse()
+
+    let semanasHtml = ''
+    semanas.forEach((lunes, semIdx) => {
+      const ciSem  = porSemana[lunes]
+      const totSem = ciSem.reduce((s, c) => s + (Number(c.total_general) || 0), 0)
+      const semOpen = mesIdx === 0 && semIdx === 0
+      const semId   = `sem-${mes}-${lunes}`
+
+      const filasHtml = ciSem.map(c => {
+        const prop  = Number(c.propina_total) || 0
+        const neta  = Number(c.total_general) - prop
+        const tprom = c.num_tickets ? neta / c.num_tickets : 0
+        const desc  = descPorCierre[c.id]
+        return `
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:8px 0 8px 32px;
+              border-bottom:1px solid var(--color-border);cursor:pointer;font-size:13px"
+            onclick="verDetalleCierre('${c.id}','${c.fecha}')"
+            onmouseenter="this.style.background='var(--color-bg-alt,rgba(0,0,0,0.03))'"
+            onmouseleave="this.style.background=''">
+            <span style="min-width:90px;font-weight:600">${c.fecha}</span>
+            <span style="color:var(--color-text-muted)">${c.num_tickets} ticket${c.num_tickets !== 1 ? 's' : ''}</span>
+            <span style="font-weight:600">$${formatNum(c.total_general)}</span>
+            ${prop ? `<span style="color:var(--color-text-muted)">propina $${formatNum(prop)}</span>` : ''}
+            ${desc  ? `<span style="color:#3A8C3E;font-weight:600">-$${formatNum(desc.monto)}</span>` : ''}
+            <span style="color:var(--color-text-muted);margin-left:auto">neta $${formatNum(neta)} · ~$${formatNum(tprom)}/ticket</span>
+            <span style="color:var(--color-text-muted)">${formatCerradoPor(c.cerrado_por)}</span>
+          </div>`
+      }).join('')
+
+      semanasHtml += `
+        <div style="margin-left:16px">
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;
+              font-size:13px;border-bottom:1px solid var(--color-border)"
+            onclick="(function(el){
+              const b=document.getElementById('${semId}');
+              const open=b.style.display!=='none';
+              b.style.display=open?'none':'';
+              el.querySelector('.sem-chev').textContent=open?'▶':'▼';
+            })(this)">
+            <span class="sem-chev" style="color:var(--color-text-muted);font-size:11px">${semOpen ? '▼' : '▶'}</span>
+            <span>${semLabel(lunes)}</span>
+            <span style="color:var(--color-text-muted)">· ${ciSem.length} cierre${ciSem.length !== 1 ? 's' : ''}</span>
+            <span style="font-weight:600;margin-left:auto">$${formatNum(totSem)}</span>
+          </div>
+          <div id="${semId}" style="display:${semOpen ? '' : 'none'}">
+            ${filasHtml}
+          </div>
+        </div>`
+    })
+
+    html += `
+      <div style="margin-bottom:8px;border:1px solid var(--color-border);border-radius:8px;overflow:hidden">
+        <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;cursor:pointer;
+            background:var(--color-bg-card)"
+          onclick="(function(el){
+            const b=document.getElementById('${mesId}');
+            const open=b.style.display!=='none';
+            b.style.display=open?'none':'';
+            el.querySelector('.mes-chev').textContent=open?'▶':'▼';
+          })(this)">
+          <span class="mes-chev" style="color:var(--color-text-muted);font-size:12px">${mesOpen ? '▼' : '▶'}</span>
+          <strong style="font-size:14px">${mesLabel}</strong>
+          <span style="color:var(--color-text-muted);font-size:13px">· ${ciMes.length} cierre${ciMes.length !== 1 ? 's' : ''}</span>
+          <span style="font-weight:700;color:var(--color-primary);margin-left:auto">$${formatNum(totMes)}</span>
+        </div>
+        <div id="${mesId}" style="display:${mesOpen ? '' : 'none'}">
+          ${semanasHtml}
+        </div>
+      </div>`
+  })
+
+  listaEl.innerHTML = html
 }
 
 async function verDetalleCierre(id_cierre, fecha) {
