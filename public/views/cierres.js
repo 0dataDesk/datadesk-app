@@ -141,49 +141,66 @@ async function renderCierresVista(periodo) {
     if (cierresFiltrados.length === 0) {
       cabeceroEl.innerHTML = ''
     } else {
+      const legendHtml = metodosEntries.length > 0
+        ? `<div style="display:grid;grid-template-columns:repeat(2,auto);gap:4px 20px;font-size:12px;justify-content:start">
+            ${metodosEntries.map(([m, suma]) => {
+              const pct   = totalMetodosSum ? Math.round(suma / totalMetodosSum * 100) : 0
+              const color = CHART_COLORS[m] || '#9B7B6A'
+              return `<div style="display:flex;align-items:center;gap:5px;white-space:nowrap">
+                <span style="color:${color};font-size:14px;line-height:1">●</span>
+                <span>${m.charAt(0).toUpperCase() + m.slice(1)} ${pct}% ($${formatNum(suma)})</span>
+              </div>`
+            }).join('')}
+           </div>`
+        : ''
+
       cabeceroEl.innerHTML = `
+        <style>
+          @media(min-width:640px){
+            #cierres-cab-inner { flex-direction: row !important; align-items: flex-start !important; }
+            #cierres-cab-donut { align-items: flex-end !important; }
+            #cierres-cab-legend { grid-template-columns: repeat(2,auto) !important; }
+          }
+          @media(max-width:639px){
+            #cierres-cab-donut { align-items: center !important; }
+            #cierres-cab-legend { grid-template-columns: 1fr !important; }
+          }
+        </style>
         <div class="receta-card" style="margin-bottom:18px">
-          <div style="display:flex;gap:32px;flex-wrap:wrap;align-items:flex-start">
-            <div style="display:flex;flex-direction:column;gap:14px">
+          <div id="cierres-cab-inner" style="display:flex;flex-direction:column;gap:20px">
+
+            <!-- Izquierda: venta total + tabla secundaria -->
+            <div style="flex:1;display:flex;flex-direction:column;gap:14px">
               <div>
                 <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-muted)">Venta total</div>
-                <div style="font-family:'Bebas Neue',sans-serif;font-size:34px;line-height:1.1;color:var(--color-primary)">$${formatNum(ventaTotal)}</div>
+                <div style="font-family:'Bebas Neue',sans-serif;font-size:48px;line-height:1;color:var(--color-primary)">$${formatNum(ventaTotal)}</div>
               </div>
-              <div style="display:flex;gap:24px;flex-wrap:wrap">
-                <div>
-                  <div style="font-size:11px;color:var(--color-text-muted)">Propina total</div>
-                  <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--color-text)">$${formatNum(propinaTotal)}</div>
-                </div>
-                <div>
-                  <div style="font-size:11px;color:var(--color-text-muted)">Descuentos</div>
-                  <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:#3A8C3E">$${formatNum(descTotal)}</div>
-                </div>
-              </div>
-              <div style="display:flex;gap:24px;flex-wrap:wrap">
-                <div>
-                  <div style="font-size:11px;color:var(--color-text-muted)">Tickets</div>
-                  <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--color-text)">${ticketsTotal}</div>
-                </div>
-                <div>
-                  <div style="font-size:11px;color:var(--color-text-muted)">Ticket promedio</div>
-                  <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--color-text)">$${formatNum(ticketProm)}</div>
-                </div>
-              </div>
+              <table style="border-collapse:collapse;background:var(--color-bg-alt,rgba(0,0,0,0.04));border-radius:8px;overflow:hidden">
+                <thead>
+                  <tr>
+                    ${['Propina','Descuentos','Tickets','T. Promedio'].map(h =>
+                      `<td style="padding:10px 16px 4px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);white-space:nowrap">${h}</td>`
+                    ).join('')}
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td style="padding:2px 16px 10px;font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--color-text)">$${formatNum(propinaTotal)}</td>
+                    <td style="padding:2px 16px 10px;font-family:'Bebas Neue',sans-serif;font-size:20px;color:#3A8C3E">$${formatNum(descTotal)}</td>
+                    <td style="padding:2px 16px 10px;font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--color-text)">${ticketsTotal}</td>
+                    <td style="padding:2px 16px 10px;font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--color-text)">$${formatNum(ticketProm)}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
+
+            <!-- Derecha: donut + leyenda -->
             ${metodosEntries.length > 0 ? `
-            <div style="display:flex;flex-direction:column;align-items:center;gap:10px">
+            <div id="cierres-cab-donut" style="display:flex;flex-direction:column;gap:10px">
               <canvas id="cierre-chart-metodos" width="200" height="200"></canvas>
-              <div style="display:flex;flex-direction:column;gap:4px;font-size:12px">
-                ${metodosEntries.map(([m, suma]) => {
-                  const pct   = totalMetodosSum ? Math.round(suma / totalMetodosSum * 100) : 0
-                  const color = CHART_COLORS[m] || '#9B7B6A'
-                  return `<div style="display:flex;align-items:center;gap:6px">
-                    <span style="color:${color};font-size:16px;line-height:1">●</span>
-                    <span>${m.charAt(0).toUpperCase() + m.slice(1)} ${pct}% ($${formatNum(suma)})</span>
-                  </div>`
-                }).join('')}
-              </div>
+              ${legendHtml}
             </div>` : ''}
+
           </div>
         </div>
       `
@@ -193,19 +210,66 @@ async function renderCierresVista(periodo) {
           const canvas = document.getElementById('cierre-chart-metodos')
           if (!canvas) return
           if (window._cierresChart) { window._cierresChart.destroy(); window._cierresChart = null }
+
+          const cs = getComputedStyle(document.documentElement)
+          const colorText     = cs.getPropertyValue('--color-text').trim()     || '#2B1A0F'
+          const colorTextMuted = cs.getPropertyValue('--color-text-muted').trim() || '#9B7B6A'
+
+          const centerTextPlugin = {
+            id: 'centerText',
+            beforeDraw(chart) {
+              const { ctx, chartArea: { top, bottom, left, right } } = chart
+              const cx = (left + right) / 2
+              const cy = (top + bottom) / 2
+              ctx.save()
+              ctx.font = "bold 13px 'DM Sans', sans-serif"
+              ctx.fillStyle = colorTextMuted
+              ctx.textAlign = 'center'
+              ctx.textBaseline = 'middle'
+              ctx.fillText('TOTAL', cx, cy - 11)
+              ctx.font = "600 18px 'Bebas Neue', sans-serif"
+              ctx.fillStyle = colorText
+              ctx.fillText('$' + formatNum(totalMetodosSum), cx, cy + 11)
+              ctx.restore()
+            }
+          }
+          window.Chart.register(centerTextPlugin)
+
           window._cierresChart = new window.Chart(canvas, {
-            type: 'pie',
+            type: 'doughnut',
             data: {
               labels: metodosEntries.map(([m]) => m.charAt(0).toUpperCase() + m.slice(1)),
               datasets: [{
                 data: metodosEntries.map(([, v]) => v),
                 backgroundColor: metodosEntries.map(([m]) => CHART_COLORS[m] || '#9B7B6A'),
-                borderWidth: 0
+                borderWidth: 0,
+                borderRadius: 6,
+                spacing: 3
               }]
             },
-            options: { plugins: { legend: { display: false } }, animation: false }
+            options: {
+              cutout: '70%',
+              plugins: {
+                legend: { display: false },
+                tooltip: {
+                  callbacks: {
+                    label: (ctx) => {
+                      const pct = totalMetodosSum ? Math.round(ctx.parsed / totalMetodosSum * 100) : 0
+                      return ` ${ctx.label}: $${formatNum(ctx.parsed)} (${pct}%)`
+                    }
+                  },
+                  backgroundColor: 'rgba(30,10,5,0.85)',
+                  titleFont: { family: 'DM Sans', size: 12 },
+                  bodyFont:  { family: 'DM Sans', size: 12 },
+                  padding: 10,
+                  cornerRadius: 6
+                }
+              },
+              animation: { animateRotate: true, duration: 500 }
+            }
           })
         }
+
         if (window.Chart) {
           buildChart()
         } else {
