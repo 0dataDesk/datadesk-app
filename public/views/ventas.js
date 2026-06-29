@@ -8,7 +8,7 @@
 async function renderVentas(container, tenantId) {
   const { data: ventas, error } = await window._db
     .from('ventas')
-    .select('id, folio, created_at, total, estado, tipo_entrega, cliente_nombre, metodo_pago')
+    .select('id, folio, created_at, total, estado, tipo_entrega, cliente_nombre, metodo_pago, propina, descuento_porcentaje, monto_efectivo, monto_tarjeta')
     .eq('tenant_id', tenantId)
     .is('id_cierre', null)
     .order('created_at', { ascending: false })
@@ -18,13 +18,15 @@ async function renderVentas(container, tenantId) {
 
   const ids = (ventas || []).map(v => v.id)
   const itemsPorVenta = {}
+  let todosItems = []
   if (ids.length > 0) {
     const { data: items } = await window._db
       .from('venta_items')
       .select('id_venta, nombre, cantidad, importe, modificadores')
       .eq('tenant_id', tenantId)
       .in('id_venta', ids)
-    ;(items || []).forEach(it => {
+    todosItems = items || []
+    todosItems.forEach(it => {
       if (!itemsPorVenta[it.id_venta]) itemsPorVenta[it.id_venta] = []
       itemsPorVenta[it.id_venta].push(it)
     })
@@ -72,13 +74,12 @@ async function renderVentas(container, tenantId) {
   window._supaDelete = supaDelete
 
   const mostrarCierre   = ['superadmin','admin','gerente'].includes(window._rol)
-  const mostrarEliminar = ['superadmin','admin'].includes(window._rol)
+  const mostrarEliminar = window._rol === 'superadmin'
 
   let html = `
     <div class="vista-header">
       <h2>Ventas</h2>
       ${mostrarCierre ? `<button class="btn-accion" onclick="mostrarCierreCaja('${tenantId}')">Cierre de caja</button>` : ''}
-      <button class="btn-accion btn-aprobar" onclick="vistaVentas()">↺ Recargar</button>
     </div>
   `
 
@@ -88,10 +89,49 @@ async function renderVentas(container, tenantId) {
     return
   }
 
+  // — Métricas del día —
+  const totalDia = (ventas || []).reduce((s, v) => s + Number(v.total || 0), 0)
+  const ticketProm = ventas.length ? totalDia / ventas.length : 0
+
+  const conteoItems = {}
+  todosItems.forEach(it => {
+    conteoItems[it.nombre] = (conteoItems[it.nombre] || 0) + Number(it.cantidad || 1)
+  })
+  const top3 = Object.entries(conteoItems)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+
+  html += `
+    <div class="receta-card" style="margin-bottom:18px">
+      <div style="display:flex;gap:32px;flex-wrap:wrap;align-items:flex-start">
+        <div>
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-muted)">Total del día</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:36px;line-height:1.1;color:var(--color-primary)">$${formatNum(totalDia)}</div>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-muted)">Ticket promedio</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:36px;line-height:1.1;color:var(--color-text)">$${formatNum(ticketProm)}</div>
+        </div>
+        ${top3.length ? `
+        <div>
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-muted);margin-bottom:6px">Top 3</div>
+          ${top3.map(([ nombre, qty ], i) => `
+            <div style="font-size:13px;color:var(--color-text);line-height:1.6">
+              <span style="color:var(--color-text-muted)">${i + 1}.</span> ${nombre} <span style="font-family:'Bebas Neue',sans-serif;font-size:15px;color:var(--color-primary)">×${qty}</span>
+            </div>`).join('')}
+        </div>` : ''}
+      </div>
+    </div>
+  `
+
+  // — Lista acordeón —
   let listaHtml = ''
   ventas.forEach(v => {
-    const badge     = estadoBadge[v.estado] || ''
-    const items     = itemsPorVenta[v.id] || []
+    const badge    = estadoBadge[v.estado] || ''
+    const items    = itemsPorVenta[v.id] || []
+    const folio    = v.folio || v.id
+    const folioEsc = folio.toString().replace(/'/g, "\\'")
+
     const itemsHtml = items.map(it => {
       let modsText = ''
       if (it.modificadores) {
@@ -109,32 +149,78 @@ async function renderVentas(container, tenantId) {
       return `<div style="padding:3px 0;font-size:13px">${it.nombre} ×${it.cantidad} — <strong>$${it.importe}</strong>${modsText}</div>`
     }).join('')
 
-    listaHtml += `
-      <div class="receta-card" id="venta-${v.id}" style="margin-bottom:14px">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
-          <div>
-            <strong style="font-size:15px">${v.folio || v.id}</strong>
-            <span style="font-size:12px;color:var(--color-text-muted);margin-left:8px">${fmtFecha(v.created_at)}</span>
-            <span style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600;margin-left:8px;${badge}">${v.estado}</span>
-          </div>
-          ${mostrarEliminar ? `<button class="btn-accion" style="background:rgba(184,92,42,0.1);color:#B85C2A;border:1px solid rgba(184,92,42,0.2);font-size:12px;padding:4px 12px"
-            onclick="eliminarVenta('${v.id}','${(v.folio || v.id).replace(/'/g,"\\'")}','${tenantId}')">🗑 Eliminar</button>` : ''}
-        </div>
-        <div style="font-size:13px;color:var(--color-text-muted);margin-top:6px">
-          ${v.tipo_entrega || '—'} · ${v.cliente_nombre || '—'} · ${v.metodo_pago || '—'}
-        </div>
-        <div style="margin-top:10px;border-top:1px solid var(--color-border);padding-top:8px">
+    const propina    = Number(v.propina || 0)
+    const descuento  = Number(v.descuento_porcentaje || 0)
+    const metodoPago = metodoDisplay(v)
+
+    const panelHtml = `
+      <div id="panel-${v.id}" style="display:none;border-top:1px solid var(--color-border);padding-top:10px;margin-top:10px">
+        <div style="margin-bottom:10px">
           ${itemsHtml || '<span style="font-size:12px;color:var(--color-text-muted)">Sin ítems</span>'}
         </div>
-        <div style="text-align:right;margin-top:8px;font-size:18px;font-weight:700;color:var(--color-primary)">
-          $${v.total}
+        <div style="font-size:13px;color:var(--color-text-muted);border-top:1px solid var(--color-border);padding-top:8px;display:flex;flex-direction:column;gap:3px">
+          <div style="display:flex;justify-content:space-between"><span>Total</span><strong style="color:var(--color-text)">$${v.total}</strong></div>
+          ${propina   ? `<div style="display:flex;justify-content:space-between"><span>Propina</span><span>$${formatNum(propina)}</span></div>` : ''}
+          ${descuento ? `<div style="display:flex;justify-content:space-between"><span>Descuento</span><span>-${descuento}%</span></div>` : ''}
+          <div style="display:flex;justify-content:space-between"><span>Pago</span><span>${metodoPago}</span></div>
         </div>
+        ${mostrarEliminar ? `
+        <div style="margin-top:12px;text-align:right">
+          <button class="btn-accion" style="background:rgba(184,92,42,0.1);color:#B85C2A;border:1px solid rgba(184,92,42,0.2);font-size:12px;padding:4px 12px"
+            onclick="eliminarVenta('${v.id}','${folioEsc}','${tenantId}')">🗑 Eliminar</button>
+        </div>` : ''}
+      </div>
+    `
+
+    listaHtml += `
+      <div id="venta-${v.id}" style="border-bottom:2px solid var(--color-border);padding:12px 0;cursor:pointer"
+        onclick="(function(el){
+          const panel = el.querySelector('[id^=panel-]');
+          const chevron = el.querySelector('.venta-chevron');
+          const open = panel.style.display !== 'none';
+          document.querySelectorAll('[id^=panel-]').forEach(p => { p.style.display='none'; });
+          document.querySelectorAll('.venta-chevron').forEach(c => { c.textContent='▼'; });
+          if (!open) { panel.style.display=''; chevron.textContent='▲'; }
+        })(this)">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <strong style="font-size:14px;min-width:80px">${folio}</strong>
+          <span style="font-size:12px;color:var(--color-text-muted)">${fmtFecha(v.created_at)}</span>
+          <span style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600;${badge}">${v.estado}</span>
+          <span style="margin-left:auto;font-size:16px;font-weight:700;color:var(--color-primary)">$${v.total}</span>
+          <span class="venta-chevron" style="font-size:11px;color:var(--color-text-muted);min-width:12px">▼</span>
+        </div>
+        <div style="font-size:12px;color:var(--color-text-muted);margin-top:4px">
+          ${v.tipo_entrega || '—'} · ${v.metodo_pago || '—'}
+        </div>
+        ${panelHtml}
       </div>
     `
   })
 
   html += `<div id="lista-ventas-wrap">${listaHtml}</div>`
   container.innerHTML = html
+
+  // — Realtime —
+  if (window._ventasChannel) window._db.removeChannel(window._ventasChannel)
+  try {
+    const channel = window._db
+      .channel('ventas-realtime')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'ventas',
+        filter: `tenant_id=eq.${tenantId}`
+      }, () => {
+        renderVentas(container, tenantId)
+      })
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR') {
+          window._db.removeChannel(channel)
+          window._ventasChannel = null
+        }
+      })
+    window._ventasChannel = channel
+  } catch (_) {}
 }
 
 function calcularDesglosePorMetodo(ventasDia) {
