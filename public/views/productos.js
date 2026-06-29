@@ -12,8 +12,7 @@ async function vistaProductos() {
     const tenantActual   = (window._tenantConfig?.nombre || '').toLowerCase()
     const fuentesDef     = window.FUENTES_POR_TENANT[tenantActual] || []
 
-    const _fuentesAutorizadas = { furia: ['menu_charly'], tita: ['carga_eugenio', 'barra_nacho'] }
-    const _fuentes = _fuentesAutorizadas[tenant_id] || []
+    const _fuentes = (window.FUENTES_POR_TENANT[tenant_id] || []).map(f => f.fuente)
     const query = window._db.from('productos').select('*').eq('tenant_id', tenant_id).eq('activo', true).eq('tipo', 'Insumo').in('fuente', _fuentes).order('producto')
 
     const [

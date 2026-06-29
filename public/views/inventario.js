@@ -260,7 +260,7 @@ function exportarInventarioExcel() {
   const ws = XLSX.utils.json_to_sheet(filas)
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, 'Inventario')
-  XLSX.writeFile(wb, `inventario_furia_${fecha}.xlsx`)
+  XLSX.writeFile(wb, `inventario_${window._tenantActivo || 'tenant'}_${fecha}.xlsx`)
 }
 
 window.toggleInvPanel = function(idProducto) {

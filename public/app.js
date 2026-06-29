@@ -140,7 +140,7 @@ async function mostrarLogin() {
 
 async function mostrarApp(rol, email, tenant_id = null) {
   const cfg = await getTenantConfig(tenant_id)
-  document.documentElement.style.setProperty('--color-primary', cfg.color_primario)
+  applyTenantTheme(tenant_id)
   document.title = cfg.nombre
 
   window._rol   = rol || 'operador'

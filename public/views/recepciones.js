@@ -138,8 +138,7 @@ async function mostrarFormRecepcion() {
   const tenant_id = await getTenantId()
   const hoy = new Date().toISOString().split('T')[0]
 
-  const _fuentesAutorizadas = { furia: ['menu_charly'], tita: ['carga_eugenio', 'barra_nacho'] }
-  const _fuentes = _fuentesAutorizadas[tenant_id] || []
+  const _fuentes = (window.FUENTES_POR_TENANT[tenant_id] || []).map(f => f.fuente)
 
   const [
     { data: proveedores, error: errProv },

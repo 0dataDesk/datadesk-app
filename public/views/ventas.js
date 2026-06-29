@@ -430,7 +430,7 @@ function exportarCierreExcel(fecha, ventasDia) {
   const ws = XLSX.utils.json_to_sheet(filas)
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, 'Cierre')
-  XLSX.writeFile(wb, `cierre_caja_furia_${fecha}.xlsx`)
+  XLSX.writeFile(wb, `cierre_caja_${window._tenantActivo || 'tenant'}_${fecha}.xlsx`)
 }
 
 async function eliminarVenta(id, folio, tenantId) {
