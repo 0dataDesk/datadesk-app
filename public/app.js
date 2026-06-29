@@ -43,6 +43,9 @@ window._db.auth.onAuthStateChange(async (event, session) => {
 document.addEventListener('visibilitychange', () => {})
 
 async function mostrarSelectorTenant(tenants, rol, email) {
+  document.title = 'dataDesk'
+  document.documentElement.style.setProperty('--color-primary', '#1A1A1A')
+
   const configs = await Promise.all(tenants.map(async t => {
     const { data } = await window._db.from('tenants')
       .select('tenant_id, nombre, color_primario, tagline')
@@ -53,18 +56,18 @@ async function mostrarSelectorTenant(tenants, rol, email) {
   document.getElementById('app').innerHTML = `
     <div class="login-wrapper">
       <div class="login-box">
-        <div class="login-logo">dataDesk<span>.</span></div>
+        <div class="login-logo">dataDesk</div>
         <p class="login-tagline">Selecciona un negocio</p>
         <div style="display:flex;flex-direction:column;gap:12px;margin-top:8px">
           ${configs.map(cfg => `
             <button onclick="seleccionarTenant('${cfg.tenant_id}')"
-              style="width:100%;padding:16px;background:${cfg.color_primario};color:#FAF7F2;border:none;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;font-family:var(--font-main);text-align:left">
+              style="width:100%;padding:16px;background:${cfg.color_primario};color:#FFFFFF;border:none;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;font-family:var(--font-main);text-align:left">
               ${cfg.nombre}
               <small style="display:block;font-size:11px;font-weight:400;opacity:0.7;margin-top:2px">${cfg.tagline}</small>
             </button>`).join('')}
         </div>
         <button onclick="logout().then(()=>location.reload())"
-          style="width:100%;margin-top:16px;padding:10px;background:transparent;border:1px solid var(--color-border);border-radius:10px;color:var(--color-text-muted);font-size:13px;cursor:pointer;font-family:var(--font-main)">
+          style="width:100%;margin-top:16px;padding:10px;background:#FFFFFF;border:1px solid #CCCCCC;border-radius:10px;color:#555555;font-size:13px;cursor:pointer;font-family:var(--font-main)">
           Cerrar sesión
         </button>
       </div>
