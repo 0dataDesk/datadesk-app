@@ -100,6 +100,7 @@ async function renderVentas(container, tenantId) {
   const ticketProm = ventas.length ? totalDia / ventas.length : 0
 
   html += `
+    <div id="ventas-cabecero-metricas">
     <div class="receta-card" style="margin-bottom:18px">
       <div style="display:flex;gap:32px;flex-wrap:wrap;align-items:flex-start">
         <div>
@@ -119,6 +120,7 @@ async function renderVentas(container, tenantId) {
           <div style="font-family:'Bebas Neue',sans-serif;font-size:36px;line-height:1.1;color:#3A8C3E">$${formatNum(descuentoDia)}</div>
         </div>
       </div>
+    </div>
     </div>
   `
 
@@ -265,6 +267,8 @@ async function mostrarCierreCaja(tenantId) {
   if (panel) {
     panel.remove()
     if (listaWrap) listaWrap.style.display = ''
+    const cabeceroMetricas = document.getElementById('ventas-cabecero-metricas')
+    if (cabeceroMetricas) cabeceroMetricas.style.display = ''
     return
   }
 
@@ -295,6 +299,8 @@ async function mostrarCierreCaja(tenantId) {
   }
 
   if (listaWrap) listaWrap.style.display = 'none'
+  const cabeceroMetricas = document.getElementById('ventas-cabecero-metricas')
+  if (cabeceroMetricas) cabeceroMetricas.style.display = 'none'
 
   const cargarCierre = async (fecha) => {
     const resultado = document.getElementById('cierre-resultado')
