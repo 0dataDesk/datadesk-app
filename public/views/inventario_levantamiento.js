@@ -6,7 +6,7 @@ async function vistaInventarioLevantamiento() {
 
   content.innerHTML = `
     <div class="vista-header">
-      <h2>Levantar Inventario</h2>
+      <h2>📝 Levantamiento</h2>
     </div>
 
     <div id="lev-filtros" style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:20px">
@@ -15,7 +15,7 @@ async function vistaInventarioLevantamiento() {
         <input type="date" id="lev-fecha" value="${hoy}"
           style="padding:8px 12px;border:1.5px solid var(--color-border);border-radius:8px;background:var(--color-surface);color:var(--color-text);font-size:15px">
       </label>
-      <label style="display:flex;flex-direction:column;gap:4px;font-size:13px">
+      <label style="display:none;flex-direction:column;gap:4px;font-size:13px">
         Clasificación
         <select id="lev-abc"
           style="padding:8px 12px;border:1.5px solid var(--color-border);border-radius:8px;background:var(--color-surface);color:var(--color-text);font-size:15px">
@@ -25,7 +25,7 @@ async function vistaInventarioLevantamiento() {
           <option value="C">C</option>
         </select>
       </label>
-      <label style="display:flex;flex-direction:column;gap:4px;font-size:13px">
+      <label style="display:none;flex-direction:column;gap:4px;font-size:13px">
         Área
         <input type="text" id="lev-area" placeholder="Opcional"
           style="padding:8px 12px;border:1.5px solid var(--color-border);border-radius:8px;background:var(--color-surface);color:var(--color-text);font-size:15px;width:140px">
@@ -49,18 +49,16 @@ async function vistaInventarioLevantamiento() {
       <div id="lev-progreso" style="font-size:13px;color:var(--color-text-muted);margin-bottom:12px"></div>
 
       <!-- lista -->
-      <div id="lev-lista"></div>
+      <div id="lev-lista" style="padding-bottom:90px"></div>
 
-      <!-- botones guardar -->
-      <div style="display:flex;gap:10px;margin-top:24px;flex-wrap:wrap">
-        <button id="lev-btn-borrador"
-          style="padding:14px 24px;background:var(--color-surface);color:var(--color-primary);border:2px solid var(--color-primary);border-radius:10px;font-size:15px;font-weight:700;cursor:pointer">
-          💾 Guardar borrador
-        </button>
-        <button id="lev-btn-cerrar"
-          style="padding:14px 28px;background:var(--color-primary);color:#FAF7F2;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer">
-          ✓ Cerrar inventario
-        </button>
+      <!-- barra de acciones flotante -->
+      <div id="lev-acciones-flotantes" style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);display:flex;gap:12px;background:var(--color-surface);padding:10px 16px;border-radius:50px;box-shadow:0 4px 20px rgba(0,0,0,0.15);z-index:200;border:1px solid var(--color-border)">
+        <button id="lev-btn-cancelar" title="Cancelar"
+          style="width:44px;height:44px;border-radius:50%;border:1px solid var(--color-border);background:transparent;color:var(--color-text-muted);font-size:18px;cursor:pointer">✕</button>
+        <button id="lev-btn-borrador" title="Guardar avance"
+          style="width:44px;height:44px;border-radius:50%;border:2px solid var(--color-primary);background:var(--color-surface);color:var(--color-primary);font-size:18px;cursor:pointer">💾</button>
+        <button id="lev-btn-cerrar" title="Confirmar y enviar"
+          style="width:44px;height:44px;border-radius:50%;border:none;background:var(--color-primary);color:#FAF7F2;font-size:18px;cursor:pointer">✓</button>
       </div>
     </div>
 
@@ -212,13 +210,16 @@ async function vistaInventarioLevantamiento() {
                 style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--color-border);background:${bgCard}">
                 <div style="flex:1;min-width:0">
                   <div style="font-size:15px;font-weight:600">${p.producto}</div>
-                  <div style="font-size:12px;color:var(--color-text-muted)">${p.unidad_medida || '—'}${p.clasificacion_abc ? ' · ' + p.clasificacion_abc : ''}</div>
+                  ${p.clasificacion_abc ? `<div style="font-size:12px;color:var(--color-text-muted)">${p.clasificacion_abc}</div>` : ''}
                 </div>
-                <input type="number" id="lev-qty-${p.id_producto}"
-                  placeholder="—" min="0" step="any" inputmode="decimal"
-                  value="${levValores[p.id_producto] ?? ''}"
-                  style="width:88px;flex-shrink:0;padding:10px 6px;border:2px solid ${borderColor};border-radius:8px;font-size:22px;font-weight:700;text-align:center;color:var(--color-primary);background:var(--color-surface);-webkit-appearance:none"
-                  oninput="window._levOnQty(${JSON.stringify(p.id_producto)}, ${JSON.stringify(grupo)}, this)">
+                <div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0">
+                  <input type="number" id="lev-qty-${p.id_producto}"
+                    placeholder="—" min="0" step="any" inputmode="decimal"
+                    value="${levValores[p.id_producto] ?? ''}"
+                    style="width:88px;padding:10px 6px;border:2px solid ${borderColor};border-radius:8px;font-size:22px;font-weight:700;text-align:center;color:var(--color-primary);background:var(--color-surface);-webkit-appearance:none"
+                    oninput="window._levOnQty(${JSON.stringify(p.id_producto)}, ${JSON.stringify(grupo)}, this)">
+                  <span style="font-size:11px;color:var(--color-text-muted)">${p.unidad_medida || ''}</span>
+                </div>
               </div>`
           }).join('')}
         </div>`
@@ -261,7 +262,7 @@ async function vistaInventarioLevantamiento() {
     const btnB = document.getElementById('lev-btn-borrador')
     const btnC = document.getElementById('lev-btn-cerrar')
     btnB.disabled = true; btnC.disabled = true
-    btnB.textContent = 'Guardando…'; btnC.textContent = 'Guardando…'
+    btnB.title = 'Guardando…'; btnC.title = 'Guardando…'
 
     const fecha = document.getElementById('lev-fecha')?.value || new Date().toISOString().split('T')[0]
     const abc   = document.getElementById('lev-abc')?.value   || 'todos'
@@ -315,24 +316,31 @@ async function vistaInventarioLevantamiento() {
         document.getElementById('lev-cuerpo').style.display  = 'none'
         document.getElementById('lev-confirm').style.display = ''
       } else {
-        btnB.textContent = '✓ Borrador guardado'
-        btnC.textContent = '✓ Cerrar inventario'
+        btnB.title = 'Borrador guardado'
         setTimeout(() => {
-          btnB.textContent = '💾 Guardar borrador'
-          btnC.textContent = '✓ Cerrar inventario'
+          btnB.title = 'Guardar avance'
+          btnC.title = 'Confirmar y enviar'
           btnB.disabled = false; btnC.disabled = false
         }, 1500)
       }
     } catch (e) {
       errEl().textContent = 'Error: ' + e.message
       btnB.disabled = false; btnC.disabled = false
-      btnB.textContent = '💾 Guardar borrador'
-      btnC.textContent = '✓ Cerrar inventario'
+      btnB.title = 'Guardar avance'
+      btnC.title = 'Confirmar y enviar'
     }
   }
 
   document.getElementById('lev-btn-borrador').addEventListener('click', () => guardar(false))
   document.getElementById('lev-btn-cerrar').addEventListener('click',   () => guardar(true))
+  document.getElementById('lev-btn-cancelar').addEventListener('click', () => {
+    if (!window.confirm('¿Cancelar el levantamiento? Se perderá el progreso no guardado.')) return
+    levInsumos = []; levInventarioId = null; levGrupos = []; levGrupoActivo = 'todos'; levValores = {}
+    document.getElementById('lev-cuerpo').style.display  = 'none'
+    document.getElementById('lev-filtros').style.display = ''
+    document.getElementById('lev-fecha').value = new Date().toISOString().split('T')[0]
+    errEl().textContent = ''
+  })
 
   // ── Nuevo levantamiento ───────────────────────────────────────────────────────
   document.getElementById('lev-btn-nuevo').addEventListener('click', () => {
