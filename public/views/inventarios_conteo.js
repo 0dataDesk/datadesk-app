@@ -34,10 +34,10 @@ async function vistaInventariosConteo() {
 
     content.innerHTML = `
       <div class="vista-header">
-        <h2>Inventario Físico</h2>
+        <h2>📋 Conteos</h2>
       </div>
       <div id="inv-conteo-detalle"></div>
-      <div class="tabla-wrapper">
+      <div id="inv-conteo-tabla-wrap"><div class="tabla-wrapper">
         <table class="tabla">
           <thead>
             <tr>
@@ -73,7 +73,7 @@ async function vistaInventariosConteo() {
             }
           </tbody>
         </table>
-      </div>
+      </div></div>
     `
   } catch (err) {
     content.innerHTML = `<p style="color:var(--color-highlight)">Error: ${err.message}</p>`
@@ -81,6 +81,8 @@ async function vistaInventariosConteo() {
 }
 
 async function verDetalleInventario(idInventario) {
+  const tablaWrap = document.getElementById('inv-conteo-tabla-wrap')
+  if (tablaWrap) tablaWrap.style.display = 'none'
   const tenant_id = await getTenantId()
   const wrap = document.getElementById('inv-conteo-detalle')
   if (wrap) wrap.innerHTML = `<p style="color:var(--color-text-muted)">Cargando conteo...</p>`
@@ -183,7 +185,7 @@ async function verDetalleInventario(idInventario) {
                   <tr>
                     <td>${f.nombre}</td>
                     <td style="color:var(--color-text-muted)">${f.unidad}</td>
-                    <td style="text-align:right;font-weight:600">${f.contado != null ? formatNum(f.contado) : '—'}</td>
+                    <td style="text-align:right;font-weight:600">${f.contado != null ? formatInt(f.contado) : '—'}</td>
                   </tr>`).join('')}
               </tbody>
             </table>
@@ -199,11 +201,14 @@ async function verDetalleInventario(idInventario) {
       <div class="receta-detalle-card" style="margin-bottom:24px">
         <div class="detalle-header">
           <div>
-            <h3>Inventario — ${inv.fecha}</h3>
+            <h3>Conteo — ${inv.fecha}</h3>
             <p class="detalle-categoria">${inv.clasificacion || 'todos'} · ${inv.area || 'sin área'} · ${inv.estado}</p>
           </div>
           <button class="btn-accion" style="border:1px solid var(--color-border)"
-            onclick="document.getElementById('inv-conteo-detalle').innerHTML=''">Cerrar</button>
+            onclick="
+              document.getElementById('inv-conteo-tabla-wrap').style.display='';
+              document.getElementById('inv-conteo-detalle').innerHTML=''
+            ">Cerrar</button>
         </div>
 
         <input type="text" id="ic-buscador" placeholder="Buscar insumo..."
@@ -270,7 +275,7 @@ function _icBuscar(q) {
               <tr>
                 <td>${hl}</td>
                 <td style="color:var(--color-text-muted)">${f.unidad}</td>
-                <td style="text-align:right;font-weight:600">${f.contado != null ? formatNum(f.contado) : '—'}</td>
+                <td style="text-align:right;font-weight:600">${f.contado != null ? formatInt(f.contado) : '—'}</td>
               </tr>`
           }).join('')}
         </tbody>

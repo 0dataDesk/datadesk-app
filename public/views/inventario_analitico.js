@@ -7,7 +7,7 @@ async function vistaInventarioAnalitico() {
 
   content.innerHTML = `
     <div class="vista-header">
-      <h2>Inventario Analítico</h2>
+      <h2>🔍 Diagnóstico</h2>
     </div>
 
     <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:20px">
@@ -313,7 +313,7 @@ function _iaRenderTabla() {
   const invInicial = window._iaInvInicial
   const invFinal   = window._iaInvFinal
 
-  const fmtNum = v => formatNum(v)
+  const fmtNum = v => v === null ? '—' : formatInt(v)
   const fmtPct = v => v === null ? '—' : formatNum(v, 1) + '%'
 
   const alertaCell = a => {
