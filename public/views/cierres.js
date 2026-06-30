@@ -135,6 +135,30 @@ async function renderCierresVista(periodo) {
   const metodosEntries   = Object.entries(metodosSuma)
   const totalMetodosSum  = metodosEntries.reduce((s, [, v]) => s + v, 0)
 
+  // — Top 3 vendidos del periodo —
+  let top3 = []
+  if (cierresFiltrados.length > 0) {
+    const idsCierre = cierresFiltrados.map(c => c.id)
+    const { data: ventasTop } = await window._db
+      .from('ventas')
+      .select('id')
+      .eq('tenant_id', window._cierresTenant)
+      .in('id_cierre', idsCierre)
+    const ventaIds = (ventasTop || []).map(v => v.id)
+    if (ventaIds.length > 0) {
+      const { data: items } = await window._db
+        .from('venta_items')
+        .select('nombre, cantidad')
+        .eq('tenant_id', window._cierresTenant)
+        .in('id_venta', ventaIds)
+      const sumas = {}
+      ;(items || []).forEach(it => {
+        sumas[it.nombre] = (sumas[it.nombre] || 0) + (Number(it.cantidad) || 0)
+      })
+      top3 = Object.entries(sumas).sort((a, b) => b[1] - a[1]).slice(0, 3)
+    }
+  }
+
   // — Cabecero —
   const cabeceroEl = document.getElementById('cierres-cabecero')
   if (cabeceroEl) {
@@ -154,51 +178,67 @@ async function renderCierresVista(periodo) {
            </div>`
         : ''
 
+      const tdH = `padding:10px 16px 4px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);white-space:nowrap`
+      const tdV = (color = 'var(--color-text)') => `padding:2px 16px 10px;font-family:'Bebas Neue',sans-serif;font-size:20px;color:${color}`
+
       cabeceroEl.innerHTML = `
         <style>
           @media(min-width:640px){
             #cierres-cab-inner { flex-direction: row !important; align-items: flex-start !important; }
             #cierres-cab-donut { align-items: flex-end !important; }
-            #cierres-cab-legend { grid-template-columns: repeat(2,auto) !important; }
           }
           @media(max-width:639px){
             #cierres-cab-donut { align-items: center !important; }
-            #cierres-cab-legend { grid-template-columns: 1fr !important; }
           }
         </style>
         <div class="receta-card" style="margin-bottom:18px">
           <div id="cierres-cab-inner" style="display:flex;flex-direction:column;gap:20px">
 
-            <!-- Izquierda: venta total + tabla secundaria -->
+            <!-- Izquierda: venta total + tabla 2x2 -->
             <div style="flex:1;display:flex;flex-direction:column;gap:14px">
               <div>
                 <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-muted)">Venta total</div>
                 <div style="font-family:'Bebas Neue',sans-serif;font-size:48px;line-height:1;color:var(--color-primary)">$${formatNum(ventaTotal)}</div>
               </div>
               <table style="border-collapse:collapse;background:var(--color-bg-alt,rgba(0,0,0,0.04));border-radius:8px;overflow:hidden">
-                <thead>
-                  <tr>
-                    ${['Propina','Descuentos','Tickets','T. Promedio'].map(h =>
-                      `<td style="padding:10px 16px 4px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);white-space:nowrap">${h}</td>`
-                    ).join('')}
-                  </tr>
-                </thead>
                 <tbody>
                   <tr>
-                    <td style="padding:2px 16px 10px;font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--color-text)">$${formatNum(propinaTotal)}</td>
-                    <td style="padding:2px 16px 10px;font-family:'Bebas Neue',sans-serif;font-size:20px;color:#3A8C3E">$${formatNum(descTotal)}</td>
-                    <td style="padding:2px 16px 10px;font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--color-text)">${ticketsTotal}</td>
-                    <td style="padding:2px 16px 10px;font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--color-text)">$${formatNum(ticketProm)}</td>
+                    <td style="${tdH}">💰 Propina</td>
+                    <td style="${tdH}">🏷️ Descuentos</td>
+                  </tr>
+                  <tr>
+                    <td style="${tdV()}">$${formatNum(propinaTotal)}</td>
+                    <td style="${tdV('#3A8C3E')}">$${formatNum(descTotal)}</td>
+                  </tr>
+                  <tr>
+                    <td style="${tdH}">🎟️ Tickets</td>
+                    <td style="${tdH}">📊 T. Promedio</td>
+                  </tr>
+                  <tr>
+                    <td style="${tdV()}">${ticketsTotal}</td>
+                    <td style="${tdV()}">$${formatNum(ticketProm)}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
 
-            <!-- Derecha: donut + leyenda -->
+            <!-- Centro: donut + leyenda -->
             ${metodosEntries.length > 0 ? `
             <div id="cierres-cab-donut" style="display:flex;flex-direction:column;gap:10px">
               <canvas id="cierre-chart-metodos" width="220" height="220"></canvas>
               ${legendHtml}
+            </div>` : ''}
+
+            <!-- Derecha: top 3 -->
+            ${top3.length > 0 ? `
+            <div style="display:flex;flex-direction:column;gap:10px;min-width:160px">
+              <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-muted)">🏆 Top 3</div>
+              ${top3.map(([nombre, cant], i) => `
+                <div style="font-size:13px;display:flex;gap:6px;align-items:baseline">
+                  <span style="color:var(--color-text-muted);min-width:14px">${i + 1}.</span>
+                  <span style="font-weight:600;flex:1">${nombre}</span>
+                  <span style="color:var(--color-text-muted);white-space:nowrap">× ${cant}</span>
+                </div>`).join('')}
             </div>` : ''}
 
           </div>
