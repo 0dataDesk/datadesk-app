@@ -205,10 +205,10 @@ async function vistaSugeridoCompra() {
                     return `
                       <tr style="${rowBg}">
                         <td>${item.producto}</td>
-                        <td style="text-align:right">${formatNum(item.stockActual)} ${item.unidad_medida||''}</td>
-                        <td style="text-align:right;color:var(--color-text-muted)">${item.stock_maximo} ${item.unidad_medida||''}</td>
+                        <td style="text-align:right">${formatInt(item.stockActual)} ${item.unidad_medida||''}</td>
+                        <td style="text-align:right;color:var(--color-text-muted)">${formatInt(item.stock_maximo)} ${item.unidad_medida||''}</td>
                         <td style="text-align:right;font-weight:700;color:${pctColor}">${pctStr}${item.enAlerta?' 🔴':''}</td>
-                        <td style="text-align:right;font-weight:600">${formatNum(item.cantSugerida)} ${item.unidad_medida||''}</td>
+                        <td style="text-align:right;font-weight:600">${formatInt(item.cantSugerida)} ${item.unidad_medida||''}</td>
                         <td style="text-align:right;color:var(--color-text-muted)">${item.ultimo_costo ? '$'+formatNum(item.ultimo_costo) : '—'}</td>
                         <td style="text-align:right;font-weight:600">$${formatNum(item.costoTotal)}</td>
                       </tr>`
@@ -284,7 +284,7 @@ window.generarPedidoSugerido = async function(idProveedor, nombreProv) {
           ${itemsConCantidad.map((item, idx) => `
             <tr>
               <td>${item.producto}</td>
-              <td style="text-align:right;color:var(--color-text-muted)">${formatNum(item.cantSugerida)} ${item.unidad_medida||''}</td>
+              <td style="text-align:right;color:var(--color-text-muted)">${formatInt(item.cantSugerida)} ${item.unidad_medida||''}</td>
               <td style="text-align:right">
                 <input type="number" class="edit-input edit-num" style="text-align:right"
                   id="ped-sug-qty-${idx}" value="${item.cantSugerida.toFixed(2)}" min="0" step="any"
