@@ -148,11 +148,13 @@ async function renderCierresVista(periodo) {
     if (ventaIds.length > 0) {
       const { data: items } = await window._db
         .from('venta_items')
-        .select('nombre, cantidad')
+        .select('nombre, cantidad, id_item')
         .eq('tenant_id', window._cierresTenant)
         .in('id_venta', ventaIds)
+      const excluidoTop3 = (id) => /^(BEB-|RBE-|REX-COM-)/.test(id || '')
       const sumas = {}
       ;(items || []).forEach(it => {
+        if (excluidoTop3(it.id_item)) return
         sumas[it.nombre] = (sumas[it.nombre] || 0) + (Number(it.cantidad) || 0)
       })
       top3 = Object.entries(sumas).sort((a, b) => b[1] - a[1]).slice(0, 3)
