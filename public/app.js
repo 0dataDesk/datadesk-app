@@ -235,16 +235,17 @@ async function mostrarApp(rol, email, tenant_id = null) {
   const visibles = permitidasPorRol[window._rol] || ['inicio','productos','recetas','precios','costeo','pedidos']
 
   const navGrupos = [
-    { label: 'Menú',       vistas: ['productos','recetas'],              roles: ['superadmin','admin','owner','gerente','editor','caja','cocina'] },
-    { label: 'Operación',  vistas: ['ventas','cierres','recepciones','inventario','inventarios','levantamiento','sugerido'], roles: ['superadmin','admin','owner','gerente','editor'] },
-    { label: 'Desarrollo', vistas: ['inicio','precios','costeo','pedidos'], roles: ['superadmin','admin'] }
+    { label: 'Menú',        vistas: ['productos','recetas'],                                 roles: ['superadmin','admin','owner','gerente','editor','caja','cocina'] },
+    { label: 'Operación',   vistas: ['ventas','cierres','recepciones'],                      roles: ['superadmin','admin','owner','gerente','editor'] },
+    { label: 'Inventarios', vistas: ['inventario','inventarios','levantamiento','sugerido'], roles: ['superadmin','admin','owner','gerente','editor'] },
+    { label: 'Desarrollo',  vistas: ['inicio','precios','costeo','pedidos'],                 roles: ['superadmin','admin'] }
   ]
 
   const vistaLabels = {
     inicio: 'Inicio', productos: 'Insumos', recetas: 'Recetas',
     precios: 'Precios', costeo: 'Costeo', pedidos: 'Pedidos',
-    ventas: '🧾 Ventas', inventario: 'Inventario Analítico', inventarios: 'Inventario Físico', levantamiento: 'Levantar Inventario', sugerido: 'Sugerido de Compra',
-    cierres: '🔒 Cierres', recepciones: '📦 Recepciones'
+    ventas: '🧾 Ventas', cierres: '🔒 Cierres', recepciones: '📦 Recepciones',
+    inventario: 'Análisis', inventarios: 'Conteos', levantamiento: 'Levantamiento', sugerido: 'Sugerido de Compra'
   }
 
   let navHtml = ''
