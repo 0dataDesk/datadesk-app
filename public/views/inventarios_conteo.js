@@ -150,25 +150,37 @@ async function verDetalleInventario(idInventario) {
       if (ratio > bestRatio) { bestRatio = ratio; bestGroup = g }
     })
 
-    // Orden de grupos: alfabético, "Sin grupo" al final
+    const GRUPO_META = {
+      'Carnes y Proteínas': { orden: 1, emoji: '🥩', color: '#B85C2A' },
+      'Lácteos y Quesos':   { orden: 2, emoji: '🧀', color: '#6A9BB5' },
+      'Verduras y Frescos': { orden: 3, emoji: '🥬', color: '#4A7A3A' },
+      'Despensa':           { orden: 4, emoji: '🍞', color: '#C8892A' },
+      'Subrecetas':         { orden: 5, emoji: '🧪', color: '#8A5FB0' },
+      'Bebidas':            { orden: 6, emoji: '🥤', color: '#3D9BA8' },
+      'Desechables':        { orden: 7, emoji: '🗑️', color: '#9B7B6A' }
+    }
+    const metaDefault = { orden: 99, emoji: '📦', color: '#9B7B6A' }
+
+    // Orden de grupos por GRUPO_META, grupos desconocidos al final
     const grupoNames = Object.keys(grupos).sort((a, b) => {
-      if (a === 'Sin grupo') return 1
-      if (b === 'Sin grupo') return -1
-      return a.localeCompare(b)
+      const ma = GRUPO_META[a] || metaDefault
+      const mb = GRUPO_META[b] || metaDefault
+      return ma.orden - mb.orden
     })
 
     const accordionHTML = grupoNames.map(g => {
       const arr      = grupos[g]
       const contados = arr.filter(f => f.contado != null && f.contado > 0).length
       const total    = totalPorGrupo[g] || arr.length
+      const meta     = GRUPO_META[g] || metaDefault
 
       return `
         <div class="ic-grupo" data-grupo="${g.replace(/"/g,'&quot;')}"
-          style="border:1px solid var(--color-border);border-radius:8px;margin-bottom:8px;overflow:hidden">
+          style="border:1px solid var(--color-border);border-left:4px solid ${meta.color};border-radius:8px;margin-bottom:8px;overflow:hidden">
           <div class="ic-grupo-header"
             style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;cursor:pointer;background:var(--color-surface);user-select:none"
             onclick="this.parentElement.classList.toggle('open')">
-            <span style="font-weight:600">${g}</span>
+            <span style="font-weight:600">${meta.emoji} ${g}</span>
             <span style="font-size:12px;color:var(--color-text-muted)">${contados}/${total}</span>
           </div>
           <div class="ic-grupo-body" style="display:none">
@@ -202,7 +214,6 @@ async function verDetalleInventario(idInventario) {
         <div class="detalle-header">
           <div>
             <h3>Conteo — ${inv.fecha}</h3>
-            <p class="detalle-categoria">${inv.clasificacion || 'todos'} · ${inv.area || 'sin área'} · ${inv.estado}</p>
           </div>
           <button class="btn-accion" style="border:1px solid var(--color-border)"
             onclick="
