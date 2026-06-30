@@ -8,7 +8,7 @@
 async function renderVentas(container, tenantId) {
   const { data: ventas, error } = await window._db
     .from('ventas')
-    .select('id, folio, created_at, total, estado, tipo_entrega, cliente_nombre, metodo_pago, propina, descuento_porcentaje, monto_efectivo, monto_tarjeta')
+    .select('id, folio, created_at, total, subtotal, estado, tipo_entrega, cliente_nombre, metodo_pago, propina, descuento_porcentaje, monto_efectivo, monto_tarjeta')
     .eq('tenant_id', tenantId)
     .is('id_cierre', null)
     .order('created_at', { ascending: false })
@@ -90,7 +90,13 @@ async function renderVentas(container, tenantId) {
   }
 
   // — Métricas del día —
-  const totalDia = (ventas || []).reduce((s, v) => s + Number(v.total || 0), 0)
+  const propinaDia = (ventas || []).reduce((s, v) => s + Number(v.propina || 0), 0)
+  const descuentoDia = (ventas || []).reduce((s, v) => {
+    const sub = Number(v.subtotal) || 0
+    const pct = Number(v.descuento_porcentaje) || 0
+    return s + (pct > 0 ? Math.round(sub * pct) / 100 : 0)
+  }, 0)
+  const totalDia = (ventas || []).reduce((s, v) => s + Number(v.total || 0), 0) - propinaDia
   const ticketProm = ventas.length ? totalDia / ventas.length : 0
 
   html += `
@@ -103,6 +109,14 @@ async function renderVentas(container, tenantId) {
         <div>
           <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-muted)">Ticket promedio</div>
           <div style="font-family:'Bebas Neue',sans-serif;font-size:36px;line-height:1.1;color:var(--color-text)">$${formatNum(ticketProm)}</div>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-muted)">💰 Propina</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:36px;line-height:1.1;color:var(--color-text)">$${formatNum(propinaDia)}</div>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-muted)">🏷️ Descuentos</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:36px;line-height:1.1;color:#3A8C3E">$${formatNum(descuentoDia)}</div>
         </div>
       </div>
     </div>
