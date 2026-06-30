@@ -245,7 +245,7 @@ async function mostrarApp(rol, email, tenant_id = null) {
     inicio: 'Inicio', productos: 'Insumos', recetas: 'Recetas',
     precios: 'Precios', costeo: 'Costeo', pedidos: 'Pedidos',
     ventas: '🧾 Ventas', cierres: '🔒 Cierres', recepciones: '📦 Recepciones',
-    inventario: '🔍 Diagnóstico', inventarios: '📋 Conteos', levantamiento: '📝 Levantamiento', sugerido: 'Sugerido de Compra'
+    inventario: '🔍 Diagnóstico', inventarios: '📋 Conteos', levantamiento: '📝 Levantamiento', sugerido: '🛒 Sugerido de Compra'
   }
 
   let navHtml = ''

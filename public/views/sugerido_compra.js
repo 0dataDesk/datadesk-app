@@ -76,7 +76,7 @@ async function vistaSugeridoCompra() {
     // Productos con datos de inventario
     const { data: productos } = await window._db
       .from('productos')
-      .select('id_producto, producto, unidad_medida, clasificacion_abc, stock_maximo, stock_alerta_porcentaje, dias_cobertura, id_proveedor_preferencial, ultimo_costo')
+      .select('id_producto, producto, unidad_medida, clasificacion_abc, grupo, stock_maximo, stock_alerta_porcentaje, dias_cobertura, id_proveedor_preferencial, ultimo_costo')
       .eq('tenant_id', tenant_id)
       .eq('activo', true)
       .not('stock_maximo', 'is', null)
@@ -129,7 +129,7 @@ async function vistaSugeridoCompra() {
 
     if (!claves.length) {
       content.innerHTML = `
-        <div class="vista-header"><h2>Sugerido de Compra</h2></div>
+        <div class="vista-header"><h2>🛒 Sugerido de Compra</h2></div>
         <p style="color:var(--color-text-muted)">No hay insumos con stock máximo configurado. Configura stock máximo en la sección "Control de Inventario" de cada insumo.</p>
       `
       return
@@ -137,7 +137,7 @@ async function vistaSugeridoCompra() {
 
     let html = `
       <div class="vista-header">
-        <h2>Sugerido de Compra</h2>
+        <h2>🛒 Sugerido de Compra</h2>
         <small style="color:var(--color-text-muted);font-size:12px">Base: inventario del ${fechaBase} · Consumo promedio últimos 7 días</small>
       </div>
       <div id="sugerido-pedido-wrap"></div>
@@ -149,53 +149,95 @@ async function vistaSugeridoCompra() {
       const nombre = prov?.nombre || (provKey === '__sin_proveedor__' ? 'Sin proveedor' : provKey)
       const diasEntrega = prov?.dias_entrega || ''
       const totalCosto = items.reduce((s, i) => s + i.costoTotal, 0)
+      const provId = `sug-prov-${provKey.replace(/[^a-zA-Z0-9]/g,'_')}`
+      const abiertoDefault = provKey === claves[0]
+
+      // Agrupar items por grupo
+      const porGrupo = {}
+      items.forEach(item => {
+        const g = item.grupo || 'Sin grupo'
+        if (!porGrupo[g]) porGrupo[g] = []
+        porGrupo[g].push(item)
+      })
+      // Ordenar grupos: primero los con alertas
+      const grupoKeys = Object.keys(porGrupo).sort((a, b) => {
+        const aA = porGrupo[a].some(x => x.enAlerta)
+        const bA = porGrupo[b].some(x => x.enAlerta)
+        if (aA && !bA) return -1
+        if (!aA && bA) return 1
+        return a.localeCompare(b)
+      })
+
+      const subAcordeonesHtml = grupoKeys.map(g => {
+        const gItems = porGrupo[g]
+        const gId = `${provId}-g-${g.replace(/[^a-zA-Z0-9]/g,'_')}`
+        const gAbierto = gItems.some(x => x.enAlerta)
+        const gAlertCount = gItems.filter(x => x.enAlerta).length
+        return `
+          <div style="border-bottom:1px solid var(--color-border)">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 16px;cursor:pointer;background:var(--color-bg-alt,rgba(0,0,0,0.02));user-select:none"
+              onclick="(function(el){const b=document.getElementById('${gId}');const open=b.style.display!=='none';b.style.display=open?'none':'block';el.querySelector('.sug-gchev').textContent=open?'▶':'▼'})(this)">
+              <span style="font-size:13px;font-weight:600">
+                <span class="sug-gchev" style="font-size:10px;color:var(--color-text-muted);margin-right:6px">${gAbierto?'▼':'▶'}</span>
+                ${g}
+                ${gAlertCount ? `<span style="margin-left:6px;font-size:11px;color:#B85C2A">🔴 ${gAlertCount}</span>` : ''}
+              </span>
+              <span style="font-size:12px;color:var(--color-text-muted)">${gItems.length} insumo${gItems.length!==1?'s':''}</span>
+            </div>
+            <div id="${gId}" style="display:${gAbierto?'block':'none'}">
+              <table class="tabla" style="border-radius:0">
+                <thead>
+                  <tr>
+                    <th>Insumo</th>
+                    <th style="text-align:right">Stock actual</th>
+                    <th style="text-align:right">Stock máximo</th>
+                    <th style="text-align:right">% actual</th>
+                    <th style="text-align:right">Cant. sugerida</th>
+                    <th style="text-align:right">Costo unit.</th>
+                    <th style="text-align:right">Costo total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${gItems.map(item => {
+                    const pctStr = formatNum(item.pctActual, 0) + '%'
+                    const pctColor = item.enAlerta ? '#B85C2A' : item.pctActual <= 60 ? '#c8892a' : '#3A8C3E'
+                    const rowBg = item.enAlerta ? 'background:rgba(184,92,42,0.06)' : ''
+                    return `
+                      <tr style="${rowBg}">
+                        <td>${item.producto}</td>
+                        <td style="text-align:right">${formatNum(item.stockActual)} ${item.unidad_medida||''}</td>
+                        <td style="text-align:right;color:var(--color-text-muted)">${item.stock_maximo} ${item.unidad_medida||''}</td>
+                        <td style="text-align:right;font-weight:700;color:${pctColor}">${pctStr}${item.enAlerta?' 🔴':''}</td>
+                        <td style="text-align:right;font-weight:600">${formatNum(item.cantSugerida)} ${item.unidad_medida||''}</td>
+                        <td style="text-align:right;color:var(--color-text-muted)">${item.ultimo_costo ? '$'+formatNum(item.ultimo_costo) : '—'}</td>
+                        <td style="text-align:right;font-weight:600">$${formatNum(item.costoTotal)}</td>
+                      </tr>`
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>`
+      }).join('')
 
       html += `
         <div class="precios-seccion" style="margin-bottom:20px">
-          <div class="precios-seccion-header" style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px">
-            <div>
+          <div class="precios-seccion-header" style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;cursor:pointer;user-select:none"
+            onclick="(function(el){const b=document.getElementById('${provId}');const open=b.style.display!=='none';b.style.display=open?'none':'block';el.querySelector('.sug-chev').textContent=open?'▶':'▼'})(this)">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span class="sug-chev" style="font-size:11px;color:var(--color-text-muted)">${abiertoDefault?'▼':'▶'}</span>
               <span style="font-weight:700">${nombre}</span>
-              ${diasEntrega ? `<span style="font-size:11px;color:var(--color-text-muted);margin-left:8px">🗓 ${diasEntrega}</span>` : ''}
+              ${diasEntrega ? `<span style="font-size:11px;color:var(--color-text-muted)">🗓 ${diasEntrega}</span>` : ''}
             </div>
             <div style="display:flex;gap:8px;align-items:center">
               <span style="font-size:12px;color:var(--color-text-muted)">Total estimado: <strong>$${formatNum(totalCosto)}</strong></span>
               ${provKey !== '__sin_proveedor__'
                 ? `<button class="btn-accion btn-aprobar" style="font-size:11px;padding:4px 12px"
-                    onclick="generarPedidoSugerido('${provKey}','${nombre.replace(/'/g,"\\'")}')">Generar pedido</button>`
+                    onclick="event.stopPropagation();generarPedidoSugerido('${provKey}','${nombre.replace(/'/g,"\\'")}')">Generar pedido</button>`
                 : ''}
             </div>
           </div>
-          <div class="precios-seccion-body" style="display:block">
-            <table class="tabla">
-              <thead>
-                <tr>
-                  <th>Insumo</th>
-                  <th style="text-align:right">Stock actual</th>
-                  <th style="text-align:right">Stock máximo</th>
-                  <th style="text-align:right">% actual</th>
-                  <th style="text-align:right">Cant. sugerida</th>
-                  <th style="text-align:right">Costo unit.</th>
-                  <th style="text-align:right">Costo total</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${items.map(item => {
-                  const pctStr = formatNum(item.pctActual, 0) + '%'
-                  const pctColor = item.enAlerta ? '#B85C2A' : item.pctActual <= 60 ? '#c8892a' : '#3A8C3E'
-                  const rowBg = item.enAlerta ? 'background:rgba(184,92,42,0.06)' : ''
-                  return `
-                    <tr style="${rowBg}">
-                      <td>${item.producto}</td>
-                      <td style="text-align:right">${formatNum(item.stockActual)} ${item.unidad_medida||''}</td>
-                      <td style="text-align:right;color:var(--color-text-muted)">${item.stock_maximo} ${item.unidad_medida||''}</td>
-                      <td style="text-align:right;font-weight:700;color:${pctColor}">${pctStr}${item.enAlerta?' 🔴':''}</td>
-                      <td style="text-align:right;font-weight:600">${formatNum(item.cantSugerida)} ${item.unidad_medida||''}</td>
-                      <td style="text-align:right;color:var(--color-text-muted)">${item.ultimo_costo ? '$'+formatNum(item.ultimo_costo) : '—'}</td>
-                      <td style="text-align:right;font-weight:600">$${formatNum(item.costoTotal)}</td>
-                    </tr>`
-                }).join('')}
-              </tbody>
-            </table>
+          <div class="precios-seccion-body" id="${provId}" style="display:${abiertoDefault?'block':'none'}">
+            ${subAcordeonesHtml}
           </div>
         </div>
       `
