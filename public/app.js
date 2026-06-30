@@ -44,6 +44,7 @@ document.addEventListener('visibilitychange', () => {})
 
 async function mostrarSelectorTenant(tenants, rol, email) {
   document.title = 'dataDesk'
+  setFaviconEmoji('📊')
   document.documentElement.style.setProperty('--color-primary', '#1A1A1A')
 
   const configs = await Promise.all(tenants.map(async t => {
@@ -56,7 +57,7 @@ async function mostrarSelectorTenant(tenants, rol, email) {
   document.getElementById('app').innerHTML = `
     <div class="login-wrapper">
       <div class="login-box">
-        <div class="login-logo">dataDesk</div>
+        <div class="login-logo">📊 dataDesk</div>
         <p class="login-tagline">Selecciona un negocio</p>
         <div style="display:flex;flex-direction:column;gap:12px;margin-top:8px">
           ${configs.map(cfg => `
