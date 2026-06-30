@@ -510,6 +510,11 @@ async function marcarPagado(id) {
 }
 
 async function verDetalleRecepcion(id) {
+  const filtrosBar = document.querySelector('.filtros-bar')
+  const listaEl    = document.getElementById('recepciones-lista')
+  if (filtrosBar) filtrosBar.style.display = 'none'
+  if (listaEl)    listaEl.style.display    = 'none'
+
   const tenant_id = await getTenantId()
 
   const [
@@ -649,7 +654,13 @@ async function verDetalleRecepcion(id) {
 
       <div style="margin-top:16px">
         <button class="btn-accion" style="border:1px solid var(--color-border)"
-          onclick="document.getElementById('form-recepcion-wrap').innerHTML=''">Cerrar</button>
+          onclick="
+            const fb=document.querySelector('.filtros-bar');
+            const le=document.getElementById('recepciones-lista');
+            if(fb) fb.style.display='';
+            if(le) le.style.display='';
+            document.getElementById('form-recepcion-wrap').innerHTML=''
+          ">Cerrar</button>
       </div>
     </div>
   `

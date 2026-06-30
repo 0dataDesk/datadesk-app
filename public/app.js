@@ -243,8 +243,8 @@ async function mostrarApp(rol, email, tenant_id = null) {
   const vistaLabels = {
     inicio: 'Inicio', productos: 'Insumos', recetas: 'Recetas',
     precios: 'Precios', costeo: 'Costeo', pedidos: 'Pedidos',
-    ventas: 'Ventas', inventario: 'Inventario Analítico', inventarios: 'Inventario Físico', levantamiento: 'Levantar Inventario', sugerido: 'Sugerido de Compra',
-    cierres: 'Cierres', recepciones: 'Recepciones'
+    ventas: '🧾 Ventas', inventario: 'Inventario Analítico', inventarios: 'Inventario Físico', levantamiento: 'Levantar Inventario', sugerido: 'Sugerido de Compra',
+    cierres: '🔒 Cierres', recepciones: '📦 Recepciones'
   }
 
   let navHtml = ''
