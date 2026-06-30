@@ -42,12 +42,13 @@ async function vistaProductos() {
 
     content.innerHTML = `
       <div class="vista-header">
-        <h2>Insumos</h2>
+        <h2>🧂 Insumos</h2>
         ${fuentesDef.length ? `
         <div class="export-bar">
+          ${fuentesDef.length > 1 ? `
           <select id="export-fuente" class="filtro-select">
             ${fuentesDef.map(f => `<option value="${f.fuente}">${f.etiqueta}</option>`).join('')}
-          </select>
+          </select>` : ''}
           <button id="btn-export-pdf" class="btn-primary">Exportar PDF</button>
         </div>` : ''}
       </div>
@@ -193,7 +194,9 @@ async function vistaProductos() {
     document.getElementById('insumos-search').addEventListener('input', onFiltro)
     if (fuentesDef.length) {
       document.getElementById('btn-export-pdf').addEventListener('click', () => {
-        const fuente = document.getElementById('export-fuente').value
+        const fuente = fuentesDef.length > 1
+          ? document.getElementById('export-fuente').value
+          : fuentesDef[0].fuente
         exportarInsumosPDF(fuente)
       })
     }

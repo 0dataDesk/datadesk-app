@@ -38,24 +38,26 @@ async function vistaRecetas() {
 
     content.innerHTML = `
       <div class="vista-header">
-        <h2>Recetas</h2>
+        <h2>📖 Recetas</h2>
         ${fuentesDef.length ? `
         <div class="export-bar">
+          ${fuentesDef.length > 1 ? `
           <select id="export-fuente" class="filtro-select">
             ${fuentesDef.map(f => `<option value="${f.fuente}">${f.etiqueta}</option>`).join('')}
-          </select>
+          </select>` : ''}
           <button id="btn-export-pdf" class="btn-primary">Exportar PDF</button>
         </div>` : ''}
       </div>
 
       <div class="filtros-cascada">
+        ${fuentesDef.length > 1 ? `
         <div class="filtro-cascada-item">
           <label class="filtro-label">Fuente</label>
           <select id="f-fuente" class="filtro-select">
             <option value="">Todas las fuentes</option>
             ${fuentes.map(f => `<option value="${f}">${f}</option>`).join('')}
           </select>
-        </div>
+        </div>` : ''}
         <div class="filtro-cascada-item">
           <label class="filtro-label">Categoría</label>
           <select id="f-categoria" class="filtro-select">
@@ -80,7 +82,7 @@ async function vistaRecetas() {
     const fPlatillo  = document.getElementById('f-platillo')
 
     const actualizarFiltros = () => {
-      const fuente    = fFuente.value
+      const fuente    = fFuente ? fFuente.value : ''
       const categoria = fCategoria.value
 
       const catsDisp = [...new Set(
@@ -107,12 +109,14 @@ async function vistaRecetas() {
       document.getElementById('receta-detalle-wrap').innerHTML = ''
     }
 
-    fFuente.addEventListener('change', actualizarFiltros)
+    if (fFuente) fFuente.addEventListener('change', actualizarFiltros)
     fCategoria.addEventListener('change', actualizarFiltros)
 
     if (fuentesDef.length) {
       document.getElementById('btn-export-pdf').addEventListener('click', () => {
-        const fuente = document.getElementById('export-fuente').value
+        const fuente = fuentesDef.length > 1
+          ? document.getElementById('export-fuente').value
+          : fuentesDef[0].fuente
         exportarRecetasPDF(fuente)
       })
     }
@@ -269,7 +273,6 @@ async function cargarDetalleReceta(receta) {
             <h3>${receta.nombre_platillo}</h3>
             <p class="detalle-categoria">${receta.categoria || ''}</p>
           </div>
-          <span class="badge-status ${receta.status || 'pendiente'}">${receta.status || 'pendiente'}</span>
         </div>
 
         ${!esReventa ? `
