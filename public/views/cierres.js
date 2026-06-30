@@ -589,10 +589,10 @@ async function verDetalleCierre(id_cierre, fecha) {
                 <td style="text-align:right">${d.count}</td>
                 <td style="text-align:right;font-weight:600">$${formatNum(d.suma)}</td>
               </tr>`).join('')}
-            <tr class="costeo-total">
-              <td><strong>TOTAL</strong></td>
-              <td style="text-align:right"><strong>${cierre?.num_tickets || 0} tickets</strong></td>
-              <td style="text-align:right"><strong>$${formatNum(cierre?.total_general || 0)}</strong></td>
+            <tr style="border-top:2px solid var(--color-primary)">
+              <td style="padding-top:12px"><strong style="font-size:15px;color:var(--color-primary)">TOTAL</strong></td>
+              <td style="text-align:right;padding-top:12px"><strong style="font-size:15px">${cierre?.num_tickets || 0} tickets</strong></td>
+              <td style="text-align:right;padding-top:12px"><strong style="font-size:18px;color:var(--color-primary)">$${formatNum(cierre?.total_general || 0)}</strong></td>
             </tr>
           </tbody>
         </table>
