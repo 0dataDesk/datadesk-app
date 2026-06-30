@@ -57,7 +57,7 @@ async function mostrarSelectorTenant(tenants, rol, email) {
   document.getElementById('app').innerHTML = `
     <div class="login-wrapper">
       <div class="login-box">
-        <div class="login-logo">📊 dataDesk</div>
+        <div class="login-logo" style="font-family:'DM Sans',sans-serif"><span style="font-size:0.6em;vertical-align:middle;margin-right:6px">📊</span>dataDesk</div>
         <p class="login-tagline">Selecciona un negocio</p>
         <div style="display:flex;flex-direction:column;gap:12px;margin-top:8px">
           ${configs.map(cfg => `
