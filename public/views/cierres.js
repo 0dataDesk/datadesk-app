@@ -559,6 +559,18 @@ async function verDetalleCierre(id_cierre, fecha) {
         <button class="btn-accion" style="border:1px solid var(--color-border)" onclick="exportarCierrePDF()">Exportar PDF</button>
       </div>
 
+      <!-- Propina y Descuentos como columnas -->
+      <div style="display:flex;gap:32px;margin-bottom:20px;flex-wrap:wrap">
+        <div>
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--color-text-muted)">💰 Propina</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--color-text)">$${formatNum(Number(cierre?.propina_total) || 0)}</div>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--color-text-muted)">🏷️ Descuentos</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:#3A8C3E">$${formatNum(montoDescTotal)}</div>
+        </div>
+      </div>
+
       <!-- Resumen por método de pago -->
       ${secLabel('Resumen por método de pago')}
       <div style="overflow-x:auto;margin-bottom:24px">
@@ -577,18 +589,6 @@ async function verDetalleCierre(id_cierre, fecha) {
                 <td style="text-align:right">${d.count}</td>
                 <td style="text-align:right;font-weight:600">$${formatNum(d.suma)}</td>
               </tr>`).join('')}
-            ${(Number(cierre?.propina_total) || 0) > 0 ? `
-              <tr>
-                <td style="color:var(--color-text-muted)">Propina</td>
-                <td style="text-align:right;color:var(--color-text-muted)">—</td>
-                <td style="text-align:right;color:var(--color-text-muted)">$${formatNum(Number(cierre.propina_total))}</td>
-              </tr>` : ''}
-            ${ventasConDesc.length > 0 ? `
-              <tr style="background:rgba(76,153,80,0.06)">
-                <td style="color:#3A8C3E;font-weight:600">🏷 Descuentos</td>
-                <td style="text-align:right;color:#3A8C3E">${ventasConDesc.length}</td>
-                <td style="text-align:right;color:#3A8C3E;font-weight:600">-$${formatNum(montoDescTotal)}</td>
-              </tr>` : ''}
             <tr class="costeo-total">
               <td><strong>TOTAL</strong></td>
               <td style="text-align:right"><strong>${cierre?.num_tickets || 0} tickets</strong></td>
