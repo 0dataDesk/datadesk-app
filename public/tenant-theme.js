@@ -5,6 +5,8 @@ const TENANT_PALETTES = {
     '--color-primary-light':    '#a03c32',
     '--color-bg-accent':        '#ffefc5',
     '--color-text-on-primary':  '#ffffff',
+    '--font-brand':             "'Bebas Neue', sans-serif",
+    '--font-main':              "'DM Sans', sans-serif",
   },
   tita: {
     '--color-primary':          '#6A9BB5',
@@ -12,6 +14,8 @@ const TENANT_PALETTES = {
     '--color-primary-light':    '#8BBACF',
     '--color-bg-accent':        '#F5F9FC',
     '--color-text-on-primary':  '#ffffff',
+    '--font-brand':             "'Baloo 2', sans-serif",
+    '--font-main':              "'DM Sans', sans-serif",
   },
 }
 
