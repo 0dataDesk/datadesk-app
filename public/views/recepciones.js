@@ -37,7 +37,7 @@ async function vistaRecepciones() {
 
     content.innerHTML = `
       <div class="vista-header">
-        <h2>Recepciones</h2>
+        <h2>📦 Recepciones</h2>
         <button class="btn-accion btn-aprobar" onclick="mostrarFormRecepcion()">+ Nueva recepción</button>
       </div>
 

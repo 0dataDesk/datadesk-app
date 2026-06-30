@@ -15,7 +15,7 @@ async function vistaCierres() {
     if (error) throw error
 
     if (!cierres || !cierres.length) {
-      content.innerHTML = `<div class="vista-header"><h2>Cierres</h2></div><p style="color:var(--color-text-muted)">No hay cierres registrados.</p>`
+      content.innerHTML = `<div class="vista-header"><h2>🔒 Cierres</h2></div><p style="color:var(--color-text-muted)">No hay cierres registrados.</p>`
       return
     }
 
@@ -56,7 +56,7 @@ async function vistaCierres() {
 
     const periodos = ['Última semana', 'Este mes']
     content.innerHTML = `
-      <div class="vista-header"><h2>Cierres</h2></div>
+      <div class="vista-header"><h2>🔒 Cierres</h2></div>
       <div id="cierres-filtro" style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
         ${periodos.map(p => `
           <button class="btn-periodo" data-periodo="${p}"

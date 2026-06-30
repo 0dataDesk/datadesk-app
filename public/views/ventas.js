@@ -78,7 +78,7 @@ async function renderVentas(container, tenantId) {
 
   let html = `
     <div class="vista-header">
-      <h2>Ventas</h2>
+      <h2>🧾 Ventas</h2>
       ${mostrarCierre ? `<button class="btn-accion" onclick="mostrarCierreCaja('${tenantId}')">Cierre de caja</button>` : ''}
     </div>
   `
