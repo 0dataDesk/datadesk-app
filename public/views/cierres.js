@@ -54,7 +54,7 @@ async function vistaCierres() {
     const periodoPorDefecto = 'Este mes'
     window._cierresPeriodoActual = periodoPorDefecto
 
-    const periodos = ['Esta semana', 'Este mes', 'Últimos 3 meses', 'Todo']
+    const periodos = ['Última semana', 'Este mes']
     content.innerHTML = `
       <div class="vista-header"><h2>Cierres</h2></div>
       <div id="cierres-filtro" style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
@@ -81,20 +81,20 @@ async function vistaCierres() {
 
 function _filtrarCierresPorPeriodo(periodo) {
   const todos = window._cierresData || []
-  if (periodo === 'Todo') return todos
   const hoy = new Date()
-  let desde
-  if (periodo === 'Esta semana') {
+  if (periodo === 'Última semana') {
     const d = new Date(hoy)
     const day = d.getDay() || 7
-    d.setDate(d.getDate() - (day - 1))
-    desde = d.toISOString().split('T')[0]
-  } else if (periodo === 'Este mes') {
+    d.setDate(d.getDate() - (day - 1) - 7)
+    const desde = d.toISOString().split('T')[0]
+    const domingoPasado = new Date(d)
+    domingoPasado.setDate(domingoPasado.getDate() + 6)
+    const hasta = domingoPasado.toISOString().split('T')[0]
+    return todos.filter(c => c.fecha >= desde && c.fecha <= hasta)
+  }
+  let desde
+  if (periodo === 'Este mes') {
     desde = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-01`
-  } else if (periodo === 'Últimos 3 meses') {
-    const d = new Date(hoy)
-    d.setMonth(d.getMonth() - 3)
-    desde = d.toISOString().split('T')[0]
   }
   return todos.filter(c => c.fecha >= desde)
 }
@@ -197,7 +197,7 @@ async function renderCierresVista(periodo) {
             <!-- Derecha: donut + leyenda -->
             ${metodosEntries.length > 0 ? `
             <div id="cierres-cab-donut" style="display:flex;flex-direction:column;gap:10px">
-              <canvas id="cierre-chart-metodos" width="200" height="200"></canvas>
+              <canvas id="cierre-chart-metodos" width="220" height="220"></canvas>
               ${legendHtml}
             </div>` : ''}
 
@@ -222,12 +222,12 @@ async function renderCierresVista(periodo) {
               const cx = (left + right) / 2
               const cy = (top + bottom) / 2
               ctx.save()
-              ctx.font = "bold 13px 'DM Sans', sans-serif"
+              ctx.font = "bold 12px 'DM Sans', sans-serif"
               ctx.fillStyle = colorTextMuted
               ctx.textAlign = 'center'
               ctx.textBaseline = 'middle'
-              ctx.fillText('TOTAL', cx, cy - 11)
-              ctx.font = "600 18px 'Bebas Neue', sans-serif"
+              ctx.fillText('TOTAL', cx, cy - 12)
+              ctx.font = "600 20px 'Bebas Neue', sans-serif"
               ctx.fillStyle = colorText
               ctx.fillText('$' + formatNum(totalMetodosSum), cx, cy + 11)
               ctx.restore()
@@ -248,7 +248,7 @@ async function renderCierresVista(periodo) {
               }]
             },
             options: {
-              cutout: '70%',
+              cutout: '58%',
               plugins: {
                 legend: { display: false },
                 tooltip: {
@@ -412,6 +412,8 @@ async function verDetalleCierre(id_cierre, fecha) {
   const detalleWrap = document.getElementById('cierre-detalle-wrap')
   if (!listaWrap || !detalleWrap) return
 
+  document.getElementById('cierres-filtro').style.display   = 'none'
+  document.getElementById('cierres-cabecero').style.display = 'none'
   listaWrap.style.display   = 'none'
   detalleWrap.style.display = ''
   detalleWrap.innerHTML     = `<p style="color:var(--color-text-muted);margin-top:16px">Cargando detalle...</p>`
@@ -506,6 +508,8 @@ async function verDetalleCierre(id_cierre, fecha) {
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:20px">
         <div style="display:flex;align-items:center;gap:12px">
           <button class="btn-accion" style="border:1px solid var(--color-border)" onclick="
+            document.getElementById('cierres-filtro').style.display='';
+            document.getElementById('cierres-cabecero').style.display='';
             document.getElementById('cierres-lista-wrap').style.display='';
             document.getElementById('cierre-detalle-wrap').style.display='none'">← Volver</button>
           <h3 style="margin:0">Cierre — ${fecha}</h3>
@@ -531,14 +535,17 @@ async function verDetalleCierre(id_cierre, fecha) {
                 <td style="text-align:right">${d.count}</td>
                 <td style="text-align:right;font-weight:600">$${formatNum(d.suma)}</td>
               </tr>`).join('')}
+            ${(Number(cierre?.propina_total) || 0) > 0 ? `
+              <tr>
+                <td style="color:var(--color-text-muted)">Propina</td>
+                <td style="text-align:right;color:var(--color-text-muted)">—</td>
+                <td style="text-align:right;color:var(--color-text-muted)">$${formatNum(Number(cierre.propina_total))}</td>
+              </tr>` : ''}
             ${ventasConDesc.length > 0 ? `
               <tr style="background:rgba(76,153,80,0.06)">
                 <td style="color:#3A8C3E;font-weight:600">🏷 Descuentos</td>
                 <td style="text-align:right;color:#3A8C3E">${ventasConDesc.length}</td>
-                <td style="text-align:right;color:#3A8C3E;font-weight:600">
-                  -$${formatNum(montoDescTotal)}<br>
-                  <span style="font-size:11px;font-weight:400">s. bruto $${formatNum(subtotalBruto)}</span>
-                </td>
+                <td style="text-align:right;color:#3A8C3E;font-weight:600">-$${formatNum(montoDescTotal)}</td>
               </tr>` : ''}
             <tr class="costeo-total">
               <td><strong>TOTAL</strong></td>
