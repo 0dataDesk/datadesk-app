@@ -19,10 +19,17 @@ async function renderVentas(container, tenantId) {
   const ids = (ventas || []).map(v => v.id)
   const itemsPorVenta = {}
   let todosItems = []
+  const promoPrecioPorItem = {}
+  const { data: preciosPromo } = await window._db
+    .from('precios_venta')
+    .select('id_item, precio')
+    .eq('tenant_id', tenantId)
+    .eq('lista', 'promo_inauguracion')
+  ;(preciosPromo || []).forEach(p => { promoPrecioPorItem[p.id_item] = Number(p.precio) })
   if (ids.length > 0) {
     const { data: items } = await window._db
       .from('venta_items')
-      .select('id_venta, nombre, cantidad, importe, modificadores')
+      .select('id_venta, nombre, cantidad, importe, modificadores, id_item, precio_unitario')
       .eq('tenant_id', tenantId)
       .in('id_venta', ids)
     todosItems = items || []
@@ -146,7 +153,9 @@ async function renderVentas(container, tenantId) {
         if (m.nota) parts.push('📝 ' + m.nota)
         if (parts.length) modsText = `<div style="font-size:11px;color:var(--color-text-muted);margin-left:12px">${parts.join(' · ')}</div>`
       }
-      return `<div style="padding:3px 0;font-size:13px">${it.nombre} ×${it.cantidad} — <strong>$${it.importe}</strong>${modsText}</div>`
+      const esPromo = it.id_item in promoPrecioPorItem && Number(it.precio_unitario) === promoPrecioPorItem[it.id_item]
+      const promoBadge = esPromo ? `<span style="background:rgba(200,137,42,0.15);color:#c8892a;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:600;text-transform:uppercase;margin-left:6px">PROMO</span>` : ''
+      return `<div style="padding:3px 0;font-size:13px">${it.nombre}${promoBadge} ×${it.cantidad} — <strong>$${it.importe}</strong>${modsText}</div>`
     }).join('')
 
     const propina   = Number(v.propina) || 0

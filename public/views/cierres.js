@@ -137,6 +137,8 @@ async function renderCierresVista(periodo) {
 
   // — Top 3 vendidos del periodo —
   let top3 = []
+  let promoPiezas = 0
+  let promoMonto = 0
   if (cierresFiltrados.length > 0) {
     const idsCierre = cierresFiltrados.map(c => c.id)
     const { data: ventasTop } = await window._db
@@ -145,15 +147,26 @@ async function renderCierresVista(periodo) {
       .eq('tenant_id', window._cierresTenant)
       .in('id_cierre', idsCierre)
     const ventaIds = (ventasTop || []).map(v => v.id)
+    const { data: preciosPromo } = await window._db
+      .from('precios_venta')
+      .select('id_item, precio')
+      .eq('tenant_id', window._cierresTenant)
+      .eq('lista', 'promo_inauguracion')
+    const promoPrecioPorItem = {}
+    ;(preciosPromo || []).forEach(p => { promoPrecioPorItem[p.id_item] = Number(p.precio) })
     if (ventaIds.length > 0) {
       const { data: items } = await window._db
         .from('venta_items')
-        .select('nombre, cantidad, id_item')
+        .select('nombre, cantidad, id_item, precio_unitario, importe')
         .eq('tenant_id', window._cierresTenant)
         .in('id_venta', ventaIds)
       const excluidoTop3 = (id) => /^(BEB-|RBE-|REX-COM-)/.test(id || '')
       const sumas = {}
       ;(items || []).forEach(it => {
+        if (it.id_item in promoPrecioPorItem && Number(it.precio_unitario) === promoPrecioPorItem[it.id_item]) {
+          promoPiezas += Number(it.cantidad) || 0
+          promoMonto  += Number(it.importe) || 0
+        }
         if (excluidoTop3(it.id_item)) return
         sumas[it.nombre] = (sumas[it.nombre] || 0) + (Number(it.cantidad) || 0)
       })
@@ -177,6 +190,12 @@ async function renderCierresVista(periodo) {
                 <span>${m.charAt(0).toUpperCase() + m.slice(1)} ${pct}% ($${formatNum(suma)})</span>
               </div>`
             }).join('')}
+           </div>`
+        : ''
+
+      const promoHtml = promoPiezas > 0
+        ? `<div style="background:rgba(200,137,42,0.15);color:#c8892a;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:600">
+            Venta en promo inauguración: ${promoPiezas} pieza${promoPiezas !== 1 ? 's' : ''} — $${formatNum(promoMonto)}
            </div>`
         : ''
 
@@ -229,7 +248,8 @@ async function renderCierresVista(periodo) {
             <div id="cierres-cab-donut" style="display:flex;flex-direction:column;gap:10px">
               <canvas id="cierre-chart-metodos" width="220" height="220"></canvas>
               ${legendHtml}
-            </div>` : ''}
+              ${promoHtml}
+            </div>` : promoHtml}
 
             <!-- Derecha: top 3 -->
             ${top3.length > 0 ? `
