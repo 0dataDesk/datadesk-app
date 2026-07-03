@@ -175,7 +175,8 @@ async function renderCierresVista() {
             <div style="flex:1;display:flex;flex-direction:column;gap:14px">
               <div>
                 <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-muted)">Venta total</div>
-                <div style="font-family:'Bebas Neue',sans-serif;font-size:48px;line-height:1;color:var(--color-primary)">$${formatNum(ventaTotal)}</div>
+                <div style="font-family:'Bebas Neue',sans-serif;font-size:48px;line-height:1;color:var(--color-primary)">$${formatNum(ventaNeta)}</div>
+                <div style="font-size:11px;color:var(--color-text-muted)">V $${formatNum(ventaNeta + descTotal)} − desc $${formatNum(descTotal)} = VT $${formatNum(ventaNeta)} + prop $${formatNum(propinaTotal)} = Tot $${formatNum(ventaTotal)}</div>
               </div>
               <table style="border-collapse:collapse;background:var(--color-bg-alt,rgba(0,0,0,0.04));border-radius:8px;overflow:hidden">
                 <tbody>
@@ -360,10 +361,13 @@ async function renderCierresVista() {
       const semId   = `sem-${mes}-${lunes}`
 
       const filasHtml = ciSem.map(c => {
+        const tot   = Number(c.total_general) || 0
         const prop  = Number(c.propina_total) || 0
-        const neta  = Number(c.total_general) - prop
-        const tprom = c.num_tickets ? neta / c.num_tickets : 0
-        const desc  = descPorCierre[c.id]
+        const vt    = tot - prop
+        const desc  = (descPorCierre[c.id] && descPorCierre[c.id].monto) || 0
+        const v     = vt + desc
+        const tprom = c.num_tickets ? vt / c.num_tickets : 0
+        const descSegmento = desc ? ` − desc $${formatNum(desc)}` : ''
         return `
           <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:8px 0 8px 32px;
               border-bottom:1px solid var(--color-border);cursor:pointer;font-size:13px"
@@ -371,12 +375,9 @@ async function renderCierresVista() {
             onmouseenter="this.style.background='var(--color-bg-alt,rgba(0,0,0,0.03))'"
             onmouseleave="this.style.background=''">
             <span style="min-width:90px;font-weight:600">${c.fecha}</span>
-            <span style="color:var(--color-text-muted)">${c.num_tickets} ticket${c.num_tickets !== 1 ? 's' : ''}</span>
-            <span style="font-weight:600">$${formatNum(c.total_general)}</span>
-            ${prop ? `<span style="color:var(--color-text-muted)">propina $${formatNum(prop)}</span>` : ''}
-            ${desc  ? `<span style="color:#3A8C3E;font-weight:600">-$${formatNum(desc.monto)}</span>` : ''}
-            <span style="color:var(--color-text-muted);margin-left:auto">neta $${formatNum(neta)} · ~$${formatNum(tprom)}/ticket</span>
-            <span style="color:var(--color-text-muted)">${formatCerradoPor(c.cerrado_por)}</span>
+            <span>V $${formatNum(v)}${descSegmento} = VT $${formatNum(vt)} + prop $${formatNum(prop)} = Tot $${formatNum(tot)}</span>
+            <span style="color:var(--color-text-muted);margin-left:auto">${c.num_tickets} ticket${c.num_tickets !== 1 ? 's' : ''} · ~$${formatNum(tprom)}/ticket</span>
+            <span style="color:var(--color-text-muted);font-size:11px">${formatCerradoPor(c.cerrado_por)}</span>
           </div>`
       }).join('')
 
