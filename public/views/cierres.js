@@ -51,22 +51,67 @@ async function vistaCierres() {
     window._cierresDescMap          = descPorCierre
     window._cierresFormatCerradoPor = formatCerradoPor
 
+    const periodoPorDefecto = 'Todo'
+    window._cierresPeriodoActual = periodoPorDefecto
+
+    const periodos = ['Este mes', 'Última semana', 'Todo']
     content.innerHTML = `
       <div class="vista-header"><h2>🔒 Cierres</h2></div>
+      <div id="cierres-filtro" style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+        ${periodos.map(p => `
+          <button class="btn-periodo" data-periodo="${p}"
+            onclick="setCierresPeriodo('${p}')"
+            style="padding:5px 14px;border-radius:20px;border:1px solid var(--color-border);cursor:pointer;font-size:13px;
+              background:${p === periodoPorDefecto ? 'var(--color-primary)' : 'transparent'};
+              color:${p === periodoPorDefecto ? '#fff' : 'var(--color-text)'}">
+            ${p}
+          </button>`).join('')}
+      </div>
       <div id="cierres-cabecero"></div>
       <div id="cierres-lista-wrap"></div>
       <div id="cierre-detalle-wrap" style="display:none"></div>
     `
 
-    await renderCierresVista()
+    await renderCierresVista(periodoPorDefecto)
 
   } catch (err) {
     content.innerHTML = `<p style="color:var(--color-highlight)">Error: ${err.message}</p>`
   }
 }
 
-async function renderCierresVista() {
-  const cierresFiltrados  = window._cierresData || []
+function _filtrarCierresPorPeriodo(periodo) {
+  const todos = window._cierresData || []
+  if (periodo === 'Todo') return todos
+  const hoy = new Date()
+  if (periodo === 'Última semana') {
+    const d = new Date(hoy)
+    const day = d.getDay() || 7
+    d.setDate(d.getDate() - (day - 1) - 7)
+    const desde = d.toISOString().split('T')[0]
+    const domingoPasado = new Date(d)
+    domingoPasado.setDate(domingoPasado.getDate() + 6)
+    const hasta = domingoPasado.toISOString().split('T')[0]
+    return todos.filter(c => c.fecha >= desde && c.fecha <= hasta)
+  }
+  if (periodo === 'Este mes') {
+    const desde = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-01`
+    return todos.filter(c => c.fecha >= desde)
+  }
+  return todos
+}
+
+async function setCierresPeriodo(periodo) {
+  window._cierresPeriodoActual = periodo
+  document.querySelectorAll('.btn-periodo').forEach(btn => {
+    const active = btn.dataset.periodo === periodo
+    btn.style.background = active ? 'var(--color-primary)' : 'transparent'
+    btn.style.color      = active ? '#fff' : 'var(--color-text)'
+  })
+  await renderCierresVista(periodo)
+}
+
+async function renderCierresVista(periodo) {
+  const cierresFiltrados  = _filtrarCierresPorPeriodo(periodo)
   const descPorCierre     = window._cierresDescMap || {}
   const formatCerradoPor  = window._cierresFormatCerradoPor || (v => v || '—')
 
@@ -171,7 +216,7 @@ async function renderCierresVista() {
         <div class="receta-card" style="margin-bottom:18px">
           <div id="cierres-cab-inner" style="display:flex;flex-direction:column;gap:20px">
 
-            <!-- Izquierda: venta total + tabla 2x2 -->
+            <!-- Izquierda: venta total + tabla 2x2 + top 3 -->
             <div style="flex:1;display:flex;flex-direction:column;gap:14px">
               <div>
                 <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-muted)">Venta total</div>
@@ -198,27 +243,25 @@ async function renderCierresVista() {
                   </tr>
                 </tbody>
               </table>
+              ${top3.length > 0 ? `
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-muted)">🏆 Top 3</div>
+                ${top3.map(([nombre, cant], i) => `
+                  <div style="font-size:13px;display:flex;gap:6px;align-items:baseline">
+                    <span style="color:var(--color-text-muted);min-width:14px">${i + 1}.</span>
+                    <span style="font-weight:600;flex:1">${nombre}</span>
+                    <span style="color:var(--color-text-muted);white-space:nowrap">× ${cant}</span>
+                  </div>`).join('')}
+              </div>` : ''}
             </div>
 
-            <!-- Centro: donut + leyenda -->
+            <!-- Derecha: donut + leyenda -->
             ${metodosEntries.length > 0 ? `
             <div id="cierres-cab-donut" style="display:flex;flex-direction:column;gap:10px">
               <canvas id="cierre-chart-metodos" width="220" height="220"></canvas>
               ${legendHtml}
               ${promoHtml}
             </div>` : promoHtml}
-
-            <!-- Derecha: top 3 -->
-            ${top3.length > 0 ? `
-            <div style="display:flex;flex-direction:column;gap:10px;min-width:160px">
-              <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-muted)">🏆 Top 3</div>
-              ${top3.map(([nombre, cant], i) => `
-                <div style="font-size:13px;display:flex;gap:6px;align-items:baseline">
-                  <span style="color:var(--color-text-muted);min-width:14px">${i + 1}.</span>
-                  <span style="font-weight:600;flex:1">${nombre}</span>
-                  <span style="color:var(--color-text-muted);white-space:nowrap">× ${cant}</span>
-                </div>`).join('')}
-            </div>` : ''}
 
           </div>
         </div>
