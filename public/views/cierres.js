@@ -1,3 +1,49 @@
+const MESES_NOMBRES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+const MESES_CORTOS  = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
+
+function getLunes(fechaStr) {
+  const d = new Date(fechaStr + 'T12:00:00')
+  const day = d.getDay() || 7
+  d.setDate(d.getDate() - (day - 1))
+  return d.toISOString().split('T')[0]
+}
+
+function semLabel(lunesStr) {
+  const lun = new Date(lunesStr + 'T12:00:00')
+  const dom = new Date(lun); dom.setDate(dom.getDate() + 6)
+  const sufijo = dom.getMonth() !== lun.getMonth()
+    ? `${MESES_CORTOS[dom.getMonth()]}`
+    : MESES_CORTOS[lun.getMonth()]
+  return `Semana del ${lun.getDate()} al ${dom.getDate()} ${sufijo}`
+}
+
+function _agruparCierresPorMes(cierresArr) {
+  const porMes = {}
+  cierresArr.forEach(c => {
+    const mes = c.fecha.slice(0, 7)
+    if (!porMes[mes]) porMes[mes] = []
+    porMes[mes].push(c)
+  })
+  const meses = Object.keys(porMes).sort().reverse()
+  return { meses, porMes }
+}
+
+function _agruparCierresPorSemana(cierresArr) {
+  const porSemana = {}
+  cierresArr.forEach(c => {
+    const lunes = getLunes(c.fecha)
+    if (!porSemana[lunes]) porSemana[lunes] = []
+    porSemana[lunes].push(c)
+  })
+  const semanas = Object.keys(porSemana).sort().reverse()
+  return { semanas, porSemana }
+}
+
+function _mesLabelDe(mes, soloUnAño) {
+  const [year, month] = mes.split('-')
+  return soloUnAño ? MESES_NOMBRES[Number(month) - 1] : `${MESES_NOMBRES[Number(month) - 1]} ${year}`
+}
+
 async function vistaCierres() {
   const content = document.getElementById('content')
   content.innerHTML = `<p style="color:var(--color-text-muted)">Cargando cierres...</p>`
@@ -51,73 +97,105 @@ async function vistaCierres() {
     window._cierresDescMap          = descPorCierre
     window._cierresFormatCerradoPor = formatCerradoPor
 
-    const periodoPorDefecto = 'Todo'
-    window._cierresPeriodoActual = periodoPorDefecto
+    window._cierresNivel1    = 'Todo'
+    window._cierresMesSel    = null
+    window._cierresSemanaSel = null
 
-    const periodos = ['Este mes', 'Última semana', 'Todo']
     content.innerHTML = `
       <div class="vista-header"><h2>🔒 Cierres</h2></div>
-      <div id="cierres-filtro" style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
-        ${periodos.map(p => `
-          <button class="btn-periodo" data-periodo="${p}"
-            onclick="setCierresPeriodo('${p}')"
-            style="padding:5px 14px;border-radius:20px;border:1px solid var(--color-border);cursor:pointer;font-size:13px;
-              background:${p === periodoPorDefecto ? 'var(--color-primary)' : 'transparent'};
-              color:${p === periodoPorDefecto ? '#fff' : 'var(--color-text)'}">
-            ${p}
-          </button>`).join('')}
-      </div>
+      <div id="cierres-filtro" style="margin-bottom:16px"></div>
       <div id="cierres-cabecero"></div>
       <div id="cierres-lista-wrap"></div>
       <div id="cierre-detalle-wrap" style="display:none"></div>
     `
 
-    await renderCierresVista(periodoPorDefecto)
+    renderCierresFiltro()
+    await renderCierresVista()
 
   } catch (err) {
     content.innerHTML = `<p style="color:var(--color-highlight)">Error: ${err.message}</p>`
   }
 }
 
-function _filtrarCierresPorPeriodo(periodo) {
+function _filtrarCierresPorPeriodo() {
   const todos = window._cierresData || []
-  if (periodo === 'Todo') return todos
-  const hoy = new Date()
-  if (periodo === 'Última semana') {
-    const d = new Date(hoy)
-    const day = d.getDay() || 7
-    d.setDate(d.getDate() - (day - 1) - 7)
-    const desde = d.toISOString().split('T')[0]
-    const domingoPasado = new Date(d)
-    domingoPasado.setDate(domingoPasado.getDate() + 6)
-    const hasta = domingoPasado.toISOString().split('T')[0]
-    return todos.filter(c => c.fecha >= desde && c.fecha <= hasta)
+  const nivel1 = window._cierresNivel1 || 'Todo'
+  if (nivel1 === 'Todo') return todos
+  if (nivel1 === 'Mes') {
+    if (!window._cierresMesSel) return todos
+    return todos.filter(c => c.fecha.slice(0, 7) === window._cierresMesSel)
   }
-  if (periodo === 'Este mes') {
-    const desde = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-01`
-    return todos.filter(c => c.fecha >= desde)
+  if (nivel1 === 'Semana') {
+    if (!window._cierresMesSel) return todos
+    const delMes = todos.filter(c => c.fecha.slice(0, 7) === window._cierresMesSel)
+    if (!window._cierresSemanaSel) return delMes
+    return delMes.filter(c => getLunes(c.fecha) === window._cierresSemanaSel)
   }
   return todos
 }
 
-async function setCierresPeriodo(periodo) {
-  window._cierresPeriodoActual = periodo
-  document.querySelectorAll('.btn-periodo').forEach(btn => {
-    const active = btn.dataset.periodo === periodo
-    btn.style.background = active ? 'var(--color-primary)' : 'transparent'
-    btn.style.color      = active ? '#fff' : 'var(--color-text)'
-  })
-  await renderCierresVista(periodo)
+function renderCierresFiltro() {
+  const cont = document.getElementById('cierres-filtro')
+  if (!cont) return
+  const todos = window._cierresData || []
+  const { meses, porMes } = _agruparCierresPorMes(todos)
+  const añosDistintos = [...new Set(meses.map(m => m.split('-')[0]))]
+  const soloUnAño = añosDistintos.length === 1
+
+  const nivel1 = window._cierresNivel1 || 'Todo'
+  const pill = (active) => `padding:5px 14px;border-radius:20px;border:1px solid var(--color-border);cursor:pointer;font-size:13px;
+    background:${active ? 'var(--color-primary)' : 'transparent'};color:${active ? '#fff' : 'var(--color-text)'}`
+
+  let html = `<div style="display:flex;gap:8px;flex-wrap:wrap">
+    ${['Todo', 'Mes', 'Semana'].map(p => `
+      <button class="btn-periodo" onclick="setCierresNivel1('${p}')" style="${pill(nivel1 === p)}">${p}</button>`).join('')}
+  </div>`
+
+  if (nivel1 === 'Mes' || nivel1 === 'Semana') {
+    html += `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+      ${meses.map(mes => `
+        <button class="btn-periodo" onclick="setCierresMes('${mes}')" style="${pill(window._cierresMesSel === mes)}">${_mesLabelDe(mes, soloUnAño)}</button>`).join('')}
+    </div>`
+  }
+
+  if (nivel1 === 'Semana' && window._cierresMesSel) {
+    const { semanas } = _agruparCierresPorSemana(porMes[window._cierresMesSel] || [])
+    html += `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+      ${semanas.map(lunes => `
+        <button class="btn-periodo" onclick="setCierresSemana('${lunes}')" style="${pill(window._cierresSemanaSel === lunes)}">${semLabel(lunes)}</button>`).join('')}
+    </div>`
+  }
+
+  cont.innerHTML = html
 }
 
-async function renderCierresVista(periodo) {
-  const cierresFiltrados  = _filtrarCierresPorPeriodo(periodo)
+async function setCierresNivel1(nivel) {
+  window._cierresNivel1    = nivel
+  window._cierresMesSel    = null
+  window._cierresSemanaSel = null
+  renderCierresFiltro()
+  await renderCierresVista()
+}
+
+async function setCierresMes(mes) {
+  window._cierresMesSel    = mes
+  window._cierresSemanaSel = null
+  renderCierresFiltro()
+  await renderCierresVista()
+}
+
+async function setCierresSemana(lunes) {
+  window._cierresSemanaSel = lunes
+  renderCierresFiltro()
+  await renderCierresVista()
+}
+
+async function renderCierresVista() {
+  const cierresFiltrados  = _filtrarCierresPorPeriodo()
   const descPorCierre     = window._cierresDescMap || {}
   const formatCerradoPor  = window._cierresFormatCerradoPor || (v => v || '—')
 
   const CHART_COLORS = { efectivo: '#4A7A3A', debito: '#792c24', credito: '#C8892A', tarjeta: '#9B7B6A', delivery_didi: '#E8622C', delivery_rappi: '#FF441F', delivery_uber: '#2B1A0F' }
-  const MESES_NOMBRES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
-  const MESES_CORTOS  = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
 
   // Métricas acumuladas
   let ventaTotal = 0, propinaTotal = 0, descTotal = 0, ticketsTotal = 0
@@ -138,8 +216,6 @@ async function renderCierresVista(periodo) {
 
   // — Top 3 vendidos del periodo —
   let top3 = []
-  let promoPiezas = 0
-  let promoMonto = 0
   if (cierresFiltrados.length > 0) {
     const idsCierre = cierresFiltrados.map(c => c.id)
     const { data: ventasTop } = await window._db
@@ -148,26 +224,15 @@ async function renderCierresVista(periodo) {
       .eq('tenant_id', window._cierresTenant)
       .in('id_cierre', idsCierre)
     const ventaIds = (ventasTop || []).map(v => v.id)
-    const { data: preciosPromo } = await window._db
-      .from('precios_venta')
-      .select('id_item, precio')
-      .eq('tenant_id', window._cierresTenant)
-      .eq('lista', 'promo_inauguracion')
-    const promoPrecioPorItem = {}
-    ;(preciosPromo || []).forEach(p => { promoPrecioPorItem[p.id_item] = Number(p.precio) })
     if (ventaIds.length > 0) {
       const { data: items } = await window._db
         .from('venta_items')
-        .select('nombre, cantidad, id_item, precio_unitario, importe')
+        .select('nombre, cantidad, id_item')
         .eq('tenant_id', window._cierresTenant)
         .in('id_venta', ventaIds)
       const excluidoTop3 = (id) => /^(BEB-|RBE-|REX-COM-)/.test(id || '')
       const sumas = {}
       ;(items || []).forEach(it => {
-        if (it.id_item in promoPrecioPorItem && Number(it.precio_unitario) === promoPrecioPorItem[it.id_item]) {
-          promoPiezas += Number(it.cantidad) || 0
-          promoMonto  += Number(it.importe) || 0
-        }
         if (excluidoTop3(it.id_item)) return
         sumas[it.nombre] = (sumas[it.nombre] || 0) + (Number(it.cantidad) || 0)
       })
@@ -191,12 +256,6 @@ async function renderCierresVista(periodo) {
                 <span>${formatMetodoKey(m)} ${pct}% ($${formatNum(suma)})</span>
               </div>`
             }).join('')}
-           </div>`
-        : ''
-
-      const promoHtml = promoPiezas > 0
-        ? `<div style="background:rgba(200,137,42,0.15);color:#c8892a;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:600">
-            Venta en promo inauguración: ${promoPiezas} pieza${promoPiezas !== 1 ? 's' : ''} — $${formatNum(promoMonto)}
            </div>`
         : ''
 
@@ -260,8 +319,7 @@ async function renderCierresVista(periodo) {
             <div id="cierres-cab-donut" style="display:flex;flex-direction:column;gap:10px">
               <canvas id="cierre-chart-metodos" width="220" height="220"></canvas>
               ${legendHtml}
-              ${promoHtml}
-            </div>` : promoHtml}
+            </div>` : ''}
 
           </div>
         </div>
@@ -353,48 +411,21 @@ async function renderCierresVista(periodo) {
     return
   }
 
-  function getLunes(fechaStr) {
-    const d = new Date(fechaStr + 'T12:00:00')
-    const day = d.getDay() || 7
-    d.setDate(d.getDate() - (day - 1))
-    return d.toISOString().split('T')[0]
-  }
+  const { meses, porMes } = _agruparCierresPorMes(cierresFiltrados)
+  const añosDistintos = [...new Set(meses.map(m => m.split('-')[0]))]
+  const soloUnAño = añosDistintos.length === 1
 
-  function semLabel(lunesStr) {
-    const lun = new Date(lunesStr + 'T12:00:00')
-    const dom = new Date(lun); dom.setDate(dom.getDate() + 6)
-    const sufijo = dom.getMonth() !== lun.getMonth()
-      ? `${MESES_CORTOS[dom.getMonth()]}`
-      : MESES_CORTOS[lun.getMonth()]
-    return `Semana del ${lun.getDate()} al ${dom.getDate()} ${sufijo}`
-  }
-
-  // Agrupar por mes
-  const porMes = {}
-  cierresFiltrados.forEach(c => {
-    const mes = c.fecha.slice(0, 7)
-    if (!porMes[mes]) porMes[mes] = []
-    porMes[mes].push(c)
-  })
-  const meses = Object.keys(porMes).sort().reverse()
-
-  let html = ''
+  let html = soloUnAño
+    ? `<div style="font-size:12px;color:var(--color-text-muted);margin-bottom:8px">Cierres ${añosDistintos[0]}</div>`
+    : ''
   meses.forEach((mes, mesIdx) => {
     const ciMes   = porMes[mes]
     const totMes  = ciMes.reduce((s, c) => s + ((Number(c.total_general) || 0) - (Number(c.propina_total) || 0)), 0)
-    const [year, month] = mes.split('-')
-    const mesLabel = `${MESES_NOMBRES[Number(month) - 1]} ${year}`
+    const mesLabel = _mesLabelDe(mes, soloUnAño)
     const mesOpen  = mesIdx === 0
     const mesId    = `mes-${mes}`
 
-    // Agrupar por semana
-    const porSemana = {}
-    ciMes.forEach(c => {
-      const lunes = getLunes(c.fecha)
-      if (!porSemana[lunes]) porSemana[lunes] = []
-      porSemana[lunes].push(c)
-    })
-    const semanas = Object.keys(porSemana).sort().reverse()
+    const { semanas, porSemana } = _agruparCierresPorSemana(ciMes)
 
     let semanasHtml = ''
     semanas.forEach((lunes, semIdx) => {
