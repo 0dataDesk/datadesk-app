@@ -51,66 +51,22 @@ async function vistaCierres() {
     window._cierresDescMap          = descPorCierre
     window._cierresFormatCerradoPor = formatCerradoPor
 
-    const periodoPorDefecto = 'Este mes'
-    window._cierresPeriodoActual = periodoPorDefecto
-
-    const periodos = ['Última semana', 'Este mes']
     content.innerHTML = `
       <div class="vista-header"><h2>🔒 Cierres</h2></div>
-      <div id="cierres-filtro" style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
-        ${periodos.map(p => `
-          <button class="btn-periodo" data-periodo="${p}"
-            onclick="setCierresPeriodo('${p}')"
-            style="padding:5px 14px;border-radius:20px;border:1px solid var(--color-border);cursor:pointer;font-size:13px;
-              background:${p === periodoPorDefecto ? 'var(--color-primary)' : 'transparent'};
-              color:${p === periodoPorDefecto ? '#fff' : 'var(--color-text)'}">
-            ${p}
-          </button>`).join('')}
-      </div>
       <div id="cierres-cabecero"></div>
       <div id="cierres-lista-wrap"></div>
       <div id="cierre-detalle-wrap" style="display:none"></div>
     `
 
-    await renderCierresVista(periodoPorDefecto)
+    await renderCierresVista()
 
   } catch (err) {
     content.innerHTML = `<p style="color:var(--color-highlight)">Error: ${err.message}</p>`
   }
 }
 
-function _filtrarCierresPorPeriodo(periodo) {
-  const todos = window._cierresData || []
-  const hoy = new Date()
-  if (periodo === 'Última semana') {
-    const d = new Date(hoy)
-    const day = d.getDay() || 7
-    d.setDate(d.getDate() - (day - 1) - 7)
-    const desde = d.toISOString().split('T')[0]
-    const domingoPasado = new Date(d)
-    domingoPasado.setDate(domingoPasado.getDate() + 6)
-    const hasta = domingoPasado.toISOString().split('T')[0]
-    return todos.filter(c => c.fecha >= desde && c.fecha <= hasta)
-  }
-  let desde
-  if (periodo === 'Este mes') {
-    desde = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-01`
-  }
-  return todos.filter(c => c.fecha >= desde)
-}
-
-async function setCierresPeriodo(periodo) {
-  window._cierresPeriodoActual = periodo
-  document.querySelectorAll('.btn-periodo').forEach(btn => {
-    const active = btn.dataset.periodo === periodo
-    btn.style.background = active ? 'var(--color-primary)' : 'transparent'
-    btn.style.color      = active ? '#fff' : 'var(--color-text)'
-  })
-  await renderCierresVista(periodo)
-}
-
-async function renderCierresVista(periodo) {
-  const cierresFiltrados  = _filtrarCierresPorPeriodo(periodo)
+async function renderCierresVista() {
+  const cierresFiltrados  = window._cierresData || []
   const descPorCierre     = window._cierresDescMap || {}
   const formatCerradoPor  = window._cierresFormatCerradoPor || (v => v || '—')
 
@@ -474,7 +430,6 @@ async function verDetalleCierre(id_cierre, fecha) {
   const detalleWrap = document.getElementById('cierre-detalle-wrap')
   if (!listaWrap || !detalleWrap) return
 
-  document.getElementById('cierres-filtro').style.display   = 'none'
   document.getElementById('cierres-cabecero').style.display = 'none'
   listaWrap.style.display   = 'none'
   detalleWrap.style.display = ''
@@ -570,7 +525,6 @@ async function verDetalleCierre(id_cierre, fecha) {
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:20px">
         <div style="display:flex;align-items:center;gap:12px">
           <button class="btn-accion" style="border:1px solid var(--color-border)" onclick="
-            document.getElementById('cierres-filtro').style.display='';
             document.getElementById('cierres-cabecero').style.display='';
             document.getElementById('cierres-lista-wrap').style.display='';
             document.getElementById('cierre-detalle-wrap').style.display='none'">← Volver</button>
