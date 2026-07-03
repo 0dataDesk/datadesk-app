@@ -195,7 +195,7 @@ async function renderVentas(container, tenantId) {
           <strong style="font-size:14px;min-width:80px">${folio}</strong>
           <span style="font-size:12px;color:var(--color-text-muted)">${fmtFecha(v.created_at)}</span>
           <span style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600;${badge}">${v.estado}</span>
-          <span style="margin-left:auto;font-size:16px;font-weight:700;color:var(--color-primary)">$${v.total}</span>
+          <span style="margin-left:auto;font-size:16px;font-weight:700;color:var(--color-primary)">$${formatNum(Number(v.total) - (Number(v.propina) || 0))}</span>
           <span class="venta-chevron" style="font-size:11px;color:var(--color-text-muted);min-width:12px">▼</span>
         </div>
         <div style="font-size:12px;color:var(--color-text-muted);margin-top:4px">
