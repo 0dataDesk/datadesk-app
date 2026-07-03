@@ -115,7 +115,7 @@ async function renderCierresVista(periodo) {
   const descPorCierre     = window._cierresDescMap || {}
   const formatCerradoPor  = window._cierresFormatCerradoPor || (v => v || '—')
 
-  const CHART_COLORS = { efectivo: '#4A7A3A', debito: '#792c24', credito: '#C8892A', tarjeta: '#9B7B6A' }
+  const CHART_COLORS = { efectivo: '#4A7A3A', debito: '#792c24', credito: '#C8892A', tarjeta: '#9B7B6A', delivery_didi: '#E8622C', delivery_rappi: '#FF441F', delivery_uber: '#2B1A0F' }
   const MESES_NOMBRES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
   const MESES_CORTOS  = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
 
@@ -188,7 +188,7 @@ async function renderCierresVista(periodo) {
               const color = CHART_COLORS[m] || '#9B7B6A'
               return `<div style="display:flex;align-items:center;gap:5px;white-space:nowrap">
                 <span style="color:${color};font-size:14px;line-height:1">●</span>
-                <span>${m.charAt(0).toUpperCase() + m.slice(1)} ${pct}% ($${formatNum(suma)})</span>
+                <span>${formatMetodoKey(m)} ${pct}% ($${formatNum(suma)})</span>
               </div>`
             }).join('')}
            </div>`
@@ -300,7 +300,7 @@ async function renderCierresVista(periodo) {
           window._cierresChart = new window.Chart(canvas, {
             type: 'doughnut',
             data: {
-              labels: metodosEntries.map(([m]) => m.charAt(0).toUpperCase() + m.slice(1)),
+              labels: metodosEntries.map(([m]) => formatMetodoKey(m)),
               datasets: [{
                 data: metodosEntries.map(([, v]) => v),
                 backgroundColor: metodosEntries.map(([m]) => CHART_COLORS[m] || '#9B7B6A'),
@@ -485,7 +485,7 @@ async function verDetalleCierre(id_cierre, fecha) {
 
   const { data: ventas, error } = await window._db
     .from('ventas')
-    .select('id, folio, metodo_pago, total, subtotal, descuento_porcentaje, propina, created_at')
+    .select('id, folio, metodo_pago, total, subtotal, descuento_porcentaje, propina, created_at, pagos_detalle')
     .eq('tenant_id', tenant_id)
     .eq('id_cierre', id_cierre)
     .order('created_at')
@@ -604,7 +604,7 @@ async function verDetalleCierre(id_cierre, fecha) {
           <tbody>
             ${Object.entries(desglose).map(([m, d]) => `
               <tr>
-                <td>${m}</td>
+                <td>${formatMetodoKey(m)}</td>
                 <td style="text-align:right">${d.count}</td>
                 <td style="text-align:right;font-weight:600">$${formatNum(d.suma)}</td>
               </tr>`).join('')}
@@ -648,7 +648,7 @@ async function verDetalleCierre(id_cierre, fecha) {
                 onclick="${hasItems ? `toggleItemsCierre('items-${v.id}')` : ''}">
                 <td style="color:var(--color-text-muted);font-size:12px">${hasItems ? '▶' : ''}</td>
                 <td>${v.folio || '—'}</td>
-                <td>${v.metodo_pago || '—'}</td>
+                <td>${formatMetodoPago(v.metodo_pago, v.pagos_detalle)}</td>
                 <td style="text-align:right;font-weight:600">$${formatNum(v.total)}</td>
                 <td style="text-align:right">${descCell}</td>
                 <td style="text-align:right">${v.propina ? '$' + formatNum(v.propina) : '—'}</td>
@@ -704,7 +704,7 @@ function exportarCierrePDF() {
     <thead><tr><th>Método de pago</th><th style="text-align:right">Tickets</th><th style="text-align:right">Total</th></tr></thead>
     <tbody>
       ${Object.entries(desglose).map(([m, d]) =>
-        `<tr><td>${m}</td><td style="text-align:right">${d.count}</td><td style="text-align:right">$${formatNum(d.suma)}</td></tr>`
+        `<tr><td>${formatMetodoKey(m)}</td><td style="text-align:right">${d.count}</td><td style="text-align:right">$${formatNum(d.suma)}</td></tr>`
       ).join('')}
       ${ventasConDesc.length > 0
         ? `<tr class="desc-row"><td>🏷 Descuentos</td><td style="text-align:right">${ventasConDesc.length}</td><td style="text-align:right">-$${formatNum(montoDesc)}</td></tr>`
@@ -734,7 +734,7 @@ function exportarCierrePDF() {
         const descMonto = pct > 0 ? Math.round((Number(v.subtotal) || 0) * pct) / 100 : 0
         return `<tr>
           <td>${v.folio || '—'}</td>
-          <td>${v.metodo_pago || '—'}</td>
+          <td>${formatMetodoPago(v.metodo_pago, v.pagos_detalle)}</td>
           <td style="text-align:right">$${formatNum(v.total)}</td>
           <td style="text-align:right;color:${pct > 0 ? '#3A8C3E' : 'inherit'}">
             ${pct > 0 ? `-$${formatNum(descMonto)} (${pct}%)` : '—'}

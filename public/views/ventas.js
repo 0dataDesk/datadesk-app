@@ -8,7 +8,7 @@
 async function renderVentas(container, tenantId) {
   const { data: ventas, error } = await window._db
     .from('ventas')
-    .select('id, folio, created_at, total, subtotal, estado, tipo_entrega, cliente_nombre, metodo_pago, propina, descuento_porcentaje, monto_efectivo, monto_tarjeta')
+    .select('id, folio, created_at, total, subtotal, estado, tipo_entrega, cliente_nombre, metodo_pago, propina, descuento_porcentaje, monto_efectivo, monto_tarjeta, pagos_detalle')
     .eq('tenant_id', tenantId)
     .is('id_cierre', null)
     .order('created_at', { ascending: false })
@@ -199,7 +199,9 @@ async function renderVentas(container, tenantId) {
           <span class="venta-chevron" style="font-size:11px;color:var(--color-text-muted);min-width:12px">▼</span>
         </div>
         <div style="font-size:12px;color:var(--color-text-muted);margin-top:4px">
-          ${v.tipo_entrega || '—'} · ${v.metodo_pago || '—'}
+          ${v.tipo_entrega || '—'} · ${v.metodo_pago === 'delivery'
+            ? `<span style="background:rgba(200,137,42,0.15);color:#c8892a;padding:1px 8px;border-radius:10px;font-size:11px;font-weight:600">${formatMetodoPago(v.metodo_pago, v.pagos_detalle)}</span>`
+            : (v.metodo_pago || '—')}
         </div>
         ${panelHtml}
       </div>
@@ -241,7 +243,10 @@ function calcularDesglosePorMetodo(ventasDia) {
   }
   ventasDia.forEach(v => {
     const m = (v.metodo_pago || '').toLowerCase()
-    if (m === 'mixto' || m === 'dividido' || (Number(v.monto_efectivo) > 0 && Number(v.monto_tarjeta) > 0)) {
+    if (m === 'delivery') {
+      const tipo = Array.isArray(v.pagos_detalle) && v.pagos_detalle[0] ? v.pagos_detalle[0].tipo : 'otro'
+      addMetodo('delivery_' + tipo, Number(v.total), true)
+    } else if (m === 'mixto' || m === 'dividido' || (Number(v.monto_efectivo) > 0 && Number(v.monto_tarjeta) > 0)) {
       if (Number(v.monto_efectivo) > 0) addMetodo('efectivo', Number(v.monto_efectivo), false)
       if (Number(v.monto_tarjeta) > 0) {
         const detalle = Array.isArray(v.pagos_detalle) ? v.pagos_detalle : []
@@ -259,6 +264,7 @@ function calcularDesglosePorMetodo(ventasDia) {
 }
 
 function metodoDisplay(v) {
+  if (v.metodo_pago === 'delivery') return formatMetodoPago(v.metodo_pago, v.pagos_detalle)
   return (Number(v.monto_efectivo) > 0 && Number(v.monto_tarjeta) > 0)
     ? `Efectivo $${formatNum(v.monto_efectivo)} + Tarjeta $${formatNum(v.monto_tarjeta)}`
     : (v.metodo_pago || '—')
@@ -370,7 +376,7 @@ async function mostrarCierreCaja(tenantId) {
           ${Object.entries(porMetodo).map(([m, d]) => {
             const prop = propinaPorMetodo[m] || 0
             return `<tr>
-              <td>${m}</td>
+              <td>${formatMetodoKey(m)}</td>
               <td style="text-align:right">${d.count}</td>
               <td style="text-align:right;font-weight:600">$${formatNum(d.suma)}</td>
               <td style="text-align:right">${prop ? '$' + formatNum(prop) : '—'}</td>
@@ -500,7 +506,7 @@ function exportarVentasPDF() {
   <table>
     <thead><tr><th>Método de pago</th><th style="text-align:right">Tickets</th><th style="text-align:right">Total</th></tr></thead>
     <tbody>
-      ${Object.entries(porMetodo).map(([m, d]) => `<tr><td>${m}</td><td style="text-align:right">${d.count}</td><td style="text-align:right">$${formatNum(d.suma)}</td></tr>`).join('')}
+      ${Object.entries(porMetodo).map(([m, d]) => `<tr><td>${formatMetodoKey(m)}</td><td style="text-align:right">${d.count}</td><td style="text-align:right">$${formatNum(d.suma)}</td></tr>`).join('')}
       ${(() => {
         const desc = ventas.filter(v => v.descuento_porcentaje > 0)
         if (!desc.length) return ''
