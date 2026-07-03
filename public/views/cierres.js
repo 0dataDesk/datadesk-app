@@ -239,7 +239,7 @@ async function renderCierresVista(periodo) {
                   </tr>
                   <tr>
                     <td style="${tdV()}">${ticketsTotal}</td>
-                    <td style="${tdV()}">$${formatNum(ticketProm)}</td>
+                    <td style="${tdV()}">$${formatInt(ticketProm)}</td>
                   </tr>
                 </tbody>
               </table>
@@ -410,7 +410,6 @@ async function renderCierresVista(periodo) {
         const desc  = (descPorCierre[c.id] && descPorCierre[c.id].monto) || 0
         const v     = vt + desc
         const tprom = c.num_tickets ? vt / c.num_tickets : 0
-        const descSegmento = desc ? ` − desc $${formatNum(desc)}` : ''
         return `
           <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:8px 0 8px 32px;
               border-bottom:1px solid var(--color-border);cursor:pointer;font-size:13px"
@@ -418,8 +417,8 @@ async function renderCierresVista(periodo) {
             onmouseenter="this.style.background='var(--color-bg-alt,rgba(0,0,0,0.03))'"
             onmouseleave="this.style.background=''">
             <span style="min-width:90px;font-weight:600">${c.fecha}</span>
-            <span>V $${formatNum(v)}${descSegmento} = VT $${formatNum(vt)} + prop $${formatNum(prop)} = Tot $${formatNum(tot)}</span>
-            <span style="color:var(--color-text-muted);margin-left:auto">${c.num_tickets} ticket${c.num_tickets !== 1 ? 's' : ''} · ~$${formatNum(tprom)}/ticket</span>
+            <span>V $${formatNum(v)} − desc $${formatNum(desc)} = VT $${formatNum(vt)} + prop $${formatNum(prop)} = Tot $${formatNum(tot)}</span>
+            <span style="color:var(--color-text-muted);margin-left:auto">${c.num_tickets} ticket${c.num_tickets !== 1 ? 's' : ''} · ~$${formatInt(tprom)}/ticket</span>
             <span style="color:var(--color-text-muted);font-size:11px">${formatCerradoPor(c.cerrado_por)}</span>
           </div>`
       }).join('')
@@ -465,6 +464,8 @@ async function renderCierresVista(periodo) {
         </div>
       </div>`
   })
+
+  html += `<div style="font-size:11px;color:var(--color-text-muted);margin-top:12px">V = Venta bruta · Desc = Descuento · VT = Venta neta · Prop = Propina · Tot = Total cobrado</div>`
 
   listaEl.innerHTML = html
 }
