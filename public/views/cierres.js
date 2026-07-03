@@ -381,7 +381,7 @@ async function renderCierresVista(periodo) {
   let html = ''
   meses.forEach((mes, mesIdx) => {
     const ciMes   = porMes[mes]
-    const totMes  = ciMes.reduce((s, c) => s + (Number(c.total_general) || 0), 0)
+    const totMes  = ciMes.reduce((s, c) => s + ((Number(c.total_general) || 0) - (Number(c.propina_total) || 0)), 0)
     const [year, month] = mes.split('-')
     const mesLabel = `${MESES_NOMBRES[Number(month) - 1]} ${year}`
     const mesOpen  = mesIdx === 0
@@ -399,7 +399,7 @@ async function renderCierresVista(periodo) {
     let semanasHtml = ''
     semanas.forEach((lunes, semIdx) => {
       const ciSem  = porSemana[lunes]
-      const totSem = ciSem.reduce((s, c) => s + (Number(c.total_general) || 0), 0)
+      const totSem = ciSem.reduce((s, c) => s + ((Number(c.total_general) || 0) - (Number(c.propina_total) || 0)), 0)
       const semOpen = mesIdx === 0 && semIdx === 0
       const semId   = `sem-${mes}-${lunes}`
 
