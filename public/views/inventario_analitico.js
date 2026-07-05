@@ -5,6 +5,21 @@ async function vistaInventarioAnalitico() {
   const hoy = new Date()
   const fmt = d => d.toISOString().slice(0, 10)
 
+  const hace7dias = new Date(hoy)
+  hace7dias.setDate(hace7dias.getDate() - 7)
+  let desdeDefault = fmt(hace7dias)
+  try {
+    const tenant_id = await getTenantId()
+    const { data: ultimoConteoData } = await window._db
+      .from('inventarios')
+      .select('fecha')
+      .eq('tenant_id', tenant_id)
+      .eq('estado', 'completo')
+      .order('fecha', { ascending: false })
+      .limit(1)
+    if (ultimoConteoData?.[0]?.fecha) desdeDefault = ultimoConteoData[0].fecha
+  } catch { /* sin tenant/sesión aún — _iaCargar() mostrará el error real en la tabla */ }
+
   content.innerHTML = `
     <div class="vista-header">
       <h2>🔍 Diagnóstico</h2>
@@ -13,7 +28,7 @@ async function vistaInventarioAnalitico() {
     <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:20px">
       <label style="display:flex;flex-direction:column;gap:4px;font-size:13px">
         Desde
-        <input type="date" id="ia-desde" value="${fmt(hoy)}"
+        <input type="date" id="ia-desde" value="${desdeDefault}"
           style="padding:6px 10px;border:1px solid var(--color-border);border-radius:6px;background:var(--color-surface);color:var(--color-text)">
       </label>
       <label style="display:flex;flex-direction:column;gap:4px;font-size:13px">
