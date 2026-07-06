@@ -110,14 +110,17 @@ async function verDetalleInventario(idInventario) {
       totalPorGrupo[g] = (totalPorGrupo[g] || 0) + 1
     })
 
-    // Construir filas con grupo
-    const filas = (items || []).map(item => {
-      const prod = prodMap[item.id_producto] || {}
+    // Construir filas a partir del catálogo completo (left-join con inventario_items)
+    const itemMap = {}
+    ;(items || []).forEach(item => { itemMap[item.id_producto] = item })
+
+    const filas = (productos || []).map(prod => {
+      const item = itemMap[prod.id_producto]
       return {
-        nombre:  prod.producto || item.id_producto,
+        nombre:  prod.producto || prod.id_producto,
         unidad:  prod.unidad_medida || '',
         grupo:   prod.grupo || 'Sin grupo',
-        contado: item.cantidad_contada != null ? Number(item.cantidad_contada) : null
+        contado: item && item.cantidad_contada != null ? Number(item.cantidad_contada) : null
       }
     })
 
