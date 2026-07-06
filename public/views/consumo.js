@@ -141,10 +141,20 @@ async function cargarConsumoData() {
   const wrap      = document.getElementById('consumo-lista-wrap')
   const filtroEl  = document.getElementById('consumo-filtro')
 
-  const { data: filas, error } = await window._db
-    .from('consumo_teorico')
-    .select('id_venta, id_producto, cantidad_consumida, costo_unitario_snap, fecha_venta')
-    .eq('tenant_id', tenant_id)
+  const PAGE_SIZE = 1000
+  const filas     = []
+  let error       = null
+  for (let desde = 0; ; desde += PAGE_SIZE) {
+    const hasta = desde + PAGE_SIZE - 1
+    const { data: pagina, error: errPagina } = await window._db
+      .from('consumo_teorico')
+      .select('id_venta, id_producto, cantidad_consumida, costo_unitario_snap, fecha_venta')
+      .eq('tenant_id', tenant_id)
+      .range(desde, hasta)
+    if (errPagina) { error = errPagina; break }
+    filas.push(...(pagina || []))
+    if (!pagina || pagina.length < PAGE_SIZE) break
+  }
 
   if (error) {
     if (wrap) wrap.innerHTML = `<p style="color:var(--color-highlight)">Error: ${error.message}</p>`
