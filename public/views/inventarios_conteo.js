@@ -1,9 +1,11 @@
 const IC_MESES_NOMBRES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
-const IC_DIAS_NOMBRES  = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado']
 
 function icDiaLabel(fechaStr) {
-  const d = new Date(fechaStr + 'T12:00:00')
-  return `${IC_DIAS_NOMBRES[d.getDay()]} ${String(d.getDate()).padStart(2,'0')}`
+  const d  = new Date(fechaStr + 'T12:00:00')
+  const dd = String(d.getDate()).padStart(2, '0')
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const aa = String(d.getFullYear()).slice(-2)
+  return `${dd}/${mm}/${aa}`
 }
 
 function icMesLabel(mesStr) {

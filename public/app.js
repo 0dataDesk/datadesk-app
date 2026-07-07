@@ -18,6 +18,7 @@ window._db.auth.onAuthStateChange(async (event, session) => {
     window._tenantConfig = null
     window._tenantActivo = null
     localStorage.removeItem('datadesk-view')
+    localStorage.removeItem('datadesk-tenant-activo')
     await mostrarLogin()
     return
   }
@@ -29,7 +30,13 @@ window._db.auth.onAuthStateChange(async (event, session) => {
     const email   = session.user.email
 
     if (tenants && tenants.length > 1 && !window._tenantActivo) {
-      await mostrarSelectorTenant(tenants, rol, email)
+      const tenantGuardado = localStorage.getItem('datadesk-tenant-activo')
+      if (tenantGuardado && tenants.includes(tenantGuardado)) {
+        window._tenantActivo = tenantGuardado
+        await mostrarApp(rol, email, tenantGuardado)
+      } else {
+        await mostrarSelectorTenant(tenants, rol, email)
+      }
     } else {
       const tenantId = window._tenantActivo || session.user.user_metadata?.tenant_id || null
       window._tenantActivo = tenantId
@@ -93,6 +100,7 @@ function _limpiarCacheGlobal() {
 
 async function seleccionarTenant(tenantId) {
   window._tenantActivo = tenantId
+  localStorage.setItem('datadesk-tenant-activo', tenantId)
   window._tenantConfig = null
   _limpiarCacheGlobal()
   // Escribir tenant_id en el JWT para que las políticas RLS de Supabase lo lean correctamente.
@@ -178,6 +186,7 @@ async function mostrarApp(rol, email, tenant_id = null) {
 
   document.getElementById('cambiar-tenant-btn')?.addEventListener('click', async () => {
     window._tenantActivo = null
+    localStorage.removeItem('datadesk-tenant-activo')
     window._tenantConfig = null
     _limpiarCacheGlobal()
     const { data: { user } } = await window._db.auth.getUser()
