@@ -694,6 +694,71 @@ body {
 
 .ic-col-meta { font-size: 11px; color: var(--color-text-muted); }
 
+.rec-tiles-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.rec-tile {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 18px 16px;
+  box-shadow: var(--shadow-card);
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-main);
+  transition: transform 0.15s, border-color 0.15s;
+}
+.rec-tile:hover { border-color: var(--color-accent); transform: translateY(-2px); }
+.rec-tile .rec-tile-titulo { font-weight: 600; font-size: 14px; color: var(--color-text); margin-bottom: 4px; }
+.rec-tile .rec-tile-sub { font-size: 12px; color: var(--color-text-muted); }
+
+.rec-volver-btn {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--color-text);
+  margin-bottom: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.rec-volver-btn:hover { border-color: var(--color-accent); }
+
+.receta-detalle-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 28px;
+  margin-top: 16px;
+}
+@media (min-width: 900px) {
+  .receta-detalle-grid { grid-template-columns: 1fr 1fr; }
+}
+
+.receta-foto-wrap { margin: 16px 0; }
+.receta-foto {
+  width: 100%;
+  max-height: 280px;
+  object-fit: cover;
+  border-radius: var(--radius);
+  display: block;
+}
+.receta-foto-placeholder {
+  width: 100%;
+  padding: 32px;
+  border: 1.5px dashed var(--color-border);
+  border-radius: var(--radius);
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
 /* ── RECETA DETALLE CARD ── */
 .receta-detalle-card {
   background: var(--color-card);
