@@ -601,6 +601,20 @@ async function eliminarVenta(id, folio, tenantId) {
   }
 
   try {
+    const { data: ordenes } = await window._db
+      .from('ordenes_cocina')
+      .select('id')
+      .eq('id_venta', id)
+      .eq('tenant_id', tenantId)
+
+    const idsOrdenes = (ordenes || []).map(o => o.id)
+    if (idsOrdenes.length > 0) {
+      await supaDelete('orden_items_estado', {
+        id_orden_cocina: 'in.(' + idsOrdenes.join(',') + ')',
+        tenant_id: 'eq.' + tenantId
+      })
+    }
+
     await supaDelete('ordenes_cocina', { id_venta: 'eq.' + id, tenant_id: 'eq.' + tenantId })
     await supaDelete('venta_items',    { id_venta: 'eq.' + id, tenant_id: 'eq.' + tenantId })
     await supaDelete('ventas',         { id:       'eq.' + id, tenant_id: 'eq.' + tenantId })
