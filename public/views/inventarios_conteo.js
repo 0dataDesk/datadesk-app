@@ -37,7 +37,7 @@ async function vistaInventariosConteo() {
         <h2>📋 Conteos</h2>
       </div>
       <div id="inv-conteo-detalle"></div>
-      <div id="inv-conteo-tabla-wrap"><div class="tabla-wrapper">
+      <div id="inv-conteo-tabla-wrap"><div class="tabla-wrapper card-surface">
         <table class="tabla">
           <thead>
             <tr>
@@ -80,6 +80,12 @@ async function vistaInventariosConteo() {
   }
 }
 
+function icBadge(contados, total, size) {
+  const ok = contados === total && total > 0
+  const fs = size || 11
+  return `<span style="padding:2px 10px;border-radius:20px;font-size:${fs}px;font-weight:700;${ok ? 'background:rgba(76,153,80,0.15);color:#3A8C3E' : 'background:rgba(200,137,42,0.15);color:#c8892a'}">${contados}/${total}</span>`
+}
+
 async function verDetalleInventario(idInventario) {
   const tablaWrap = document.getElementById('inv-conteo-tabla-wrap')
   if (tablaWrap) tablaWrap.style.display = 'none'
@@ -91,17 +97,22 @@ async function verDetalleInventario(idInventario) {
     const [
       { data: inv },
       { data: items },
-      { data: productos }
+      { data: productos },
+      { data: proveedores }
     ] = await Promise.all([
       window._db.from('inventarios').select('*').eq('id', idInventario).single(),
       window._db.from('inventario_items').select('*').eq('id_inventario', idInventario),
-      window._db.from('productos').select('id_producto, producto, unidad_medida, grupo').eq('tenant_id', tenant_id).eq('activo', true)
+      window._db.from('productos').select('id_producto, producto, unidad_medida, grupo, id_proveedor_preferencial').eq('tenant_id', tenant_id).eq('activo', true),
+      window._db.from('proveedores').select('id_proveedor, nombre_corto').eq('tenant_id', tenant_id)
     ])
 
     if (!inv) { if (wrap) wrap.innerHTML = ''; return }
 
     const prodMap = {}
     ;(productos || []).forEach(p => { prodMap[p.id_producto] = p })
+
+    const provMap = {}
+    ;(proveedores || []).forEach(p => { provMap[p.id_proveedor] = p.nombre_corto })
 
     // Total productos activos por grupo (catálogo completo)
     const totalPorGrupo = {}
@@ -117,10 +128,11 @@ async function verDetalleInventario(idInventario) {
     const filas = (productos || []).map(prod => {
       const item = itemMap[prod.id_producto]
       return {
-        nombre:  prod.producto || prod.id_producto,
-        unidad:  prod.unidad_medida || '',
-        grupo:   prod.grupo || 'Sin grupo',
-        contado: item && item.cantidad_contada != null ? Number(item.cantidad_contada) : null
+        nombre:     prod.producto || prod.id_producto,
+        unidad:     prod.unidad_medida || '',
+        grupo:      prod.grupo || 'Sin grupo',
+        contado:    item && item.cantidad_contada != null ? Number(item.cantidad_contada) : null,
+        proveedor:  provMap[prod.id_proveedor_preferencial] || '—'
       }
     })
 
@@ -144,21 +156,12 @@ async function verDetalleInventario(idInventario) {
       })
     })
 
-    // Grupo con mayor ratio contados/total (abre por defecto)
-    let bestGroup = null, bestRatio = -1
-    Object.entries(grupos).forEach(([g, arr]) => {
-      const contados = arr.filter(f => f.contado != null && f.contado > 0).length
-      const total    = totalPorGrupo[g] || arr.length
-      const ratio    = contados / Math.max(total, 1)
-      if (ratio > bestRatio) { bestRatio = ratio; bestGroup = g }
-    })
-
     const GRUPO_META = {
       'Carnes y Proteínas': { orden: 1, emoji: '🥩', color: '#B85C2A' },
       'Lácteos y Quesos':   { orden: 2, emoji: '🧀', color: '#6A9BB5' },
       'Verduras y Frescos': { orden: 3, emoji: '🥬', color: '#4A7A3A' },
-      'Despensa':           { orden: 4, emoji: '🍞', color: '#C8892A' },
-      'Subrecetas':         { orden: 5, emoji: '🧪', color: '#8A5FB0' },
+      'Despensa':           { orden: 4, emoji: '🥫', color: '#C8892A' },
+      'Subrecetas':         { orden: 5, emoji: '⚗️', color: '#8A5FB0' },
       'Bebidas':            { orden: 6, emoji: '🥤', color: '#3D9BA8' },
       'Desechables':        { orden: 7, emoji: '🗑️', color: '#9B7B6A' }
     }
@@ -171,7 +174,11 @@ async function verDetalleInventario(idInventario) {
       return ma.orden - mb.orden
     })
 
-    const accordionHTML = grupoNames.map(g => {
+    const SECCION_2_GRUPOS = ['Subrecetas', 'Bebidas', 'Desechables']
+    const seccion1 = grupoNames.filter(g => !SECCION_2_GRUPOS.includes(g))
+    const seccion2 = grupoNames.filter(g => SECCION_2_GRUPOS.includes(g))
+
+    function renderGrupo(g) {
       const arr      = grupos[g]
       const contados = arr.filter(f => f.contado != null && f.contado > 0).length
       const total    = totalPorGrupo[g] || arr.length
@@ -184,29 +191,55 @@ async function verDetalleInventario(idInventario) {
             style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;cursor:pointer;background:var(--color-surface);user-select:none"
             onclick="this.parentElement.classList.toggle('open')">
             <span style="font-weight:600">${meta.emoji} ${g}</span>
-            <span style="font-size:12px;color:var(--color-text-muted)">${contados}/${total}</span>
+            ${icBadge(contados, total)}
           </div>
           <div class="ic-grupo-body" style="display:none">
             <table class="tabla" style="margin:0;border-radius:0;border-top:1px solid var(--color-border)">
               <thead>
                 <tr>
                   <th>Insumo</th>
-                  <th>Unidad</th>
                   <th style="text-align:right">Cantidad contada</th>
+                  <th class="ic-col-meta">Unidad</th>
+                  <th class="ic-col-meta">Proveedor</th>
                 </tr>
               </thead>
               <tbody>
                 ${arr.map(f => `
                   <tr>
                     <td>${f.nombre}</td>
-                    <td style="color:var(--color-text-muted)">${f.unidad}</td>
                     <td style="text-align:right;font-weight:600">${f.contado != null ? formatInt(f.contado) : '—'}</td>
+                    <td class="ic-col-meta">${f.unidad}</td>
+                    <td class="ic-col-meta">${f.proveedor}</td>
                   </tr>`).join('')}
               </tbody>
             </table>
           </div>
         </div>`
-    }).join('')
+    }
+
+    function subtotal(nombresGrupos) {
+      let c = 0, t = 0
+      nombresGrupos.forEach(g => {
+        c += grupos[g].filter(f => f.contado != null && f.contado > 0).length
+        t += totalPorGrupo[g] || grupos[g].length
+      })
+      return { c, t }
+    }
+    const sub1 = subtotal(seccion1)
+    const sub2 = subtotal(seccion2)
+    const granTotal = { c: sub1.c + sub2.c, t: sub1.t + sub2.t }
+
+    const accordionHTML = `
+      <div style="margin-bottom:20px">
+        ${seccion1.map(renderGrupo).join('')}
+        <div style="display:flex;justify-content:flex-end;padding:6px 4px">Subtotal insumos ${icBadge(sub1.c, sub1.t, 12)}</div>
+      </div>
+      <div style="margin-bottom:12px">
+        ${seccion2.map(renderGrupo).join('')}
+        <div style="display:flex;justify-content:flex-end;padding:6px 4px">Subtotal ${icBadge(sub2.c, sub2.t, 12)}</div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;padding:10px 4px;border-top:1px solid var(--color-border);font-weight:700">Total ${icBadge(granTotal.c, granTotal.t, 13)}</div>
+    `
 
     if (wrap) wrap.innerHTML = `
       <style>
@@ -233,13 +266,6 @@ async function verDetalleInventario(idInventario) {
         <div id="ic-lista-plana" style="display:none"></div>
       </div>
     `
-
-    // Abrir grupo con mejor ratio
-    if (bestGroup !== null) {
-      wrap.querySelectorAll('.ic-grupo').forEach(el => {
-        if (el.dataset.grupo === bestGroup) el.classList.add('open')
-      })
-    }
 
     // Guardar filas para búsqueda
     window._icFilas = filas
@@ -278,8 +304,9 @@ function _icBuscar(q) {
         <thead>
           <tr>
             <th>Insumo</th>
-            <th>Unidad</th>
             <th style="text-align:right">Cantidad contada</th>
+            <th class="ic-col-meta">Unidad</th>
+            <th class="ic-col-meta">Proveedor</th>
           </tr>
         </thead>
         <tbody>
@@ -288,8 +315,9 @@ function _icBuscar(q) {
             return `
               <tr>
                 <td>${hl}</td>
-                <td style="color:var(--color-text-muted)">${f.unidad}</td>
                 <td style="text-align:right;font-weight:600">${f.contado != null ? formatInt(f.contado) : '—'}</td>
+                <td class="ic-col-meta">${f.unidad}</td>
+                <td class="ic-col-meta">${f.proveedor}</td>
               </tr>`
           }).join('')}
         </tbody>

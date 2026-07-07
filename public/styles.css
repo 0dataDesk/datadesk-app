@@ -684,6 +684,16 @@ body {
 .filtro-select:focus    { border-color: var(--color-accent); }
 .filtro-select:disabled { opacity: 0.4; cursor: not-allowed; }
 
+.card-surface {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.ic-col-meta { font-size: 11px; color: var(--color-text-muted); }
+
 /* ── RECETA DETALLE CARD ── */
 .receta-detalle-card {
   background: var(--color-card);
