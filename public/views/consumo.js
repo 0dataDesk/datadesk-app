@@ -1,10 +1,23 @@
 // ── Vista: Consumo teórico ──────────────────────────────────────────────────────
 // Mismo patrón de filtro jerárquico Todo/Mes/Semana que cierres.js (helpers copiados
 // y renombrados con prefijo Consumo para no colisionar con los globals de cierres.js,
-// ya que ambos scripts comparten el mismo scope global).
+// ya que ambos scripts comparten el mismo scope global). El look del filtro reutiliza
+// las clases .cierres-segmented ya existentes en styles.css.
 
 const CONSUMO_MESES_NOMBRES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const CONSUMO_MESES_CORTOS  = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
+
+const CONSUMO_GRUPO_META = {
+  'Carnes y Proteínas': { orden: 1, emoji: '🥩', color: '#B85C2A' },
+  'Lácteos y Quesos':   { orden: 2, emoji: '🧀', color: '#6A9BB5' },
+  'Verduras y Frescos': { orden: 3, emoji: '🥬', color: '#4A7A3A' },
+  'Despensa':           { orden: 4, emoji: '🥫', color: '#C8892A' },
+  'Subrecetas':         { orden: 5, emoji: '⚗️', color: '#8A5FB0' },
+  'Bebidas':            { orden: 6, emoji: '🥤', color: '#3D9BA8' },
+  'Desechables':        { orden: 7, emoji: '🗑️', color: '#9B7B6A' }
+}
+const CONSUMO_META_DEFAULT = { orden: 99, emoji: '📦', color: '#9B7B6A' }
+const CONSUMO_SECCION_2_GRUPOS = ['Subrecetas', 'Bebidas', 'Desechables', 'Empaque y Desechables']
 
 function _getLunesConsumo(fechaStr) {
   const d = new Date(fechaStr + 'T12:00:00')
@@ -61,36 +74,24 @@ async function vistaConsumo() {
     window._consumoMesSel    = null
     window._consumoSemanaSel = null
     window._consumoBuscador  = ''
-
-    const hoy = new Date()
-    const fmt = d => d.toISOString().slice(0, 10)
+    window._consumoDiaSel    = null
 
     content.innerHTML = `
-      <div class="vista-header"><h2>🧮 Consumo</h2></div>
-
-      <div class="receta-card" style="margin-bottom:16px">
-        <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
-          <label style="display:flex;flex-direction:column;gap:4px;font-size:13px">
-            Desde
-            <input type="date" id="consumo-gen-desde" value="${fmt(hoy)}"
-              style="padding:6px 10px;border:1px solid var(--color-border);border-radius:6px;background:var(--color-surface);color:var(--color-text)">
-          </label>
-          <label style="display:flex;flex-direction:column;gap:4px;font-size:13px">
-            Hasta
-            <input type="date" id="consumo-gen-hasta" value="${fmt(hoy)}"
-              style="padding:6px 10px;border:1px solid var(--color-border);border-radius:6px;background:var(--color-surface);color:var(--color-text)">
-          </label>
-          <button id="consumo-gen-btn" class="btn-accion btn-aprobar" onclick="generarConsumoRango()">Generar consumo teórico</button>
-        </div>
-        <div id="consumo-gen-resultado" style="margin-top:10px;font-size:13px"></div>
+      <div class="vista-header">
+        <h2>🧮 Consumo</h2>
+        <button class="btn-accion btn-aprobar" onclick="abrirModalGenerarConsumo()">Generar consumo teórico</button>
       </div>
 
-      <input type="text" id="consumo-buscador" placeholder="Buscar insumo..."
-        style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--color-border);border-radius:6px;background:var(--color-surface);color:var(--color-text);font-size:14px;margin-bottom:12px"
-        oninput="filtrarConsumoBuscador(this.value)">
+      <div id="consumo-controles">
+        <input type="text" id="consumo-buscador" placeholder="Buscar insumo..."
+          style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--color-border);border-radius:6px;background:var(--color-card);color:var(--color-text);font-size:14px;margin-bottom:12px"
+          oninput="filtrarConsumoBuscador(this.value)">
 
-      <div id="consumo-filtro" style="margin-bottom:16px"></div>
-      <div id="consumo-lista-wrap"></div>
+        <div id="consumo-filtro" style="margin-bottom:16px"></div>
+        <div id="consumo-lista-wrap"></div>
+      </div>
+
+      <div id="consumo-detalle-wrap" style="display:none"></div>
     `
 
     await cargarConsumoData()
@@ -100,11 +101,51 @@ async function vistaConsumo() {
   }
 }
 
-async function generarConsumoRango() {
-  const btn   = document.getElementById('consumo-gen-btn')
-  const resEl = document.getElementById('consumo-gen-resultado')
-  const desde = document.getElementById('consumo-gen-desde').value
-  const hasta = document.getElementById('consumo-gen-hasta').value
+// ── Modal: Generar consumo teórico ──────────────────────────────────────────────
+function abrirModalGenerarConsumo() {
+  if (document.getElementById('consumo-modal-overlay')) return
+  const hoy = new Date()
+  const fmt = d => d.toISOString().slice(0, 10)
+
+  const overlay = document.createElement('div')
+  overlay.id = 'consumo-modal-overlay'
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(43,26,15,0.45);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px'
+  overlay.innerHTML = `
+    <div class="card-surface" style="padding:24px;max-width:360px;width:100%">
+      <h3 style="margin:0 0 4px">Generar consumo teórico</h3>
+      <p style="font-size:13px;color:var(--color-text-muted);margin:0 0 16px">Elige el rango de fechas a procesar.</p>
+      <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:20px">
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:13px">
+          Desde
+          <input type="date" id="consumo-modal-desde" value="${fmt(hoy)}"
+            style="padding:8px 10px;border:1px solid var(--color-border);border-radius:6px;background:var(--color-bg);color:var(--color-text)">
+        </label>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:13px">
+          Hasta
+          <input type="date" id="consumo-modal-hasta" value="${fmt(hoy)}"
+            style="padding:8px 10px;border:1px solid var(--color-border);border-radius:6px;background:var(--color-bg);color:var(--color-text)">
+        </label>
+      </div>
+      <div id="consumo-modal-resultado" style="font-size:13px;margin-bottom:12px"></div>
+      <div style="display:flex;justify-content:flex-end;gap:8px">
+        <button class="btn-accion" style="border:1px solid var(--color-border)" onclick="cerrarModalGenerarConsumo()">Cancelar</button>
+        <button id="consumo-modal-confirmar" class="btn-accion btn-aprobar" onclick="confirmarGenerarConsumo()">Generar</button>
+      </div>
+    </div>
+  `
+  document.body.appendChild(overlay)
+}
+
+function cerrarModalGenerarConsumo() {
+  const overlay = document.getElementById('consumo-modal-overlay')
+  if (overlay) overlay.remove()
+}
+
+async function confirmarGenerarConsumo() {
+  const btn   = document.getElementById('consumo-modal-confirmar')
+  const resEl = document.getElementById('consumo-modal-resultado')
+  const desde = document.getElementById('consumo-modal-desde').value
+  const hasta = document.getElementById('consumo-modal-hasta').value
   if (!desde || !hasta || !btn || !resEl) return
 
   const original = btn.textContent
@@ -128,14 +169,15 @@ async function generarConsumoRango() {
       : `<span style="color:#3A8C3E;font-weight:600">${procesadas} venta${procesadas !== 1 ? 's' : ''} procesada${procesadas !== 1 ? 's' : ''} · ${filas} fila${filas !== 1 ? 's' : ''} generada${filas !== 1 ? 's' : ''}.</span>`
 
     await cargarConsumoData()
+    setTimeout(cerrarModalGenerarConsumo, 1400)
   } catch (err) {
     resEl.innerHTML = `<span style="color:var(--color-highlight)">Error: ${err.message}</span>`
-  } finally {
     btn.disabled = false
     btn.textContent = original
   }
 }
 
+// ── Carga de datos ───────────────────────────────────────────────────────────────
 async function cargarConsumoData() {
   const tenant_id = window._consumoTenant
   const wrap      = document.getElementById('consumo-lista-wrap')
@@ -171,11 +213,15 @@ async function cargarConsumoData() {
   const idsProducto = [...new Set(filas.map(f => f.id_producto))]
   const { data: productos } = await window._db
     .from('productos')
-    .select('id_producto, producto')
+    .select('id_producto, producto, grupo')
     .eq('tenant_id', tenant_id)
     .in('id_producto', idsProducto)
   const nombreMap = {}
-  ;(productos || []).forEach(p => { nombreMap[p.id_producto] = p.producto })
+  const grupoMap  = {}
+  ;(productos || []).forEach(p => {
+    nombreMap[p.id_producto] = p.producto
+    grupoMap[p.id_producto]  = p.grupo || 'Sin grupo'
+  })
 
   const porDia = {}
   filas.forEach(f => {
@@ -184,7 +230,13 @@ async function cargarConsumoData() {
     porDia[fecha].ventasSet.add(f.id_venta)
     const idp = f.id_producto
     if (!porDia[fecha].productosMap[idp]) {
-      porDia[fecha].productosMap[idp] = { id_producto: idp, nombre: nombreMap[idp] || idp, cantidad: 0, subtotal: 0 }
+      porDia[fecha].productosMap[idp] = {
+        id_producto: idp,
+        nombre: nombreMap[idp] || idp,
+        grupo:  grupoMap[idp] || 'Sin grupo',
+        cantidad: 0,
+        subtotal: 0
+      }
     }
     const p     = porDia[fecha].productosMap[idp]
     const cant  = Number(f.cantidad_consumida) || 0
@@ -227,6 +279,7 @@ function _filtrarConsumoPorPeriodo() {
   return todos
 }
 
+// ── Filtro Todo/Mes/Semana (mismo look que Cierres) ──────────────────────────────
 function renderConsumoFiltro() {
   const cont = document.getElementById('consumo-filtro')
   if (!cont) return
@@ -236,26 +289,27 @@ function renderConsumoFiltro() {
   const soloUnAño = añosDistintos.length === 1
 
   const nivel1 = window._consumoNivel1 || 'Todo'
-  const pill = (active) => `padding:5px 14px;border-radius:20px;border:1px solid var(--color-border);cursor:pointer;font-size:13px;
-    background:${active ? 'var(--color-primary)' : 'transparent'};color:${active ? '#fff' : 'var(--color-text)'}`
 
-  let html = `<div style="display:flex;gap:8px;flex-wrap:wrap">
-    ${['Todo', 'Mes', 'Semana'].map(p => `
-      <button class="btn-periodo" onclick="setConsumoNivel1('${p}')" style="${pill(nivel1 === p)}">${p}</button>`).join('')}
-  </div>`
+  let html = `
+    <div class="cierres-segmented">
+      ${['Todo', 'Mes', 'Semana'].map(p => `
+        <button class="btn-periodo${nivel1 === p ? ' active' : ''}" onclick="setConsumoNivel1('${p}')">${p}</button>`).join('')}
+    </div>`
 
   if (nivel1 === 'Mes' || nivel1 === 'Semana') {
-    html += `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+    html += `
+    <div class="cierres-segmented cierres-segmented-sub" style="margin-top:10px">
       ${meses.map(mes => `
-        <button class="btn-periodo" onclick="setConsumoMes('${mes}')" style="${pill(window._consumoMesSel === mes)}">${_consumoMesLabelDe(mes, soloUnAño)}</button>`).join('')}
+        <button class="btn-periodo${window._consumoMesSel === mes ? ' active' : ''}" onclick="setConsumoMes('${mes}')">${_consumoMesLabelDe(mes, soloUnAño)}</button>`).join('')}
     </div>`
   }
 
   if (nivel1 === 'Semana' && window._consumoMesSel) {
     const { semanas } = _agruparConsumoPorSemana(porMes[window._consumoMesSel] || [])
-    html += `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+    html += `
+    <div class="cierres-segmented cierres-segmented-sub" style="margin-top:8px">
       ${semanas.map(lunes => `
-        <button class="btn-periodo" onclick="setConsumoSemana('${lunes}')" style="${pill(window._consumoSemanaSel === lunes)}">${_semLabelConsumo(lunes)}</button>`).join('')}
+        <button class="btn-periodo${window._consumoSemanaSel === lunes ? ' active' : ''}" onclick="setConsumoSemana('${lunes}')">${_semLabelConsumo(lunes)}</button>`).join('')}
     </div>`
   }
 
@@ -288,6 +342,7 @@ function filtrarConsumoBuscador(val) {
   renderConsumoVista()
 }
 
+// ── Lista agrupada mes → semana → día (cada día es un renglón, abre vista nueva) ─
 function renderConsumoVista() {
   const listaEl = document.getElementById('consumo-lista-wrap')
   if (!listaEl) return
@@ -295,7 +350,6 @@ function renderConsumoVista() {
   const diasFiltrados = _filtrarConsumoPorPeriodo()
   const buscador = (window._consumoBuscador || '').trim().toLowerCase()
 
-  // El buscador filtra productos dentro de cada día (no solo el día expandido) y oculta días sin match
   const diasConFiltro = buscador
     ? diasFiltrados
         .map(d => {
@@ -314,7 +368,8 @@ function renderConsumoVista() {
   const añosDistintos = [...new Set(meses.map(m => m.split('-')[0]))]
   const soloUnAño = añosDistintos.length === 1
 
-  let html = soloUnAño
+  let html = `<div class="card-surface" style="padding:16px 20px">`
+  html += soloUnAño
     ? `<div style="font-size:12px;color:var(--color-text-muted);margin-bottom:8px">Consumo ${añosDistintos[0]}</div>`
     : ''
 
@@ -334,45 +389,17 @@ function renderConsumoVista() {
       const semOpen = (mesIdx === 0 && semIdx === 0) || !!buscador
       const semId   = `consumo-sem-${mes}-${lunes}`
 
-      const diasHtml = diasSem.map(d => {
-        const diaId   = `consumo-dia-${d.fecha}`
-        const diaOpen = !!buscador
-
-        const filasProducto = d.productos.map(p => `
-          <tr>
-            <td>${p.nombre}</td>
-            <td style="text-align:right">${formatNum(p.cantidad)}</td>
-            <td style="text-align:right">$${formatNum(p.costoUnitario)}</td>
-            <td style="text-align:right;font-weight:600">$${formatNum(p.subtotal)}</td>
-          </tr>`).join('')
-
-        return `
-          <div style="margin-left:16px">
-            <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;
-                font-size:13px;border-bottom:1px solid var(--color-border)"
-              onclick="(function(el){
-                const b=document.getElementById('${diaId}');
-                const open=b.style.display!=='none';
-                b.style.display=open?'none':'';
-                el.querySelector('.dia-chev').textContent=open?'▶':'▼';
-              })(this)">
-              <span class="dia-chev" style="color:var(--color-text-muted);font-size:11px">${diaOpen ? '▼' : '▶'}</span>
-              <span style="font-weight:600">${d.fecha}</span>
-              <span style="color:var(--color-text-muted)">· ${d.numProductos} producto${d.numProductos !== 1 ? 's' : ''} · ${d.numVentas} venta${d.numVentas !== 1 ? 's' : ''}</span>
-              <span style="font-weight:600;margin-left:auto">$${formatNum(d.costoTotal)}</span>
-            </div>
-            <div id="${diaId}" style="display:${diaOpen ? '' : 'none'};padding:8px 0 8px 12px">
-              <div style="overflow-x:auto">
-                <table class="tabla">
-                  <thead>
-                    <tr><th>Producto</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Costo unitario</th><th style="text-align:right">Subtotal</th></tr>
-                  </thead>
-                  <tbody>${filasProducto}</tbody>
-                </table>
-              </div>
-            </div>
-          </div>`
-      }).join('')
+      const diasHtml = diasSem.map(d => `
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:10px 12px 10px 32px;
+            border-bottom:1px solid var(--color-border);cursor:pointer;font-size:13px"
+          onclick="verDetalleConsumoDia('${d.fecha}')"
+          onmouseenter="this.style.background='var(--color-secondary)'"
+          onmouseleave="this.style.background=''">
+          <span style="min-width:90px;font-weight:600">${d.fecha}</span>
+          <span style="font-family:'Bebas Neue',sans-serif;font-size:19px;color:var(--color-primary)">$${formatNum(d.costoTotal)}</span>
+          <span style="color:var(--color-text-muted)">${d.numProductos} producto${d.numProductos !== 1 ? 's' : ''}</span>
+          <span style="color:var(--color-text-muted);margin-left:auto">${d.numVentas} venta${d.numVentas !== 1 ? 's' : ''}</span>
+        </div>`).join('')
 
       semanasHtml += `
         <div style="margin-left:16px">
@@ -398,7 +425,7 @@ function renderConsumoVista() {
     html += `
       <div style="margin-bottom:8px;border:1px solid var(--color-border);border-radius:8px;overflow:hidden">
         <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;cursor:pointer;
-            background:var(--color-bg-card)"
+            background:var(--color-secondary)"
           onclick="(function(el){
             const b=document.getElementById('${mesId}');
             const open=b.style.display!=='none';
@@ -416,5 +443,110 @@ function renderConsumoVista() {
       </div>`
   })
 
+  html += `</div>`
+
   listaEl.innerHTML = html
+}
+
+// ── Detalle de un día: vista nueva, con secciones por grupo (como Insumos) ──────
+function verDetalleConsumoDia(fecha) {
+  const controles   = document.getElementById('consumo-controles')
+  const detalleWrap = document.getElementById('consumo-detalle-wrap')
+  if (!controles || !detalleWrap) return
+
+  window._consumoDiaSel = fecha
+  controles.style.display   = 'none'
+  detalleWrap.style.display = ''
+
+  const dia = (window._consumoDiasData || []).find(d => d.fecha === fecha)
+  if (!dia) {
+    detalleWrap.innerHTML = `<p style="color:var(--color-highlight)">No se encontró consumo para ${fecha}.</p>`
+    return
+  }
+
+  const porGrupo = {}
+  dia.productos.forEach(p => {
+    const g = p.grupo || 'Sin grupo'
+    if (!porGrupo[g]) porGrupo[g] = []
+    porGrupo[g].push(p)
+  })
+  const nombresGrupos = Object.keys(porGrupo).sort((a, b) => {
+    const ma = CONSUMO_GRUPO_META[a] || CONSUMO_META_DEFAULT
+    const mb = CONSUMO_GRUPO_META[b] || CONSUMO_META_DEFAULT
+    return ma.orden - mb.orden
+  })
+
+  const seccion1 = nombresGrupos.filter(g => !CONSUMO_SECCION_2_GRUPOS.includes(g))
+  const seccion2 = nombresGrupos.filter(g => CONSUMO_SECCION_2_GRUPOS.includes(g))
+
+  const badge = (monto, size) => {
+    const fs = size || 12
+    return `<span style="padding:2px 10px;border-radius:20px;font-size:${fs}px;font-weight:700;background:rgba(154,123,106,0.15);color:var(--color-text-muted)">$${formatNum(monto)}</span>`
+  }
+
+  const renderGrupo = (g) => {
+    const prods = porGrupo[g]
+    const meta  = CONSUMO_GRUPO_META[g] || CONSUMO_META_DEFAULT
+    const subtotalGrupo = prods.reduce((s, p) => s + p.subtotal, 0)
+
+    return `
+      <div class="ic-grupo" style="border:1px solid var(--color-border);border-left:4px solid ${meta.color};border-radius:8px;margin-bottom:8px;overflow:hidden">
+        <div class="ic-grupo-header"
+          style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;cursor:pointer;background:var(--color-surface);user-select:none"
+          onclick="this.parentElement.classList.toggle('open')">
+          <span style="font-weight:600">${meta.emoji} ${g}</span>
+          ${badge(subtotalGrupo)}
+        </div>
+        <div class="ic-grupo-body" style="display:none">
+          <table class="tabla" style="margin:0;border-radius:0;border-top:1px solid var(--color-border)">
+            <thead>
+              <tr><th>Producto</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Costo unitario</th><th style="text-align:right">Subtotal</th></tr>
+            </thead>
+            <tbody>
+              ${prods.map(p => `
+                <tr>
+                  <td>${p.nombre}</td>
+                  <td style="text-align:right">${formatNum(p.cantidad)}</td>
+                  <td style="text-align:right">$${formatNum(p.costoUnitario)}</td>
+                  <td style="text-align:right;font-weight:600">$${formatNum(p.subtotal)}</td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>`
+  }
+
+  const sub1 = seccion1.reduce((s, g) => s + porGrupo[g].reduce((s2, p) => s2 + p.subtotal, 0), 0)
+  const sub2 = seccion2.reduce((s, g) => s + porGrupo[g].reduce((s2, p) => s2 + p.subtotal, 0), 0)
+
+  detalleWrap.innerHTML = `
+    <style>
+      .ic-grupo.open .ic-grupo-body { display:block !important }
+      .ic-grupo-header:hover { opacity:.85 }
+    </style>
+    <div class="card-surface" style="padding:24px;margin-top:16px">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+        <button class="btn-accion" style="border:1px solid var(--color-border)" onclick="volverDeConsumoDetalle()">← Volver</button>
+        <h3 style="margin:0">Consumo — ${fecha}</h3>
+      </div>
+
+      <div style="margin-bottom:20px">
+        ${seccion1.map(renderGrupo).join('')}
+        ${seccion1.length ? `<div style="display:flex;justify-content:flex-end;padding:6px 4px">Subtotal insumos ${badge(sub1)}</div>` : ''}
+      </div>
+      <div style="margin-bottom:12px">
+        ${seccion2.map(renderGrupo).join('')}
+        ${seccion2.length ? `<div style="display:flex;justify-content:flex-end;padding:6px 4px">Subtotal ${badge(sub2)}</div>` : ''}
+      </div>
+      ${(seccion1.length && seccion2.length) ? `<div style="display:flex;justify-content:flex-end;padding:10px 4px;border-top:1px solid var(--color-border);font-weight:700">Total ${badge(sub1 + sub2, 13)}</div>` : ''}
+    </div>
+  `
+}
+
+function volverDeConsumoDetalle() {
+  const controles   = document.getElementById('consumo-controles')
+  const detalleWrap = document.getElementById('consumo-detalle-wrap')
+  if (controles)   controles.style.display   = ''
+  if (detalleWrap) { detalleWrap.style.display = 'none'; detalleWrap.innerHTML = '' }
+  window._consumoDiaSel = null
 }
