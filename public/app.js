@@ -220,7 +220,6 @@ async function mostrarApp(rol, email, tenant_id = null) {
     if (view === 'cierres')          await vistaCierres()
     if (view === 'consumo')          await vistaConsumo()
     if (view === 'recepciones')      await vistaRecepciones()
-    if (view === 'levantamiento')    await vistaInventarioLevantamiento()
   })
 
   // Cerrar dropdowns al hacer click fuera del nav
@@ -234,9 +233,9 @@ async function mostrarApp(rol, email, tenant_id = null) {
 
   // Nav agrupado según rol
   const permitidasPorRol = {
-    superadmin: ['inicio','productos','recetas','precios','costeo','pedidos','ventas','cierres','consumo','recepciones','inventario','inventarios','levantamiento','sugerido'],
-    owner:      ['inicio','productos','recetas','ventas','cierres','consumo','recepciones','inventario','inventarios','levantamiento','sugerido'],
-    gerente:    ['inicio','productos','recetas','ventas','cierres','consumo','recepciones','inventario','inventarios','levantamiento','sugerido'],
+    superadmin: ['inicio','productos','recetas','precios','costeo','pedidos','ventas','cierres','consumo','recepciones','inventario','inventarios','sugerido'],
+    owner:      ['inicio','productos','recetas','ventas','cierres','consumo','recepciones','inventario','inventarios','sugerido'],
+    gerente:    ['inicio','productos','recetas','ventas','cierres','consumo','recepciones','inventario','inventarios','sugerido'],
     caja:       ['productos','recetas','ventas'],
     // legacy
     admin:      ['inicio','productos','recetas','precios','costeo','pedidos','ventas','cierres','consumo','recepciones','inventario','inventarios','sugerido'],
@@ -247,7 +246,7 @@ async function mostrarApp(rol, email, tenant_id = null) {
   const navGrupos = [
     { label: 'Menú',        vistas: ['productos','recetas'],                                 roles: ['superadmin','admin','owner','gerente','editor','caja','cocina'] },
     { label: 'Operación',   vistas: ['ventas','cierres','consumo','recepciones'],             roles: ['superadmin','admin','owner','gerente','editor'] },
-    { label: 'Inventarios', vistas: ['inventario','inventarios','levantamiento','sugerido'], roles: ['superadmin','admin','owner','gerente','editor'] },
+    { label: 'Inventarios', vistas: ['inventario','inventarios','sugerido'], roles: ['superadmin','admin','owner','gerente','editor'] },
     { label: 'Desarrollo',  vistas: ['inicio','precios','costeo','pedidos'],                 roles: ['superadmin','admin'] }
   ]
 
@@ -255,7 +254,7 @@ async function mostrarApp(rol, email, tenant_id = null) {
     inicio: 'Inicio', productos: '🧂 Insumos y Subrecetas', recetas: '📖 Recetas',
     precios: 'Precios', costeo: 'Costeo', pedidos: 'Pedidos',
     ventas: '🧾 Ventas', cierres: '🔒 Cierres', consumo: '🧮 Consumo', recepciones: '📦 Recepciones',
-    inventario: '🔍 Diagnóstico', inventarios: '📋 Conteos', levantamiento: '📝 Levantamiento', sugerido: '🛒 Sugerido de Compra'
+    inventario: '🔍 Diagnóstico', inventarios: '📋 Conteos', sugerido: '🛒 Sugerido de Compra'
   }
 
   let navHtml = ''
@@ -328,7 +327,6 @@ async function mostrarApp(rol, email, tenant_id = null) {
   else if (vistaInicial === 'cierres')     vistaCierres()
   else if (vistaInicial === 'consumo')     vistaConsumo()
   else if (vistaInicial === 'recepciones')    vistaRecepciones()
-  else if (vistaInicial === 'levantamiento') vistaInventarioLevantamiento()
   else                                     mostrarBienvenida()
 }
 
