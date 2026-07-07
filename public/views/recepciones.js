@@ -91,6 +91,9 @@ async function vistaRecepciones() {
     window._badgeEstatus  = badgeEstatus
     window._iconoEstatus  = iconoEstatus
     window._recFiltroProv = ''
+    window._recNivel1     = 'Todo'
+    window._recMesSel     = null
+    window._recSemanaSel  = null
 
     const nombresMap = {}
     try {
@@ -115,6 +118,8 @@ async function vistaRecepciones() {
           </select>
         </div>
 
+        <div id="recepciones-filtro-periodo" style="margin-bottom:16px"></div>
+
         <div id="recepciones-cabecero"></div>
         <div id="recepciones-lista"></div>
       </div>
@@ -122,11 +127,12 @@ async function vistaRecepciones() {
 
     window.filtrarRecepciones = function() {
       window._recFiltroProv = document.getElementById('filtro-rec-prov')?.value || ''
-      const filtradas = window._recepciones.filter(r => !window._recFiltroProv || r.id_proveedor === window._recFiltroProv)
+      const filtradas = _recepcionesFiltroCombinado()
       renderCabeceroRecepciones(filtradas)
       renderListaRecepciones(filtradas)
     }
 
+    renderRecFiltroPeriodo()
     renderCabeceroRecepciones(window._recepciones)
     renderListaRecepciones(window._recepciones)
 
@@ -135,7 +141,78 @@ async function vistaRecepciones() {
   }
 }
 
-// ── Cabecero: total gastado, recepciones, sin factura, top proveedores, donut ──
+function _recepcionesFiltroCombinado() {
+  const prov = window._recFiltroProv
+  let lista = (window._recepciones || []).filter(r => !prov || r.id_proveedor === prov)
+
+  const nivel1 = window._recNivel1 || 'Todo'
+  if (nivel1 === 'Mes' && window._recMesSel) {
+    lista = lista.filter(r => (r.fecha || '').slice(0, 7) === window._recMesSel)
+  } else if (nivel1 === 'Semana' && window._recMesSel) {
+    lista = lista.filter(r => (r.fecha || '').slice(0, 7) === window._recMesSel)
+    if (window._recSemanaSel) lista = lista.filter(r => _getLunesRecepcion(r.fecha) === window._recSemanaSel)
+  }
+  return lista
+}
+
+// ── Filtro Todo/Mes/Semana (mismo look que Cierres) ──────────────────────────────
+function renderRecFiltroPeriodo() {
+  const cont = document.getElementById('recepciones-filtro-periodo')
+  if (!cont) return
+  const { meses } = _agruparRecepcionesPorMes(window._recepciones || [])
+  const añosDistintos = [...new Set(meses.map(m => m.split('-')[0]))]
+  const soloUnAño = añosDistintos.length === 1
+  const nivel1 = window._recNivel1 || 'Todo'
+
+  let html = `
+    <div class="cierres-segmented">
+      ${['Todo', 'Mes', 'Semana'].map(p => `
+        <button class="btn-periodo${nivel1 === p ? ' active' : ''}" onclick="setRecNivel1('${p}')">${p}</button>`).join('')}
+    </div>`
+
+  if (nivel1 === 'Mes' || nivel1 === 'Semana') {
+    html += `
+    <div class="cierres-segmented cierres-segmented-sub" style="margin-top:10px">
+      ${meses.map(mes => `
+        <button class="btn-periodo${window._recMesSel === mes ? ' active' : ''}" onclick="setRecMes('${mes}')">${_recMesLabelDe(mes, soloUnAño)}</button>`).join('')}
+    </div>`
+  }
+
+  if (nivel1 === 'Semana' && window._recMesSel) {
+    const recDelMes = (window._recepciones || []).filter(r => (r.fecha || '').slice(0, 7) === window._recMesSel)
+    const { semanas } = _agruparRecepcionesPorSemana(recDelMes)
+    html += `
+    <div class="cierres-segmented cierres-segmented-sub" style="margin-top:8px">
+      ${semanas.map(lunes => `
+        <button class="btn-periodo${window._recSemanaSel === lunes ? ' active' : ''}" onclick="setRecSemana('${lunes}')">${_semLabelRecepcion(lunes)}</button>`).join('')}
+    </div>`
+  }
+
+  cont.innerHTML = html
+}
+
+function setRecNivel1(nivel) {
+  window._recNivel1    = nivel
+  window._recMesSel    = null
+  window._recSemanaSel = null
+  renderRecFiltroPeriodo()
+  window.filtrarRecepciones()
+}
+
+function setRecMes(mes) {
+  window._recMesSel    = mes
+  window._recSemanaSel = null
+  renderRecFiltroPeriodo()
+  window.filtrarRecepciones()
+}
+
+function setRecSemana(lunes) {
+  window._recSemanaSel = lunes
+  renderRecFiltroPeriodo()
+  window.filtrarRecepciones()
+}
+
+// ── Cabecero: total gastado, recepciones, sin factura, donut por proveedor ─────
 function renderCabeceroRecepciones(lista) {
   const cabeceroEl = document.getElementById('recepciones-cabecero')
   if (!cabeceroEl) return
@@ -155,7 +232,6 @@ function renderCabeceroRecepciones(lista) {
     porProveedor[key] = (porProveedor[key] || 0) + _recGasto(r)
   })
   const provEntries = Object.entries(porProveedor).sort((a, b) => b[1] - a[1])
-  const top5 = provEntries.slice(0, 5)
   const nombreDe = (key) => key === 'Inventario Inicial' ? key : (window._nombreProv[key] || key)
 
   const tdH = `padding:10px 16px 4px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);white-space:nowrap`
@@ -204,16 +280,6 @@ function renderCabeceroRecepciones(lista) {
               </tr>
             </tbody>
           </table>
-          ${top5.length > 0 ? `
-          <div style="display:flex;flex-direction:column;gap:10px">
-            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-muted)">🏆 Top proveedores</div>
-            ${top5.map(([key, monto], i) => `
-              <div style="font-size:13px;display:flex;gap:6px;align-items:baseline">
-                <span style="color:var(--color-text-muted);min-width:14px">${i + 1}.</span>
-                <span style="font-weight:600;flex:1">${nombreDe(key)}</span>
-                <span style="color:var(--color-text-muted);white-space:nowrap">$${formatNum(monto)}</span>
-              </div>`).join('')}
-          </div>` : ''}
         </div>
 
         ${provEntries.length > 0 ? `
