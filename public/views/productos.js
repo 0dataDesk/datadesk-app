@@ -1,3 +1,20 @@
+const PR_GRUPO_META = {
+  'Carnes y Proteínas': { orden: 1, emoji: '🥩', color: '#B85C2A' },
+  'Lácteos y Quesos':   { orden: 2, emoji: '🧀', color: '#6A9BB5' },
+  'Verduras y Frescos': { orden: 3, emoji: '🥬', color: '#4A7A3A' },
+  'Despensa':           { orden: 4, emoji: '🥫', color: '#C8892A' },
+  'Subrecetas':         { orden: 5, emoji: '⚗️', color: '#8A5FB0' },
+  'Bebidas':            { orden: 6, emoji: '🥤', color: '#3D9BA8' },
+  'Desechables':        { orden: 7, emoji: '🗑️', color: '#9B7B6A' }
+}
+const PR_META_DEFAULT = { orden: 99, emoji: '📦', color: '#9B7B6A' }
+
+function _prHighlight(texto, termino) {
+  if (!termino) return texto
+  const escaped = termino.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const re = new RegExp(escaped, 'gi')
+  return texto.replace(re, m => `<mark style="background:rgba(200,137,42,0.3);color:inherit;border-radius:2px">${m}</mark>`)
+}
 
 async function vistaProductos() {
   const content = document.getElementById('content')
@@ -8,9 +25,7 @@ async function vistaProductos() {
     const rol              = window._rol || 'operador'
     const puedeEditar      = ['admin', 'editor', 'cocina'].includes(rol)
     const puedeInvEditar   = ['superadmin', 'owner', 'gerente', 'admin', 'editor'].includes(rol)
-
-    const tenantActual   = (window._tenantConfig?.nombre || '').toLowerCase()
-    const fuentesDef     = window.FUENTES_POR_TENANT[tenantActual] || []
+    const mostrarAcciones  = puedeEditar || puedeInvEditar
 
     const _fuentes = (window.FUENTES_POR_TENANT[tenant_id] || []).map(f => f.fuente)
     const query = window._db.from('productos').select('*').eq('tenant_id', tenant_id).eq('activo', true).eq('tipo', 'Insumo').in('fuente', _fuentes).order('producto')
@@ -31,8 +46,6 @@ async function vistaProductos() {
 
     const hayUnidades = window._unidades.length > 0
 
-    const grupos  = [...new Set(window._productos.map(p => p.grupo).filter(Boolean))].sort()
-
     const uOptsFor = (valorActual) => {
       if (!hayUnidades) return `<option value="${valorActual}">${valorActual || '—'}</option>`
       return window._unidades
@@ -43,64 +56,20 @@ async function vistaProductos() {
     content.innerHTML = `
       <div class="vista-header">
         <h2>🧂 Insumos</h2>
-        ${fuentesDef.length ? `
-        <div class="export-bar">
-          ${fuentesDef.length > 1 ? `
-          <select id="export-fuente" class="filtro-select">
-            ${fuentesDef.map(f => `<option value="${f.fuente}">${f.etiqueta}</option>`).join('')}
-          </select>` : ''}
-          <button id="btn-export-pdf" class="btn-primary">Exportar PDF</button>
-        </div>` : ''}
       </div>
 
       <div class="filtros-bar">
         <input type="text" id="insumos-search" placeholder="Buscar insumo..." class="filtro-search" />
       </div>
-      <div id="prod-pills-wrap" style="position:relative;display:flex;align-items:center;gap:0;margin:0 0 4px">
-        <button id="prod-pills-prev" onclick="prodPillsScroll(-1)" style="display:none;flex-shrink:0;background:var(--color-surface,#fff);border:1.5px solid var(--color-border);border-radius:50%;width:28px;height:28px;font-size:14px;cursor:pointer;line-height:1;color:var(--color-text);z-index:2;margin-right:4px">‹</button>
-        <div id="prod-pills-nav" style="display:flex;gap:8px;overflow-x:auto;padding:10px 0 4px;scrollbar-width:none;-ms-overflow-style:none;flex-wrap:nowrap;flex:1;scroll-behavior:smooth"></div>
-        <button id="prod-pills-next" onclick="prodPillsScroll(1)" style="display:none;flex-shrink:0;background:var(--color-surface,#fff);border:1.5px solid var(--color-border);border-radius:50%;width:28px;height:28px;font-size:14px;cursor:pointer;line-height:1;color:var(--color-text);z-index:2;margin-left:4px">›</button>
-      </div>
       <div id="insumos-lista-wrap"></div>
     `
 
-    window._prodGrupoActivo = 'todos'
-
-    const aplicarFiltros = () => {
-      const texto = document.getElementById('insumos-search')?.value.toLowerCase() || ''
-      return window._productos.filter(p => {
-        const matchTexto = !texto || p.producto?.toLowerCase().includes(texto)
-        const matchGrupo = window._prodGrupoActivo === 'todos' || p.grupo === window._prodGrupoActivo
-        return matchTexto && matchGrupo
-      })
-    }
-
-    let renderPills = () => {
-      const nav = document.getElementById('prod-pills-nav')
-      if (!nav) return
-      const ps = (activo) => `flex-shrink:0;padding:5px 13px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;border:1.5px solid ${activo?'var(--color-primary)':'var(--color-border)'};background:${activo?'var(--color-primary)':'transparent'};color:${activo?'#fff':'var(--color-text)'};white-space:nowrap`
-      nav.innerHTML = `<button style="${ps(window._prodGrupoActivo==='todos')}" onclick="prodFiltrarGrupo('todos')">Todos <span style="opacity:0.7;font-weight:400">(${window._productos.length})</span></button>`
-        + grupos.map(g => {
-            const items  = window._productos.filter(p => p.grupo === g)
-            const activo = window._prodGrupoActivo === g
-            return `<button style="${ps(activo)}" onclick="prodFiltrarGrupo('${g.replace(/'/g,"\\'")}')">${g} <span style="opacity:0.7;font-weight:400">(${items.length})</span></button>`
-          }).join('')
-    }
-
-    window.prodFiltrarGrupo = function(grupo) {
-      window._prodGrupoActivo = grupo
-      document.getElementById('insumos-search').value = ''
-      renderPills()
-      renderTabla(aplicarFiltros())
-    }
-
-    const renderFilaProducto = (p) => `
+    const renderFilaProducto = (p, termino) => `
       <tr data-prod-id="${p.id_producto}">
-        <td style="font-size:11px;color:var(--color-text-muted)">${p.id_producto}</td>
         <td>${puedeEditar
           ? `<input type="text" class="edit-input" id="prod-nombre-${p.id_producto}"
                   value="${p.producto.replace(/"/g, '&quot;')}" style="width:100%">`
-          : p.producto}
+          : _prHighlight(p.producto, termino)}
         </td>
         <td>${puedeEditar
           ? `<select class="edit-select" id="prod-unidad-${p.id_producto}">
@@ -110,14 +79,14 @@ async function vistaProductos() {
              ${!p.unidad_medida ? '<span class="badge-faltante" title="Este insumo no tiene unidad definida">⚠ falta unidad</span>' : ''}`
           : (p.unidad_medida || `<span class="badge-faltante">⚠ falta unidad</span>`)}
         </td>
-        ${(puedeEditar || puedeInvEditar) ? `<td style="text-align:right;white-space:nowrap">
+        ${mostrarAcciones ? `<td style="text-align:right;white-space:nowrap">
           ${puedeEditar ? `<button class="btn-fila btn-guardar-ing" onclick="guardarProducto('${p.id_producto}')">💾</button>` : ''}
           ${puedeInvEditar ? `<button class="btn-fila" style="margin-left:4px;background:rgba(200,137,42,0.12);color:#c8892a;border:1px solid rgba(200,137,42,0.3);border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer"
             onclick="toggleInventarioPanel('${p.id_producto}')">⚙ Inventario</button>` : ''}
         </td>` : ''}
       </tr>
       <tr id="inv-panel-${p.id_producto}" style="display:none">
-        <td colspan="${puedeEditar ? 4 : 3}" style="padding:0">
+        <td colspan="${mostrarAcciones ? 3 : 2}" style="padding:0">
           <div style="background:rgba(200,137,42,0.06);border:1px solid rgba(200,137,42,0.2);border-radius:8px;padding:16px;margin:4px 0">
             <div style="font-size:11px;font-weight:700;color:var(--color-accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">Control de Inventario</div>
             <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px">
@@ -162,25 +131,86 @@ async function vistaProductos() {
       </tr>
     `
 
-    const renderTabla = (filtrados) => {
+    const renderGrupo = (g, prods) => {
+      const meta = PR_GRUPO_META[g] || PR_META_DEFAULT
+      return `
+        <div class="pr-grupo" data-grupo="${g.replace(/"/g,'&quot;')}"
+          style="border:1px solid var(--color-border);border-left:4px solid ${meta.color};border-radius:8px;margin-bottom:8px;overflow:hidden">
+          <div class="pr-grupo-header"
+            style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;cursor:pointer;background:var(--color-surface);user-select:none"
+            onclick="this.parentElement.classList.toggle('open')">
+            <span style="font-weight:600">${meta.emoji} ${g}</span>
+            <span style="font-size:12px;color:var(--color-text-muted)">${prods.length}</span>
+          </div>
+          <div class="pr-grupo-body" style="display:none">
+            <table class="tabla" style="margin:0;border-radius:0;border-top:1px solid var(--color-border)">
+              <thead>
+                <tr>
+                  <th>Insumo</th>
+                  <th>Unidad</th>
+                  ${mostrarAcciones ? '<th></th>' : ''}
+                </tr>
+              </thead>
+              <tbody>${prods.map(p => renderFilaProducto(p, null)).join('')}</tbody>
+            </table>
+          </div>
+        </div>`
+    }
+
+    const renderTabla = (filtrados, buscando, termino) => {
       const wrap = document.getElementById('insumos-lista-wrap')
       if (!filtrados.length) {
         wrap.innerHTML = `<p style="color:var(--color-text-muted);font-size:13px">No hay insumos para mostrar.</p>`
         return
       }
+
+      if (buscando) {
+        wrap.innerHTML = `
+          <div class="card-surface" style="padding:16px">
+            <table class="tabla">
+              <thead>
+                <tr>
+                  <th>Insumo</th>
+                  <th>Unidad</th>
+                  ${mostrarAcciones ? '<th></th>' : ''}
+                </tr>
+              </thead>
+              <tbody>${filtrados.map(p => renderFilaProducto(p, termino)).join('')}</tbody>
+            </table>
+          </div>`
+        return
+      }
+
+      const porGrupo = {}
+      filtrados.forEach(p => {
+        const g = p.grupo || 'Sin grupo'
+        if (!porGrupo[g]) porGrupo[g] = []
+        porGrupo[g].push(p)
+      })
+      const nombresGrupos = Object.keys(porGrupo).sort((a, b) => {
+        const ma = PR_GRUPO_META[a] || PR_META_DEFAULT
+        const mb = PR_GRUPO_META[b] || PR_META_DEFAULT
+        return ma.orden - mb.orden
+      })
+
       wrap.innerHTML = `
-        <table class="tabla">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Insumo</th>
-              <th>Unidad</th>
-              ${(puedeEditar || puedeInvEditar) ? '<th></th>' : ''}
-            </tr>
-          </thead>
-          <tbody>${filtrados.map(p => renderFilaProducto(p)).join('')}</tbody>
-        </table>
-      `
+        <style>
+          .pr-grupo.open .pr-grupo-body { display:block !important }
+          .pr-grupo-header:hover { opacity:.85 }
+        </style>
+        <div class="card-surface" style="padding:16px">
+          ${nombresGrupos.map(g => renderGrupo(g, porGrupo[g])).join('')}
+        </div>`
+    }
+
+    const aplicarFiltros = () => {
+      const texto = document.getElementById('insumos-search')?.value.toLowerCase().trim() || ''
+      if (!texto) return { lista: window._productos, buscando: false, termino: '' }
+      return {
+        lista: window._productos.filter(p => p.producto?.toLowerCase().includes(texto)),
+        buscando: true,
+        termino: texto
+      }
     }
 
     // Cargar proveedores para el panel de inventario
@@ -190,48 +220,13 @@ async function vistaProductos() {
       window._proveedoresCache = provs || []
     }
 
-    const onFiltro = () => renderTabla(aplicarFiltros())
-    document.getElementById('insumos-search').addEventListener('input', onFiltro)
-    if (fuentesDef.length) {
-      document.getElementById('btn-export-pdf').addEventListener('click', () => {
-        const fuente = fuentesDef.length > 1
-          ? document.getElementById('export-fuente').value
-          : fuentesDef[0].fuente
-        exportarInsumosPDF(fuente)
-      })
-    }
+    document.getElementById('insumos-search').addEventListener('input', () => {
+      const { lista, buscando, termino } = aplicarFiltros()
+      renderTabla(lista, buscando, termino)
+    })
 
-    const _actualizarFlechas = () => {
-      const nav  = document.getElementById('prod-pills-nav')
-      const prev = document.getElementById('prod-pills-prev')
-      const next = document.getElementById('prod-pills-next')
-      if (!nav || !prev || !next) return
-      const isMobile = window.matchMedia('(hover:none) and (pointer:coarse)').matches
-      if (isMobile) { prev.style.display = 'none'; next.style.display = 'none'; return }
-      prev.style.display = nav.scrollLeft > 4 ? 'flex' : 'none'
-      next.style.display = nav.scrollLeft + nav.clientWidth < nav.scrollWidth - 4 ? 'flex' : 'none'
-    }
-
-    window.prodPillsScroll = function(dir) {
-      const nav = document.getElementById('prod-pills-nav')
-      if (!nav) return
-      nav.scrollBy({ left: dir * 220, behavior: 'smooth' })
-    }
-
-    const _pillsNav = document.getElementById('prod-pills-nav')
-    if (_pillsNav) {
-      _pillsNav.addEventListener('scroll', _actualizarFlechas)
-      _pillsNav.addEventListener('wheel', (e) => {
-        if (e.deltaY !== 0) { e.preventDefault(); _pillsNav.scrollBy({ left: e.deltaY * 2, behavior: 'smooth' }) }
-      }, { passive: false })
-    }
-
-    const _renderPillsOrig = renderPills
-    renderPills = () => { _renderPillsOrig(); requestAnimationFrame(_actualizarFlechas) }
-
-    renderPills()
-    renderTabla(aplicarFiltros())
-    requestAnimationFrame(_actualizarFlechas)
+    const inicial = aplicarFiltros()
+    renderTabla(inicial.lista, inicial.buscando, inicial.termino)
 
   } catch (err) {
     content.innerHTML = `<p style="color:var(--color-highlight)">Error: ${err.message}</p>`
@@ -254,70 +249,6 @@ async function guardarProducto(idProducto) {
     .eq('id_producto', idProducto)
     .eq('tenant_id', tenant_id)
   if (error) alert(`Error: ${error.message}`)
-}
-
-async function exportarInsumosPDF(fuente) {
-  const tenant_id    = await getTenantId()
-  const tenantNombre = window._tenantConfig?.nombre || tenant_id
-  const tenantActual = (window._tenantConfig?.nombre || '').toLowerCase()
-  const etiqueta     = (FUENTES_POR_TENANT[tenantActual] || []).find(f => f.fuente === fuente)?.etiqueta || fuente
-
-  const productos = (window._productos || []).filter(p =>
-    p.activo !== false && p.fuente === fuente && p.tenant_id === tenant_id
-  )
-
-  const porGrupo = {}
-  productos.forEach(p => {
-    const g = p.grupo || 'General'
-    if (!porGrupo[g]) porGrupo[g] = []
-    porGrupo[g].push(p)
-  })
-  const grupos = Object.keys(porGrupo).sort()
-  grupos.forEach(g => porGrupo[g].sort((a, b) => a.producto.localeCompare(b.producto)))
-
-  const fecha = new Date().toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' })
-
-  const html = `<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<title>Catálogo de Insumos — ${etiqueta}</title>
-<style>
-  body { font-family: Helvetica, Arial, sans-serif; color: #2B1A0F; margin: 0; }
-  .pdf-header { border-bottom: 2px solid #C8892A; padding-bottom: 12px; margin-bottom: 18px; }
-  .pdf-title { font-size: 22px; font-weight: bold; color: #2B1A0F; margin: 0; }
-  .pdf-subtitle { font-size: 10px; color: #9B7B6A; margin-top: 4px; }
-  .pdf-grupo-titulo { font-size: 13px; font-weight: bold; color: #C8892A; margin-top: 18px; margin-bottom: 6px; }
-  .pdf-table { width: 100%; border-collapse: collapse; font-size: 10px; }
-  .pdf-table th { background: #FAF7F2; color: #9B7B6A; text-align: left; padding: 5px 8px; border: 0.5px solid #E8DDD5; font-weight: bold; font-size: 9px; }
-  .pdf-table td { padding: 4px 8px; border: 0.5px solid #E8DDD5; vertical-align: top; }
-  .pdf-footer { position: fixed; bottom: 1cm; left: 0; right: 0; font-size: 8px; color: #9B7B6A; display: flex; justify-content: space-between; }
-  @page { size: letter; margin: 2cm; @bottom-right { content: "Página " counter(page) " de " counter(pages); font-size: 8px; color: #9B7B6A; } }
-</style>
-</head>
-<body>
-<div class="pdf-header">
-  <p class="pdf-title">Catálogo de Insumos — ${etiqueta}</p>
-  <p class="pdf-subtitle">${fecha} · ${productos.length} insumos</p>
-</div>
-${grupos.map(g => `
-  <p class="pdf-grupo-titulo">${g}</p>
-  <table class="pdf-table">
-    <thead><tr><th>Insumo</th><th>Unidad</th></tr></thead>
-    <tbody>
-      ${porGrupo[g].map(p => `<tr><td>${p.producto}</td><td>${p.unidad_medida || '—'}</td></tr>`).join('')}
-    </tbody>
-  </table>`).join('')}
-<div class="pdf-footer">
-  <span>dataDesk · ${tenantNombre}</span>
-</div>
-</body>
-</html>`
-
-  const win = window.open('', '_blank')
-  win.document.write(html)
-  win.document.close()
-  win.onload = () => win.print()
 }
 
 window.toggleInventarioPanel = function(idProducto) {
