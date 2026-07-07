@@ -1,50 +1,178 @@
-// ── Vista: Inventario Analítico ───────────────────────────────────────────────
+// ── Vista: Diagnóstico ────────────────────────────────────────────────────────
+const IA_GRUPO_META = {
+  'Carnes y Proteínas': { orden: 1, emoji: '🥩', color: '#B85C2A' },
+  'Lácteos y Quesos':   { orden: 2, emoji: '🧀', color: '#6A9BB5' },
+  'Verduras y Frescos': { orden: 3, emoji: '🥬', color: '#4A7A3A' },
+  'Despensa':           { orden: 4, emoji: '🥫', color: '#C8892A' },
+  'Subrecetas':         { orden: 5, emoji: '⚗️', color: '#8A5FB0' },
+  'Bebidas':            { orden: 6, emoji: '🥤', color: '#3D9BA8' },
+  'Desechables':        { orden: 7, emoji: '🗑️', color: '#9B7B6A' }
+}
+const IA_META_DEFAULT = { orden: 99, emoji: '📦', color: '#9B7B6A' }
+
+const IA_MESES_NOMBRES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+const IA_MESES_CORTOS  = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
+
+function _iaFmt(d) { return d.toISOString().slice(0, 10) }
+
+function _iaMesesDisponibles() {
+  const hoy = new Date()
+  const set = new Set((window._iaConteos || []).map(c => c.fecha.slice(0, 7)))
+  set.add(_iaFmt(hoy).slice(0, 7))
+  return [...set].sort().reverse()
+}
+
+function _iaSemanasDeMes(mes) {
+  const [y, m] = mes.split('-').map(Number)
+  const primerDia = new Date(y, m - 1, 1)
+  const ultimoDia = new Date(y, m, 0)
+  const lunesSet = new Set()
+  for (let d = new Date(primerDia); d <= ultimoDia; d.setDate(d.getDate() + 1)) {
+    const diaSemana = d.getDay() || 7
+    const l = new Date(d)
+    l.setDate(d.getDate() - (diaSemana - 1))
+    lunesSet.add(_iaFmt(l))
+  }
+  return [...lunesSet].sort().reverse()
+}
+
+function _iaMesLabel(mes, soloUnAño) {
+  const [year, month] = mes.split('-')
+  return soloUnAño ? IA_MESES_NOMBRES[Number(month) - 1] : `${IA_MESES_NOMBRES[Number(month) - 1]} ${year}`
+}
+
+function _iaSemLabel(lunesStr) {
+  const lun = new Date(lunesStr + 'T12:00:00')
+  const dom = new Date(lun); dom.setDate(dom.getDate() + 6)
+  const sufijo = dom.getMonth() !== lun.getMonth() ? IA_MESES_CORTOS[dom.getMonth()] : IA_MESES_CORTOS[lun.getMonth()]
+  return `Semana del ${lun.getDate()} al ${dom.getDate()} ${sufijo}`
+}
+
+// Calcula desde/hasta según el nivel de filtro elegido (permite "viajar en el tiempo").
+// desde siempre ancla al último conteo completo anterior o igual a "hasta".
+function _iaRangoActual() {
+  const hoy = new Date()
+  const hoyStr = _iaFmt(hoy)
+  let hasta = hoyStr
+
+  if (window._iaNivel1 === 'Mes' && window._iaMesSel) {
+    const [y, m] = window._iaMesSel.split('-').map(Number)
+    const finMes = _iaFmt(new Date(y, m, 0))
+    hasta = finMes < hoyStr ? finMes : hoyStr
+  } else if (window._iaNivel1 === 'Semana' && window._iaSemanaSel) {
+    const lunes = new Date(window._iaSemanaSel + 'T12:00:00')
+    const domingo = new Date(lunes); domingo.setDate(domingo.getDate() + 6)
+    const domStr = _iaFmt(domingo)
+    hasta = domStr < hoyStr ? domStr : hoyStr
+  }
+
+  const conteoAncla = (window._iaConteos || []).find(c => c.fecha <= hasta)
+  const desde = conteoAncla ? conteoAncla.fecha : hasta
+
+  return { desde, hasta }
+}
+
 async function vistaInventarioAnalitico() {
   const content = document.getElementById('content')
+  content.innerHTML = `<p style="color:var(--color-text-muted)">Cargando...</p>`
 
-  const hoy = new Date()
-  const fmt = d => d.toISOString().slice(0, 10)
-
-  const hace7dias = new Date(hoy)
-  hace7dias.setDate(hace7dias.getDate() - 7)
-  let desdeDefault = fmt(hace7dias)
   try {
     const tenant_id = await getTenantId()
-    const { data: ultimoConteoData } = await window._db
+    window._iaTenant = tenant_id
+
+    const { data: conteos } = await window._db
       .from('inventarios')
-      .select('fecha')
+      .select('id, fecha')
       .eq('tenant_id', tenant_id)
       .eq('estado', 'completo')
       .order('fecha', { ascending: false })
-      .limit(1)
-    if (ultimoConteoData?.[0]?.fecha) desdeDefault = ultimoConteoData[0].fecha
-  } catch { /* sin tenant/sesión aún — _iaCargar() mostrará el error real en la tabla */ }
+    window._iaConteos = conteos || []
 
-  content.innerHTML = `
-    <div class="vista-header">
-      <h2>🔍 Diagnóstico</h2>
-    </div>
+    window._iaNivel1     = 'Hoy'
+    window._iaMesSel     = null
+    window._iaSemanaSel  = null
+    window._iaBusq       = ''
+    window._iaSortCol    = 'alerta'
+    window._iaSortDir    = -1
 
-    <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:20px">
-      <label style="display:flex;flex-direction:column;gap:4px;font-size:13px">
-        Desde
-        <input type="date" id="ia-desde" value="${desdeDefault}"
-          style="padding:6px 10px;border:1px solid var(--color-border);border-radius:6px;background:var(--color-surface);color:var(--color-text)">
-      </label>
-      <label style="display:flex;flex-direction:column;gap:4px;font-size:13px">
-        Hasta
-        <input type="date" id="ia-hasta" value="${fmt(hoy)}"
-          style="padding:6px 10px;border:1px solid var(--color-border);border-radius:6px;background:var(--color-surface);color:var(--color-text)">
-      </label>
-      <button id="ia-aplicar" class="btn-accion btn-aprobar" style="padding:7px 18px">Aplicar</button>
-    </div>
+    content.innerHTML = `
+      <div class="vista-header">
+        <h2>🔍 Diagnóstico</h2>
+      </div>
 
-    <div id="ia-tabla-wrap">
-      <p style="color:var(--color-text-muted)">Cargando...</p>
-    </div>
-  `
+      <div id="ia-filtro-periodo" style="margin-bottom:16px"></div>
 
-  document.getElementById('ia-aplicar').addEventListener('click', _iaCargar)
+      <input type="text" id="ia-buscador" placeholder="Buscar insumo..."
+        style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--color-border);border-radius:6px;background:var(--color-card);color:var(--color-text);font-size:14px;margin-bottom:16px"
+        oninput="_iaBuscarAnalitico(this.value)">
+
+      <div id="ia-tabla-wrap">
+        <p style="color:var(--color-text-muted)">Calculando...</p>
+      </div>
+    `
+
+    _iaRenderFiltroPeriodo()
+    await _iaCargar()
+
+  } catch (err) {
+    content.innerHTML = `<p style="color:var(--color-highlight)">Error: ${err.message}</p>`
+  }
+}
+
+// ── Filtro Hoy/Mes/Semana (mismo look que Cierres) ──────────────────────────────
+function _iaRenderFiltroPeriodo() {
+  const cont = document.getElementById('ia-filtro-periodo')
+  if (!cont) return
+
+  const meses = _iaMesesDisponibles()
+  const añosDistintos = [...new Set(meses.map(m => m.split('-')[0]))]
+  const soloUnAño = añosDistintos.length === 1
+  const nivel1 = window._iaNivel1 || 'Hoy'
+
+  let html = `
+    <div class="cierres-segmented">
+      ${['Hoy', 'Mes', 'Semana'].map(p => `
+        <button class="btn-periodo${nivel1 === p ? ' active' : ''}" onclick="_iaSetNivel1('${p}')">${p}</button>`).join('')}
+    </div>`
+
+  if (nivel1 === 'Mes' || nivel1 === 'Semana') {
+    html += `
+    <div class="cierres-segmented cierres-segmented-sub" style="margin-top:10px">
+      ${meses.map(mes => `
+        <button class="btn-periodo${window._iaMesSel === mes ? ' active' : ''}" onclick="_iaSetMes('${mes}')">${_iaMesLabel(mes, soloUnAño)}</button>`).join('')}
+    </div>`
+  }
+
+  if (nivel1 === 'Semana' && window._iaMesSel) {
+    const semanas = _iaSemanasDeMes(window._iaMesSel)
+    html += `
+    <div class="cierres-segmented cierres-segmented-sub" style="margin-top:8px">
+      ${semanas.map(lunes => `
+        <button class="btn-periodo${window._iaSemanaSel === lunes ? ' active' : ''}" onclick="_iaSetSemana('${lunes}')">${_iaSemLabel(lunes)}</button>`).join('')}
+    </div>`
+  }
+
+  cont.innerHTML = html
+}
+
+function _iaSetNivel1(nivel) {
+  window._iaNivel1    = nivel
+  window._iaMesSel    = null
+  window._iaSemanaSel = null
+  _iaRenderFiltroPeriodo()
+  _iaCargar()
+}
+
+function _iaSetMes(mes) {
+  window._iaMesSel    = mes
+  window._iaSemanaSel = null
+  _iaRenderFiltroPeriodo()
+  _iaCargar()
+}
+
+function _iaSetSemana(lunes) {
+  window._iaSemanaSel = lunes
+  _iaRenderFiltroPeriodo()
   _iaCargar()
 }
 
@@ -53,12 +181,10 @@ async function _iaCargar() {
   if (!wrap) return
   wrap.innerHTML = `<p style="color:var(--color-text-muted)">Calculando...</p>`
 
-  const desde = document.getElementById('ia-desde').value
-  const hasta = document.getElementById('ia-hasta').value
+  const { desde, hasta } = _iaRangoActual()
+  const tenant_id = window._iaTenant
 
   try {
-    const tenant_id = await getTenantId()
-
     const { data: productos } = await window._db
       .from('productos')
       .select('id_producto, producto, unidad_medida, grupo, stock_maximo, stock_alerta_porcentaje')
@@ -68,19 +194,9 @@ async function _iaCargar() {
     const prodMap = {}
     ;(productos || []).forEach(p => { prodMap[p.id_producto] = p })
 
-    // Conteo de productos activos por grupo (para badges de pills)
-    const contPorGrupo = {}
-    let totalProds = 0
-    ;(productos || []).forEach(p => {
-      const g = p.grupo || 'Sin clasificar'
-      contPorGrupo[g] = (contPorGrupo[g] || 0) + 1
-      totalProds++
-    })
-
     const [
       recItemsRes,
       incidenciasRes,
-      ultimoConteoRes,
       conteoDelPeriodoRes
     ] = await Promise.all([
       window._db
@@ -101,15 +217,6 @@ async function _iaCargar() {
         .from('inventarios')
         .select('id, fecha')
         .eq('tenant_id', tenant_id)
-        .eq('estado', 'completo')
-        .lte('fecha', desde)
-        .order('fecha', { ascending: false })
-        .limit(1),
-
-      window._db
-        .from('inventarios')
-        .select('id, fecha')
-        .eq('tenant_id', tenant_id)
         .gte('fecha', desde)
         .lte('fecha', hasta)
         .order('fecha', { ascending: false })
@@ -118,7 +225,6 @@ async function _iaCargar() {
 
     if (recItemsRes.error)         throw new Error(`recepciones: ${recItemsRes.error.message}`)
     if (incidenciasRes.error)      throw new Error(`incidencias: ${incidenciasRes.error.message}`)
-    if (ultimoConteoRes.error)     throw new Error(`inventarios (último): ${ultimoConteoRes.error.message}`)
     if (conteoDelPeriodoRes.error) throw new Error(`inventarios (período): ${conteoDelPeriodoRes.error.message}`)
 
     const consumoMap = {}
@@ -144,18 +250,18 @@ async function _iaCargar() {
     })
 
     const inicialMap = {}
-    const invInicial = ultimoConteoRes.data?.[0] || null
-    if (invInicial) {
+    const invInicialReal = (window._iaConteos || []).find(c => c.fecha === desde) || null
+    if (invInicialReal) {
       const { data: itemsIni } = await window._db
         .from('inventario_items')
         .select('id_producto, cantidad_contada')
-        .eq('id_inventario', invInicial.id)
+        .eq('id_inventario', invInicialReal.id)
       ;(itemsIni || []).forEach(r => { inicialMap[r.id_producto] = Number(r.cantidad_contada) })
     }
 
     const finalMap = {}
     let invFinal = conteoDelPeriodoRes.data?.[0] || null
-    if (invFinal && invInicial && invFinal.id === invInicial.id && desde !== hasta) invFinal = null
+    if (invFinal && invInicialReal && invFinal.id === invInicialReal.id && desde !== hasta) invFinal = null
     if (invFinal) {
       const { data: itemsFin } = await window._db
         .from('inventario_items')
@@ -191,10 +297,8 @@ async function _iaCargar() {
         colorDiff = absPct <= 5 ? '#3A8C3E' : absPct <= 10 ? '#c8892a' : '#B85C2A'
       }
 
-      // Existencia efectiva para alertas
       const existActual = final_v !== null ? final_v : teorico
 
-      // Alerta: 0 = ninguna, 1 = amarilla, 2 = roja
       const sm  = p.stock_maximo
       const sap = p.stock_alerta_porcentaje
       const stock_critico = (sm != null && sap != null) ? sm * (sap / 100) : null
@@ -218,140 +322,40 @@ async function _iaCargar() {
       return
     }
 
-    // Grupos únicos de los productos con movimiento (orden alfabético, "Sin clasificar" al final)
-    const gruposUnicos = [...new Set(filas.map(f => f.grupo))].sort((a, b) => {
-      if (a === 'Sin clasificar') return 1
-      if (b === 'Sin clasificar') return -1
-      return a.localeCompare(b)
-    })
-
-    // Guardar estado global
-    window._iaFilas       = filas
-    window._iaGrupoActivo = '__todos__'
-    window._iaBusq        = ''
-    window._iaSortCol     = 'alerta'
-    window._iaSortDir     = -1   // -1 = desc → críticos primero
-    window._iaContGrupo   = contPorGrupo
-    window._iaTotalProds  = totalProds
-    window._iaDesde       = desde
-    window._iaHasta       = hasta
-    window._iaInvInicial  = invInicial
-    window._iaInvFinal    = invFinal
+    window._iaFilas      = filas
+    window._iaDesde      = desde
+    window._iaHasta      = hasta
+    window._iaInvInicial = invInicialReal
+    window._iaInvFinal   = invFinal
 
     wrap.innerHTML = `
       <style>
-        .ia-pills-scroll { display:flex; align-items:center; gap:6px; margin-bottom:14px; }
-        .ia-pills-track  { display:flex; gap:6px; overflow-x:auto; scrollbar-width:none; flex:1; }
-        .ia-pills-track::-webkit-scrollbar { display:none; }
-        .ia-pill {
-          flex-shrink:0; padding:5px 14px; border-radius:999px;
-          border:1px solid var(--color-border); background:var(--color-surface);
-          color:var(--color-text); font-size:13px; cursor:pointer; white-space:nowrap;
-          transition:background .12s,color .12s,border-color .12s;
-        }
-        .ia-pill:hover { background:var(--color-bg-alt,rgba(0,0,0,0.05)); }
-        .ia-pill.active {
-          background:var(--color-primary,#3D0014); color:#fff;
-          border-color:var(--color-primary,#3D0014);
-        }
-        .ia-scroll-btn {
-          flex-shrink:0; width:28px; height:28px; border-radius:50%;
-          border:1px solid var(--color-border); background:var(--color-surface);
-          cursor:pointer; font-size:14px; display:flex; align-items:center;
-          justify-content:center; line-height:1;
-        }
-        .ia-scroll-btn:hover { background:var(--color-bg-alt,rgba(0,0,0,0.05)); }
+        .ia-grupo.open .ia-grupo-body { display:block !important }
+        .ia-grupo-header:hover { opacity:.85 }
         .ia-th { cursor:pointer; user-select:none; white-space:nowrap; }
         .ia-th:hover { color:var(--color-primary); }
       </style>
 
-      <input type="text" id="ia-buscador" placeholder="Buscar insumo..."
-        style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--color-border);border-radius:6px;background:var(--color-surface);color:var(--color-text);font-size:14px;margin-bottom:12px"
-        oninput="_iaBuscarAnalitico(this.value)">
-
-      <div class="ia-pills-scroll">
-        <button class="ia-scroll-btn" onclick="_iaScrollPills(-1)">‹</button>
-        <div class="ia-pills-track" id="ia-pills-track">
-          <button class="ia-pill active" data-grupo="__todos__"
-            onclick="_iaFiltrarGrupo('__todos__')">Todos (${totalProds})</button>
-          ${gruposUnicos.map(g =>
-            `<button class="ia-pill" data-grupo="${g.replace(/"/g,'&quot;')}"
-               onclick="_iaFiltrarGrupo(this.dataset.grupo)">${g} (${contPorGrupo[g] || 0})</button>`
-          ).join('')}
-        </div>
-        <button class="ia-scroll-btn" onclick="_iaScrollPills(1)">›</button>
-      </div>
-
-      <div class="tabla-wrapper" style="overflow-x:auto">
-        <table class="tabla" id="ia-tabla">
-          <thead>
-            <tr>
-              <th class="ia-th" data-col="alerta" onclick="_iaOrdenar('alerta')" style="text-align:center" title="Alerta de stock">⚠</th>
-              <th class="ia-th" data-col="nombre" onclick="_iaOrdenar('nombre')">Insumo</th>
-              <th class="ia-th" data-col="unidad" onclick="_iaOrdenar('unidad')">Unidad</th>
-              <th class="ia-th" data-col="inicial" onclick="_iaOrdenar('inicial')" style="text-align:right">Último conteo</th>
-              <th class="ia-th" data-col="recep"   onclick="_iaOrdenar('recep')"   style="text-align:right">Recepciones</th>
-              <th class="ia-th" data-col="consumo" onclick="_iaOrdenar('consumo')" style="text-align:right">Consumo teórico</th>
-              <th class="ia-th" data-col="incid"   onclick="_iaOrdenar('incid')"   style="text-align:right">Incidencias</th>
-              <th class="ia-th" data-col="teorico" onclick="_iaOrdenar('teorico')" style="text-align:right">Teórico esperado</th>
-              <th class="ia-th" data-col="final_v" onclick="_iaOrdenar('final_v')" style="text-align:right">Conteo del período</th>
-              <th class="ia-th" data-col="diff"    onclick="_iaOrdenar('diff')"    style="text-align:right">Diferencia</th>
-              <th class="ia-th" data-col="pct"     onclick="_iaOrdenar('pct')"     style="text-align:right">%</th>
-            </tr>
-          </thead>
-          <tbody id="ia-tbody"></tbody>
-        </table>
-      </div>
+      <div class="card-surface" style="padding:16px 20px" id="ia-grupos-wrap"></div>
 
       <p id="ia-pie" style="font-size:11px;color:var(--color-text-muted);margin-top:8px"></p>
     `
 
-    _iaRenderTabla()
+    _iaRenderGrupos()
 
   } catch (err) {
     wrap.innerHTML = `<p style="color:var(--color-highlight)">Error: ${err.message}</p>`
   }
 }
 
-function _iaRenderTabla() {
-  const tbody = document.getElementById('ia-tbody')
-  const pie   = document.getElementById('ia-pie')
-  if (!tbody) return
-
-  const filas      = window._iaFilas        || []
-  const grupo      = window._iaGrupoActivo  || '__todos__'
-  const busq       = (window._iaBusq        || '').toLowerCase().trim()
-  const col        = window._iaSortCol      || 'alerta'
-  const dir        = window._iaSortDir      ?? -1
-  const desde      = window._iaDesde        || ''
-  const hasta      = window._iaHasta        || ''
-  const invInicial = window._iaInvInicial
-  const invFinal   = window._iaInvFinal
-
-  const fmtNum = v => v === null ? '—' : formatInt(v)
-  const fmtPct = v => v === null ? '—' : formatNum(v, 1) + '%'
-
-  const alertaCell = a => {
-    if (a === 2) return `<span style="color:#c0392b;font-size:15px" title="Stock crítico">⚠️</span>`
-    if (a === 1) return `<span style="color:#f39c12;font-size:15px" title="Stock bajo">⚠️</span>`
-    return ''
-  }
-
-  // Filtrar
-  let filtered = filas.filter(f => {
-    if (grupo !== '__todos__' && f.grupo !== grupo) return false
-    if (busq && !f.nombre.toLowerCase().includes(busq)) return false
-    return true
-  })
-
-  // Ordenar
-  filtered = [...filtered].sort((a, b) => {
+function _iaOrdenarFilas(lista) {
+  const col = window._iaSortCol || 'alerta'
+  const dir = window._iaSortDir ?? -1
+  return [...lista].sort((a, b) => {
     switch (col) {
       case 'alerta': {
-        // dir=-1 (desc): dir*(a-b) = -(a-b) → b-a → mayor alerta primero ✓
         const ad = dir * (a.alerta - b.alerta)
         if (ad !== 0) return ad
-        // Desempate: existencia asc (menos stock primero)
         return a.existActual - b.existActual
       }
       case 'nombre':  return dir * a.nombre.localeCompare(b.nombre)
@@ -367,51 +371,124 @@ function _iaRenderTabla() {
       default:        return 0
     }
   })
-
-  // Actualizar indicadores de orden en headers
-  document.querySelectorAll('.ia-th').forEach(th => {
-    const thCol = th.dataset.col
-    // Guardar texto base en data-label la primera vez
-    if (!th.dataset.label) th.dataset.label = th.textContent.trim()
-    const base = th.dataset.label
-    if (thCol === col) {
-      th.textContent  = base + (dir === 1 ? ' ▲' : ' ▼')
-      th.style.color  = 'var(--color-primary)'
-    } else {
-      th.textContent  = base
-      th.style.color  = ''
-    }
-  })
-
-  tbody.innerHTML = filtered.map(f => `
-    <tr data-grupo="${f.grupo.replace(/"/g,'&quot;')}">
-      <td style="text-align:center">${alertaCell(f.alerta)}</td>
-      <td>${f.nombre}</td>
-      <td style="color:var(--color-text-muted)">${f.unidad}</td>
-      <td style="text-align:right">${fmtNum(f.inicial)}</td>
-      <td style="text-align:right">${fmtNum(f.recep)}</td>
-      <td style="text-align:right">${fmtNum(f.consumo)}</td>
-      <td style="text-align:right">${fmtNum(f.incid)}</td>
-      <td style="text-align:right">${fmtNum(f.teorico)}</td>
-      <td style="text-align:right;font-weight:600">${fmtNum(f.final_v)}</td>
-      <td style="text-align:right;font-weight:600;color:${f.colorDiff||'var(--color-text)'}">${fmtNum(f.diff)}</td>
-      <td style="text-align:right;font-weight:600;color:${f.colorDiff||'var(--color-text)'}">${fmtPct(f.pct)}</td>
-    </tr>`).join('')
-
-  if (pie) {
-    pie.textContent = `Período: ${desde} → ${hasta}`
-      + (invInicial ? ` · Último conteo: ${invInicial.fecha}` : '')
-      + (invFinal   ? ` · Conteo del período: ${invFinal.fecha}` : '')
-      + ` · ${filtered.length} insumo${filtered.length !== 1 ? 's' : ''} mostrado${filtered.length !== 1 ? 's' : ''}`
-  }
 }
 
-function _iaFiltrarGrupo(grupo) {
-  window._iaGrupoActivo = grupo
-  document.querySelectorAll('.ia-pill').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.grupo === grupo)
+function _iaBadgeGrupo(items) {
+  const criticos = items.filter(f => f.alerta === 2).length
+  const bajos    = items.filter(f => f.alerta === 1).length
+  if (!criticos && !bajos) {
+    return `<span style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;background:rgba(154,123,106,0.15);color:var(--color-text-muted)">${items.length}</span>`
+  }
+  const partes = []
+  if (criticos) partes.push(`<span style="padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;background:rgba(184,92,42,0.15);color:#B85C2A">🔴 ${criticos}</span>`)
+  if (bajos)    partes.push(`<span style="padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;background:rgba(200,137,42,0.15);color:#c8892a">🟡 ${bajos}</span>`)
+  return partes.join(' ')
+}
+
+const IA_COLS = [
+  { key: 'alerta',  label: '⚠',                  align: 'center' },
+  { key: 'nombre',  label: 'Insumo',              align: 'left'   },
+  { key: 'unidad',  label: 'Unidad',              align: 'left'   },
+  { key: 'inicial', label: 'Último conteo',       align: 'right'  },
+  { key: 'recep',   label: 'Recepciones',         align: 'right'  },
+  { key: 'consumo', label: 'Consumo teórico',     align: 'right'  },
+  { key: 'incid',   label: 'Incidencias',         align: 'right'  },
+  { key: 'teorico', label: 'Teórico esperado',    align: 'right'  },
+  { key: 'final_v', label: 'Conteo del período',  align: 'right'  },
+  { key: 'diff',    label: 'Diferencia',          align: 'right'  },
+  { key: 'pct',     label: '%',                   align: 'right'  }
+]
+
+function _iaRenderGrupos() {
+  const grupWrap = document.getElementById('ia-grupos-wrap')
+  const pie      = document.getElementById('ia-pie')
+  if (!grupWrap) return
+
+  const busq = (window._iaBusq || '').toLowerCase().trim()
+  const filtradas = (window._iaFilas || []).filter(f => !busq || f.nombre.toLowerCase().includes(busq))
+
+  if (!filtradas.length) {
+    grupWrap.innerHTML = `<p style="color:var(--color-text-muted);font-size:13px">Sin insumos para mostrar${busq ? ' con "' + busq + '"' : ''}.</p>`
+    if (pie) pie.textContent = ''
+    return
+  }
+
+  const porGrupo = {}
+  filtradas.forEach(f => {
+    if (!porGrupo[f.grupo]) porGrupo[f.grupo] = []
+    porGrupo[f.grupo].push(f)
   })
-  _iaRenderTabla()
+  const nombresGrupos = Object.keys(porGrupo).sort((a, b) => {
+    const ma = IA_GRUPO_META[a] || IA_META_DEFAULT
+    const mb = IA_GRUPO_META[b] || IA_META_DEFAULT
+    return ma.orden - mb.orden
+  })
+
+  const fmtNum = v => v === null ? '—' : formatInt(v)
+  const fmtPct = v => v === null ? '—' : formatNum(v, 1) + '%'
+  const alertaCell = a => {
+    if (a === 2) return `<span style="color:#c0392b;font-size:15px" title="Stock crítico">⚠️</span>`
+    if (a === 1) return `<span style="color:#f39c12;font-size:15px" title="Stock bajo">⚠️</span>`
+    return ''
+  }
+
+  const col = window._iaSortCol || 'alerta'
+  const dir = window._iaSortDir ?? -1
+
+  const renderGrupo = (g) => {
+    const meta  = IA_GRUPO_META[g] || IA_META_DEFAULT
+    const items = _iaOrdenarFilas(porGrupo[g])
+
+    return `
+      <div class="ia-grupo" data-grupo="${g.replace(/"/g,'&quot;')}"
+        style="border:1px solid var(--color-border);border-left:4px solid ${meta.color};border-radius:8px;margin-bottom:8px;overflow:hidden">
+        <div class="ia-grupo-header"
+          style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;cursor:pointer;background:var(--color-surface);user-select:none"
+          onclick="this.parentElement.classList.toggle('open')">
+          <span style="font-weight:600">${meta.emoji} ${g}</span>
+          ${_iaBadgeGrupo(porGrupo[g])}
+        </div>
+        <div class="ia-grupo-body" style="display:none">
+          <div style="overflow-x:auto">
+            <table class="tabla" style="margin:0;border-radius:0;border-top:1px solid var(--color-border)">
+              <thead>
+                <tr>
+                  ${IA_COLS.map(c => `
+                    <th class="ia-th" onclick="_iaOrdenar('${c.key}')" style="text-align:${c.align}${c.key === col ? ';color:var(--color-primary)' : ''}">
+                      ${c.label}${c.key === col ? (dir === 1 ? ' ▲' : ' ▼') : ''}
+                    </th>`).join('')}
+                </tr>
+              </thead>
+              <tbody>
+                ${items.map(f => `
+                  <tr>
+                    <td style="text-align:center">${alertaCell(f.alerta)}</td>
+                    <td>${f.nombre}</td>
+                    <td style="color:var(--color-text-muted)">${f.unidad}</td>
+                    <td style="text-align:right">${fmtNum(f.inicial)}</td>
+                    <td style="text-align:right">${fmtNum(f.recep)}</td>
+                    <td style="text-align:right">${fmtNum(f.consumo)}</td>
+                    <td style="text-align:right">${fmtNum(f.incid)}</td>
+                    <td style="text-align:right">${fmtNum(f.teorico)}</td>
+                    <td style="text-align:right;font-weight:600">${fmtNum(f.final_v)}</td>
+                    <td style="text-align:right;font-weight:600;color:${f.colorDiff||'var(--color-text)'}">${fmtNum(f.diff)}</td>
+                    <td style="text-align:right;font-weight:600;color:${f.colorDiff||'var(--color-text)'}">${fmtPct(f.pct)}</td>
+                  </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>`
+  }
+
+  grupWrap.innerHTML = nombresGrupos.map(renderGrupo).join('')
+
+  if (pie) {
+    pie.textContent = `Período: ${window._iaDesde} → ${window._iaHasta}`
+      + (window._iaInvInicial ? ` · Último conteo: ${window._iaInvInicial.fecha}` : '')
+      + (window._iaInvFinal   ? ` · Conteo del período: ${window._iaInvFinal.fecha}` : '')
+      + ` · ${filtradas.length} insumo${filtradas.length !== 1 ? 's' : ''} mostrado${filtradas.length !== 1 ? 's' : ''}`
+  }
 }
 
 function _iaOrdenar(col) {
@@ -419,18 +496,12 @@ function _iaOrdenar(col) {
     window._iaSortDir = (window._iaSortDir ?? -1) * -1
   } else {
     window._iaSortCol = col
-    // Texto: asc por defecto; numérico/alerta: desc por defecto
     window._iaSortDir = (col === 'nombre' || col === 'unidad') ? 1 : -1
   }
-  _iaRenderTabla()
+  _iaRenderGrupos()
 }
 
 function _iaBuscarAnalitico(q) {
   window._iaBusq = q
-  _iaRenderTabla()
-}
-
-function _iaScrollPills(dir) {
-  const track = document.getElementById('ia-pills-track')
-  if (track) track.scrollBy({ left: dir * 160, behavior: 'smooth' })
+  _iaRenderGrupos()
 }
