@@ -237,7 +237,7 @@ async function renderCierresVista() {
         if (excluidoTop3(it.id_item)) return
         sumas[it.nombre] = (sumas[it.nombre] || 0) + (Number(it.cantidad) || 0)
       })
-      top3 = Object.entries(sumas).sort((a, b) => b[1] - a[1]).slice(0, 3)
+      top3 = Object.entries(sumas).sort((a, b) => b[1] - a[1]).slice(0, 5)
     }
   }
 
@@ -305,7 +305,7 @@ async function renderCierresVista() {
               </table>
               ${top3.length > 0 ? `
               <div style="display:flex;flex-direction:column;gap:10px">
-                <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-muted)">🏆 Top 3</div>
+                <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-muted)">🏆 Top 5</div>
                 ${top3.map(([nombre, cant], i) => `
                   <div style="font-size:13px;display:flex;gap:6px;align-items:baseline">
                     <span style="color:var(--color-text-muted);min-width:14px">${i + 1}.</span>
