@@ -8,12 +8,18 @@ const PR_GRUPO_META = {
   'Desechables':        { orden: 7, emoji: '🗑️', color: '#9B7B6A' }
 }
 const PR_META_DEFAULT = { orden: 99, emoji: '📦', color: '#9B7B6A' }
+const PR_SECCION_2_GRUPOS = ['Subrecetas', 'Bebidas', 'Desechables', 'Empaque y Desechables']
 
 function _prHighlight(texto, termino) {
   if (!termino) return texto
   const escaped = termino.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const re = new RegExp(escaped, 'gi')
   return texto.replace(re, m => `<mark style="background:rgba(200,137,42,0.3);color:inherit;border-radius:2px">${m}</mark>`)
+}
+
+function _prBadge(n, size) {
+  const fs = size || 12
+  return `<span style="padding:2px 10px;border-radius:20px;font-size:${fs}px;font-weight:700;background:rgba(154,123,106,0.15);color:var(--color-text-muted)">${n}</span>`
 }
 
 async function vistaProductos() {
@@ -28,7 +34,7 @@ async function vistaProductos() {
     const mostrarAcciones  = puedeEditar || puedeInvEditar
 
     const _fuentes = (window.FUENTES_POR_TENANT[tenant_id] || []).map(f => f.fuente)
-    const query = window._db.from('productos').select('*').eq('tenant_id', tenant_id).eq('activo', true).eq('tipo', 'Insumo').in('fuente', _fuentes).order('producto')
+    const query = window._db.from('productos').select('*').eq('tenant_id', tenant_id).eq('activo', true).or('tipo.eq.Insumo,grupo.eq.Subrecetas').in('fuente', _fuentes).order('producto')
 
     const [
       { data: productos, error: errP },
@@ -55,7 +61,7 @@ async function vistaProductos() {
 
     content.innerHTML = `
       <div class="vista-header">
-        <h2>🧂 Insumos</h2>
+        <h2>🧂 Insumos y Subrecetas</h2>
       </div>
 
       <div class="filtros-bar">
@@ -193,13 +199,27 @@ async function vistaProductos() {
         return ma.orden - mb.orden
       })
 
+      const seccion1 = nombresGrupos.filter(g => !PR_SECCION_2_GRUPOS.includes(g))
+      const seccion2 = nombresGrupos.filter(g => PR_SECCION_2_GRUPOS.includes(g))
+      const contarSeccion = (grs) => grs.reduce((acc, g) => acc + porGrupo[g].length, 0)
+      const sub1 = contarSeccion(seccion1)
+      const sub2 = contarSeccion(seccion2)
+
       wrap.innerHTML = `
         <style>
           .pr-grupo.open .pr-grupo-body { display:block !important }
           .pr-grupo-header:hover { opacity:.85 }
         </style>
         <div class="card-surface" style="padding:16px">
-          ${nombresGrupos.map(g => renderGrupo(g, porGrupo[g])).join('')}
+          <div style="margin-bottom:20px">
+            ${seccion1.map(g => renderGrupo(g, porGrupo[g])).join('')}
+            ${seccion1.length ? `<div style="display:flex;justify-content:flex-end;padding:6px 4px">Subtotal insumos ${_prBadge(sub1)}</div>` : ''}
+          </div>
+          <div style="margin-bottom:12px">
+            ${seccion2.map(g => renderGrupo(g, porGrupo[g])).join('')}
+            ${seccion2.length ? `<div style="display:flex;justify-content:flex-end;padding:6px 4px">Subtotal ${_prBadge(sub2)}</div>` : ''}
+          </div>
+          ${(seccion1.length && seccion2.length) ? `<div style="display:flex;justify-content:flex-end;padding:10px 4px;border-top:1px solid var(--color-border);font-weight:700">Total ${_prBadge(sub1 + sub2, 13)}</div>` : ''}
         </div>`
     }
 

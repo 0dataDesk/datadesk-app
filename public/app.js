@@ -252,7 +252,7 @@ async function mostrarApp(rol, email, tenant_id = null) {
   ]
 
   const vistaLabels = {
-    inicio: 'Inicio', productos: '🧂 Insumos', recetas: '📖 Recetas',
+    inicio: 'Inicio', productos: '🧂 Insumos y Subrecetas', recetas: '📖 Recetas',
     precios: 'Precios', costeo: 'Costeo', pedidos: 'Pedidos',
     ventas: '🧾 Ventas', cierres: '🔒 Cierres', consumo: '🧮 Consumo', recepciones: '📦 Recepciones',
     inventario: '🔍 Diagnóstico', inventarios: '📋 Conteos', levantamiento: '📝 Levantamiento', sugerido: '🛒 Sugerido de Compra'
