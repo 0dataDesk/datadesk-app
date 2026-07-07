@@ -70,9 +70,6 @@ async function vistaConsumo() {
     await window._db.auth.refreshSession()
     const tenant_id = await getTenantId()
     window._consumoTenant    = tenant_id
-    window._consumoNivel1    = 'Todo'
-    window._consumoMesSel    = null
-    window._consumoSemanaSel = null
     window._consumoBuscador  = ''
     window._consumoDiaSel    = null
 
@@ -87,7 +84,6 @@ async function vistaConsumo() {
           style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--color-border);border-radius:6px;background:var(--color-card);color:var(--color-text);font-size:14px;margin-bottom:12px"
           oninput="filtrarConsumoBuscador(this.value)">
 
-        <div id="consumo-filtro" style="margin-bottom:16px"></div>
         <div id="consumo-lista-wrap"></div>
       </div>
 
@@ -113,16 +109,11 @@ function abrirModalGenerarConsumo() {
   overlay.innerHTML = `
     <div class="card-surface" style="padding:24px;max-width:360px;width:100%">
       <h3 style="margin:0 0 4px">Generar consumo teórico</h3>
-      <p style="font-size:13px;color:var(--color-text-muted);margin:0 0 16px">Elige el rango de fechas a procesar.</p>
+      <p style="font-size:13px;color:var(--color-text-muted);margin:0 0 16px">Elige el día a procesar.</p>
       <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:20px">
         <label style="display:flex;flex-direction:column;gap:4px;font-size:13px">
-          Desde
-          <input type="date" id="consumo-modal-desde" value="${fmt(hoy)}"
-            style="padding:8px 10px;border:1px solid var(--color-border);border-radius:6px;background:var(--color-bg);color:var(--color-text)">
-        </label>
-        <label style="display:flex;flex-direction:column;gap:4px;font-size:13px">
-          Hasta
-          <input type="date" id="consumo-modal-hasta" value="${fmt(hoy)}"
+          Fecha
+          <input type="date" id="consumo-modal-fecha" value="${fmt(hoy)}"
             style="padding:8px 10px;border:1px solid var(--color-border);border-radius:6px;background:var(--color-bg);color:var(--color-text)">
         </label>
       </div>
@@ -144,9 +135,8 @@ function cerrarModalGenerarConsumo() {
 async function confirmarGenerarConsumo() {
   const btn   = document.getElementById('consumo-modal-confirmar')
   const resEl = document.getElementById('consumo-modal-resultado')
-  const desde = document.getElementById('consumo-modal-desde').value
-  const hasta = document.getElementById('consumo-modal-hasta').value
-  if (!desde || !hasta || !btn || !resEl) return
+  const fecha = document.getElementById('consumo-modal-fecha').value
+  if (!fecha || !btn || !resEl) return
 
   const original = btn.textContent
   btn.disabled = true
@@ -156,7 +146,7 @@ async function confirmarGenerarConsumo() {
   try {
     const tenant_id = window._consumoTenant || await getTenantId()
     const { data, error } = await window._db.rpc('fn_generar_consumo_rango', {
-      p_tenant_id: tenant_id, p_desde: desde, p_hasta: hasta
+      p_tenant_id: tenant_id, p_desde: fecha, p_hasta: fecha
     })
     if (error) throw error
 
@@ -181,7 +171,6 @@ async function confirmarGenerarConsumo() {
 async function cargarConsumoData() {
   const tenant_id = window._consumoTenant
   const wrap      = document.getElementById('consumo-lista-wrap')
-  const filtroEl  = document.getElementById('consumo-filtro')
 
   const PAGE_SIZE = 1000
   const filas     = []
@@ -205,7 +194,6 @@ async function cargarConsumoData() {
 
   if (!filas || !filas.length) {
     window._consumoDiasData = []
-    if (filtroEl) filtroEl.innerHTML = ''
     if (wrap) wrap.innerHTML = `<p style="color:var(--color-text-muted)">No hay consumo teórico registrado.</p>`
     return
   }
@@ -258,82 +246,6 @@ async function cargarConsumoData() {
     }
   }).sort((a, b) => b.fecha.localeCompare(a.fecha))
 
-  renderConsumoFiltro()
-  renderConsumoVista()
-}
-
-function _filtrarConsumoPorPeriodo() {
-  const todos  = window._consumoDiasData || []
-  const nivel1 = window._consumoNivel1 || 'Todo'
-  if (nivel1 === 'Todo') return todos
-  if (nivel1 === 'Mes') {
-    if (!window._consumoMesSel) return todos
-    return todos.filter(d => d.fecha.slice(0, 7) === window._consumoMesSel)
-  }
-  if (nivel1 === 'Semana') {
-    if (!window._consumoMesSel) return todos
-    const delMes = todos.filter(d => d.fecha.slice(0, 7) === window._consumoMesSel)
-    if (!window._consumoSemanaSel) return delMes
-    return delMes.filter(d => _getLunesConsumo(d.fecha) === window._consumoSemanaSel)
-  }
-  return todos
-}
-
-// ── Filtro Todo/Mes/Semana (mismo look que Cierres) ──────────────────────────────
-function renderConsumoFiltro() {
-  const cont = document.getElementById('consumo-filtro')
-  if (!cont) return
-  const todos = window._consumoDiasData || []
-  const { meses, porMes } = _agruparConsumoPorMes(todos)
-  const añosDistintos = [...new Set(meses.map(m => m.split('-')[0]))]
-  const soloUnAño = añosDistintos.length === 1
-
-  const nivel1 = window._consumoNivel1 || 'Todo'
-
-  let html = `
-    <div class="cierres-segmented">
-      ${['Todo', 'Mes', 'Semana'].map(p => `
-        <button class="btn-periodo${nivel1 === p ? ' active' : ''}" onclick="setConsumoNivel1('${p}')">${p}</button>`).join('')}
-    </div>`
-
-  if (nivel1 === 'Mes' || nivel1 === 'Semana') {
-    html += `
-    <div class="cierres-segmented cierres-segmented-sub" style="margin-top:10px">
-      ${meses.map(mes => `
-        <button class="btn-periodo${window._consumoMesSel === mes ? ' active' : ''}" onclick="setConsumoMes('${mes}')">${_consumoMesLabelDe(mes, soloUnAño)}</button>`).join('')}
-    </div>`
-  }
-
-  if (nivel1 === 'Semana' && window._consumoMesSel) {
-    const { semanas } = _agruparConsumoPorSemana(porMes[window._consumoMesSel] || [])
-    html += `
-    <div class="cierres-segmented cierres-segmented-sub" style="margin-top:8px">
-      ${semanas.map(lunes => `
-        <button class="btn-periodo${window._consumoSemanaSel === lunes ? ' active' : ''}" onclick="setConsumoSemana('${lunes}')">${_semLabelConsumo(lunes)}</button>`).join('')}
-    </div>`
-  }
-
-  cont.innerHTML = html
-}
-
-function setConsumoNivel1(nivel) {
-  window._consumoNivel1    = nivel
-  window._consumoMesSel    = null
-  window._consumoSemanaSel = null
-  renderConsumoFiltro()
-  renderConsumoVista()
-}
-
-function setConsumoMes(mes) {
-  window._consumoMesSel    = mes
-  window._consumoSemanaSel = null
-  renderConsumoFiltro()
-  renderConsumoVista()
-}
-
-function setConsumoSemana(lunes) {
-  window._consumoSemanaSel = lunes
-  renderConsumoFiltro()
   renderConsumoVista()
 }
 
@@ -347,7 +259,7 @@ function renderConsumoVista() {
   const listaEl = document.getElementById('consumo-lista-wrap')
   if (!listaEl) return
 
-  const diasFiltrados = _filtrarConsumoPorPeriodo()
+  const diasFiltrados = window._consumoDiasData || []
   const buscador = (window._consumoBuscador || '').trim().toLowerCase()
 
   const diasConFiltro = buscador
