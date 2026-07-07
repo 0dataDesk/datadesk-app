@@ -102,6 +102,8 @@ async function vistaInventarioAnalitico() {
 
       <div id="ia-filtro-periodo" style="margin-bottom:16px"></div>
 
+      <div id="ia-cabecero"></div>
+
       <input type="text" id="ia-buscador" placeholder="Buscar insumo..."
         style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--color-border);border-radius:6px;background:var(--color-card);color:var(--color-text);font-size:14px;margin-bottom:16px"
         oninput="_iaBuscarAnalitico(this.value)">
@@ -318,6 +320,8 @@ async function _iaCargar() {
     })
 
     if (!filas.length) {
+      const cabeceroEl = document.getElementById('ia-cabecero')
+      if (cabeceroEl) cabeceroEl.innerHTML = ''
       wrap.innerHTML = `<p style="color:var(--color-text-muted);padding:24px 0">Sin movimientos en el período seleccionado.</p>`
       return
     }
@@ -328,11 +332,19 @@ async function _iaCargar() {
     window._iaInvInicial = invInicialReal
     window._iaInvFinal   = invFinal
 
+    _iaRenderCabecero()
+
     wrap.innerHTML = `
       <style>
         .ia-grupo.open .ia-grupo-body { display:block !important }
         .ia-grupo-header:hover { opacity:.85 }
-        .ia-th { cursor:pointer; user-select:none; white-space:nowrap; }
+        .ia-tabla-compacta { font-size:12px }
+        .ia-tabla-compacta th.ia-th {
+          cursor:pointer; user-select:none;
+          white-space:normal; line-height:1.2; font-size:10.5px;
+          vertical-align:bottom; padding:6px 8px;
+        }
+        .ia-tabla-compacta td { padding:6px 8px; }
         .ia-th:hover { color:var(--color-primary); }
       </style>
 
@@ -346,6 +358,71 @@ async function _iaCargar() {
   } catch (err) {
     wrap.innerHTML = `<p style="color:var(--color-highlight)">Error: ${err.message}</p>`
   }
+}
+
+function _iaRenderCabecero() {
+  const cabeceroEl = document.getElementById('ia-cabecero')
+  if (!cabeceroEl) return
+
+  const filas = window._iaFilas || []
+  if (!filas.length) { cabeceroEl.innerHTML = ''; return }
+
+  const total    = filas.length
+  const criticos = filas.filter(f => f.alerta === 2).length
+  const bajos    = filas.filter(f => f.alerta === 1).length
+  const sanos    = total - criticos - bajos
+  const enAlerta = criticos + bajos
+  const pct      = n => total ? Math.round(n / total * 100) : 0
+
+  const porGrupoCriticos = {}
+  filas.forEach(f => { if (f.alerta === 2) porGrupoCriticos[f.grupo] = (porGrupoCriticos[f.grupo] || 0) + 1 })
+  const grupoUrgente = Object.entries(porGrupoCriticos).sort((a, b) => b[1] - a[1])[0] || null
+
+  cabeceroEl.innerHTML = `
+    <div class="card-surface" style="padding:20px;margin-bottom:18px">
+      <div style="display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start">
+        <div>
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-muted)">Insumos en alerta</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:42px;line-height:1;color:${enAlerta ? '#B85C2A' : 'var(--color-primary)'}">
+            ${enAlerta}<span style="font-size:18px;color:var(--color-text-muted)"> / ${total}</span>
+          </div>
+        </div>
+        <table style="border-collapse:collapse;background:var(--color-secondary);border-radius:8px;overflow:hidden">
+          <tbody>
+            <tr>
+              <td style="padding:8px 16px 2px;font-size:10px;font-weight:600;text-transform:uppercase;color:var(--color-text-muted);white-space:nowrap">🔴 Críticos</td>
+              <td style="padding:8px 16px 2px;font-size:10px;font-weight:600;text-transform:uppercase;color:var(--color-text-muted);white-space:nowrap">🟡 Bajos</td>
+            </tr>
+            <tr>
+              <td style="padding:0 16px 8px;font-family:'Bebas Neue',sans-serif;font-size:24px;color:#B85C2A">${criticos}</td>
+              <td style="padding:0 16px 8px;font-family:'Bebas Neue',sans-serif;font-size:24px;color:#c8892a">${bajos}</td>
+            </tr>
+          </tbody>
+        </table>
+        ${grupoUrgente ? `
+        <div>
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-muted)">Necesita atención primero</div>
+          <div style="font-size:14px;margin-top:6px;line-height:1.3">
+            <strong>${grupoUrgente[0]}</strong><br>
+            <span style="color:var(--color-text-muted);font-size:12px">${grupoUrgente[1]} insumo${grupoUrgente[1] !== 1 ? 's' : ''} en crítico</span>
+          </div>
+        </div>` : ''}
+      </div>
+
+      <div style="margin-top:18px">
+        <div style="display:flex;height:10px;border-radius:6px;overflow:hidden">
+          ${sanos    ? `<div style="flex:${sanos} 0 0 auto;background:#4A7A3A"></div>` : ''}
+          ${bajos    ? `<div style="flex:${bajos} 0 0 auto;background:#c8892a"></div>` : ''}
+          ${criticos ? `<div style="flex:${criticos} 0 0 auto;background:#B85C2A"></div>` : ''}
+        </div>
+        <div style="display:flex;gap:16px;margin-top:6px;font-size:11px;color:var(--color-text-muted);flex-wrap:wrap">
+          <span>🟢 Sano ${pct(sanos)}%</span>
+          <span>🟡 Bajo ${pct(bajos)}%</span>
+          <span>🔴 Crítico ${pct(criticos)}%</span>
+        </div>
+      </div>
+    </div>
+  `
 }
 
 function _iaOrdenarFilas(lista) {
@@ -377,26 +454,25 @@ function _iaBadgeGrupo(items) {
   const criticos = items.filter(f => f.alerta === 2).length
   const bajos    = items.filter(f => f.alerta === 1).length
   if (!criticos && !bajos) {
-    return `<span style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;background:rgba(154,123,106,0.15);color:var(--color-text-muted)">${items.length}</span>`
+    return `<span style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;background:rgba(154,123,106,0.15);color:var(--color-text-muted)">${items.length} insumos</span>`
   }
   const partes = []
-  if (criticos) partes.push(`<span style="padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;background:rgba(184,92,42,0.15);color:#B85C2A">🔴 ${criticos}</span>`)
-  if (bajos)    partes.push(`<span style="padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;background:rgba(200,137,42,0.15);color:#c8892a">🟡 ${bajos}</span>`)
+  if (criticos) partes.push(`<span style="padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;background:rgba(184,92,42,0.15);color:#B85C2A">🔴 ${criticos} crít.</span>`)
+  if (bajos)    partes.push(`<span style="padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;background:rgba(200,137,42,0.15);color:#c8892a">🟡 ${bajos} bajo${bajos !== 1 ? 's' : ''}</span>`)
   return partes.join(' ')
 }
 
 const IA_COLS = [
-  { key: 'alerta',  label: '⚠',                  align: 'center' },
-  { key: 'nombre',  label: 'Insumo',              align: 'left'   },
-  { key: 'unidad',  label: 'Unidad',              align: 'left'   },
-  { key: 'inicial', label: 'Último conteo',       align: 'right'  },
-  { key: 'recep',   label: 'Recepciones',         align: 'right'  },
-  { key: 'consumo', label: 'Consumo teórico',     align: 'right'  },
-  { key: 'incid',   label: 'Incidencias',         align: 'right'  },
-  { key: 'teorico', label: 'Teórico esperado',    align: 'right'  },
-  { key: 'final_v', label: 'Conteo del período',  align: 'right'  },
-  { key: 'diff',    label: 'Diferencia',          align: 'right'  },
-  { key: 'pct',     label: '%',                   align: 'right'  }
+  { key: 'nombre',  label: 'Insumo',            align: 'left',  width: '140px' },
+  { key: 'unidad',  label: 'Unidad',             align: 'left',  width: '55px'  },
+  { key: 'inicial', label: 'Último conteo',      align: 'right', width: '68px'  },
+  { key: 'recep',   label: 'Recepciones',        align: 'right', width: '68px'  },
+  { key: 'consumo', label: 'Consumo teórico',    align: 'right', width: '68px'  },
+  { key: 'incid',   label: 'Incidencias',        align: 'right', width: '68px'  },
+  { key: 'teorico', label: 'Teórico esperado',   align: 'right', width: '68px'  },
+  { key: 'final_v', label: 'Conteo del período', align: 'right', width: '68px'  },
+  { key: 'diff',    label: 'Diferencia',         align: 'right', width: '68px'  },
+  { key: 'pct',     label: '%',                  align: 'right', width: '52px'  }
 ]
 
 function _iaRenderGrupos() {
@@ -426,11 +502,6 @@ function _iaRenderGrupos() {
 
   const fmtNum = v => v === null ? '—' : formatInt(v)
   const fmtPct = v => v === null ? '—' : formatNum(v, 1) + '%'
-  const alertaCell = a => {
-    if (a === 2) return `<span style="color:#c0392b;font-size:15px" title="Stock crítico">⚠️</span>`
-    if (a === 1) return `<span style="color:#f39c12;font-size:15px" title="Stock bajo">⚠️</span>`
-    return ''
-  }
 
   const col = window._iaSortCol || 'alerta'
   const dir = window._iaSortDir ?? -1
@@ -450,19 +521,22 @@ function _iaRenderGrupos() {
         </div>
         <div class="ia-grupo-body" style="display:none">
           <div style="overflow-x:auto">
-            <table class="tabla" style="margin:0;border-radius:0;border-top:1px solid var(--color-border)">
+            <table class="tabla ia-tabla-compacta" style="margin:0;border-radius:0;border-top:1px solid var(--color-border);table-layout:fixed;width:100%">
               <thead>
                 <tr>
                   ${IA_COLS.map(c => `
-                    <th class="ia-th" onclick="_iaOrdenar('${c.key}')" style="text-align:${c.align}${c.key === col ? ';color:var(--color-primary)' : ''}">
+                    <th class="ia-th" onclick="_iaOrdenar('${c.key}')" style="text-align:${c.align};width:${c.width}${c.key === col ? ';color:var(--color-primary)' : ''}">
                       ${c.label}${c.key === col ? (dir === 1 ? ' ▲' : ' ▼') : ''}
                     </th>`).join('')}
                 </tr>
               </thead>
               <tbody>
-                ${items.map(f => `
-                  <tr>
-                    <td style="text-align:center">${alertaCell(f.alerta)}</td>
+                ${items.map(f => {
+                  const tinte = f.alerta === 2 ? 'background:rgba(184,92,42,0.07)'
+                    : f.alerta === 1 ? 'background:rgba(200,137,42,0.07)'
+                    : ''
+                  return `
+                  <tr style="${tinte}" title="${f.alerta === 2 ? 'Stock crítico' : f.alerta === 1 ? 'Stock bajo' : ''}">
                     <td>${f.nombre}</td>
                     <td style="color:var(--color-text-muted)">${f.unidad}</td>
                     <td style="text-align:right">${fmtNum(f.inicial)}</td>
@@ -473,7 +547,8 @@ function _iaRenderGrupos() {
                     <td style="text-align:right;font-weight:600">${fmtNum(f.final_v)}</td>
                     <td style="text-align:right;font-weight:600;color:${f.colorDiff||'var(--color-text)'}">${fmtNum(f.diff)}</td>
                     <td style="text-align:right;font-weight:600;color:${f.colorDiff||'var(--color-text)'}">${fmtPct(f.pct)}</td>
-                  </tr>`).join('')}
+                  </tr>`
+                }).join('')}
               </tbody>
             </table>
           </div>
