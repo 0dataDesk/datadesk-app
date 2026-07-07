@@ -1,3 +1,54 @@
+const REC_MESES_NOMBRES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+const REC_MESES_CORTOS  = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
+const REC_CHART_COLORS  = ['#792c24', '#C8892A', '#4A7A3A', '#6A9BB5', '#8A5FB0', '#B85C2A', '#3D9BA8', '#9B7B6A']
+
+function _getLunesRecepcion(fechaStr) {
+  const d = new Date(fechaStr + 'T12:00:00')
+  const day = d.getDay() || 7
+  d.setDate(d.getDate() - (day - 1))
+  return d.toISOString().split('T')[0]
+}
+
+function _semLabelRecepcion(lunesStr) {
+  const lun = new Date(lunesStr + 'T12:00:00')
+  const dom = new Date(lun); dom.setDate(dom.getDate() + 6)
+  const sufijo = dom.getMonth() !== lun.getMonth()
+    ? `${REC_MESES_CORTOS[dom.getMonth()]}`
+    : REC_MESES_CORTOS[lun.getMonth()]
+  return `Semana del ${lun.getDate()} al ${dom.getDate()} ${sufijo}`
+}
+
+function _agruparRecepcionesPorMes(lista) {
+  const porMes = {}
+  lista.forEach(r => {
+    const mes = (r.fecha || '').slice(0, 7)
+    if (!porMes[mes]) porMes[mes] = []
+    porMes[mes].push(r)
+  })
+  const meses = Object.keys(porMes).sort().reverse()
+  return { meses, porMes }
+}
+
+function _agruparRecepcionesPorSemana(lista) {
+  const porSemana = {}
+  lista.forEach(r => {
+    const lunes = _getLunesRecepcion(r.fecha)
+    if (!porSemana[lunes]) porSemana[lunes] = []
+    porSemana[lunes].push(r)
+  })
+  const semanas = Object.keys(porSemana).sort().reverse()
+  return { semanas, porSemana }
+}
+
+function _recMesLabelDe(mes, soloUnAño) {
+  const [year, month] = mes.split('-')
+  return soloUnAño ? REC_MESES_NOMBRES[Number(month) - 1] : `${REC_MESES_NOMBRES[Number(month) - 1]} ${year}`
+}
+
+function _recGasto(r) {
+  return Number(r.total_con_impuestos ?? r.subtotal ?? 0) || 0
+}
+
 async function vistaRecepciones() {
   const content = document.getElementById('content')
   content.innerHTML = `<p style="color:var(--color-text-muted)">Cargando recepciones...</p>`
@@ -15,7 +66,7 @@ async function vistaRecepciones() {
         .order('fecha', { ascending: false })
         .order('created_at', { ascending: false }),
       window._db.from('proveedores')
-        .select('id_proveedor, nombre')
+        .select('id_proveedor, nombre, nombre_corto')
         .eq('tenant_id', tenant_id)
         .eq('activo', true)
         .order('nombre')
@@ -25,15 +76,28 @@ async function vistaRecepciones() {
     if (errP) throw errP
 
     const nombreProv = {}
-    ;(proveedores || []).forEach(p => { nombreProv[p.id_proveedor] = p.nombre })
+    ;(proveedores || []).forEach(p => { nombreProv[p.id_proveedor] = p.nombre_corto || p.nombre })
 
     const badgeEstatus = {
       SIN_FACTURA: 'background:rgba(184,92,42,0.12);color:#B85C2A;border:1px solid rgba(184,92,42,0.3)',
       CON_FACTURA: 'background:rgba(200,137,42,0.12);color:#c8892a;border:1px solid rgba(200,137,42,0.3)',
       PAGADO:      'background:rgba(76,153,80,0.12);color:#3A8C3E;border:1px solid rgba(76,153,80,0.3)'
     }
-
     const iconoEstatus = { SIN_FACTURA: '✕', CON_FACTURA: '!', PAGADO: '✓' }
+
+    window._recepciones   = recepciones || []
+    window._nombreProv    = nombreProv
+    window._proveedoresRec = proveedores || []
+    window._badgeEstatus  = badgeEstatus
+    window._iconoEstatus  = iconoEstatus
+    window._recFiltroProv = ''
+
+    const nombresMap = {}
+    try {
+      const { data: users } = await window._db.rpc('get_usuarios_nombres')
+      if (users) users.forEach(u => { if (u.email) nombresMap[u.email] = u.nombre_corto })
+    } catch (e) {}
+    window._recNombresMap = nombresMap
 
     content.innerHTML = `
       <div class="vista-header">
@@ -43,37 +107,27 @@ async function vistaRecepciones() {
 
       <div id="form-recepcion-wrap"></div>
 
-      <div class="filtros-bar">
-        <select id="filtro-rec-estatus" class="filtro-select" onchange="filtrarRecepciones()">
-          <option value="">Todos los estatus</option>
-          <option value="SIN_FACTURA">Sin factura</option>
-          <option value="CON_FACTURA">Con factura</option>
-          <option value="PAGADO">Pagado</option>
-        </select>
-        <select id="filtro-rec-prov" class="filtro-select" onchange="filtrarRecepciones()">
-          <option value="">Todos los proveedores</option>
-          ${(proveedores || []).map(p => `<option value="${p.id_proveedor}">${p.nombre}</option>`).join('')}
-        </select>
-      </div>
+      <div id="recepciones-controles">
+        <div class="filtros-bar">
+          <select id="filtro-rec-prov" class="filtro-select" onchange="filtrarRecepciones()">
+            <option value="">Todos los proveedores</option>
+            ${(proveedores || []).map(p => `<option value="${p.id_proveedor}">${p.nombre_corto || p.nombre}</option>`).join('')}
+          </select>
+        </div>
 
-      <div id="recepciones-lista"></div>
+        <div id="recepciones-cabecero"></div>
+        <div id="recepciones-lista"></div>
+      </div>
     `
 
-    window._recepciones = recepciones || []
-    window._nombreProv  = nombreProv
-    window._badgeEstatus = badgeEstatus
-    window._iconoEstatus = iconoEstatus
-
     window.filtrarRecepciones = function() {
-      const estatus = document.getElementById('filtro-rec-estatus')?.value || ''
-      const prov    = document.getElementById('filtro-rec-prov')?.value || ''
-      const filtradas = window._recepciones.filter(r =>
-        (!estatus || r.estatus === estatus) &&
-        (!prov    || r.id_proveedor === prov)
-      )
+      window._recFiltroProv = document.getElementById('filtro-rec-prov')?.value || ''
+      const filtradas = window._recepciones.filter(r => !window._recFiltroProv || r.id_proveedor === window._recFiltroProv)
+      renderCabeceroRecepciones(filtradas)
       renderListaRecepciones(filtradas)
     }
 
+    renderCabeceroRecepciones(window._recepciones)
     renderListaRecepciones(window._recepciones)
 
   } catch (err) {
@@ -81,57 +135,274 @@ async function vistaRecepciones() {
   }
 }
 
+// ── Cabecero: total gastado, recepciones, sin factura, top proveedores, donut ──
+function renderCabeceroRecepciones(lista) {
+  const cabeceroEl = document.getElementById('recepciones-cabecero')
+  if (!cabeceroEl) return
+
+  if (!lista.length) {
+    cabeceroEl.innerHTML = ''
+    return
+  }
+
+  const totalGastado = lista.reduce((s, r) => s + _recGasto(r), 0)
+  const numRecepciones = lista.length
+  const sinFactura = lista.filter(r => r.estatus === 'SIN_FACTURA').length
+
+  const porProveedor = {}
+  lista.forEach(r => {
+    const key = r.id_proveedor || 'Inventario Inicial'
+    porProveedor[key] = (porProveedor[key] || 0) + _recGasto(r)
+  })
+  const provEntries = Object.entries(porProveedor).sort((a, b) => b[1] - a[1])
+  const top5 = provEntries.slice(0, 5)
+  const nombreDe = (key) => key === 'Inventario Inicial' ? key : (window._nombreProv[key] || key)
+
+  const tdH = `padding:10px 16px 4px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);white-space:nowrap`
+  const tdV = (color = 'var(--color-text)') => `padding:2px 16px 10px;font-family:'Bebas Neue',sans-serif;font-size:20px;color:${color}`
+
+  const legendHtml = provEntries.length
+    ? `<div style="display:grid;grid-template-columns:repeat(2,auto);gap:4px 20px;font-size:12px;justify-content:start">
+        ${provEntries.slice(0, 8).map(([key, monto], i) => {
+          const pct = totalGastado ? Math.round(monto / totalGastado * 100) : 0
+          const color = REC_CHART_COLORS[i % REC_CHART_COLORS.length]
+          return `<div style="display:flex;align-items:center;gap:5px;white-space:nowrap">
+            <span style="color:${color};font-size:14px;line-height:1">●</span>
+            <span>${nombreDe(key)} ${pct}% ($${formatNum(monto)})</span>
+          </div>`
+        }).join('')}
+       </div>`
+    : ''
+
+  cabeceroEl.innerHTML = `
+    <style>
+      @media(min-width:640px){
+        #recep-cab-inner { flex-direction: row !important; align-items: flex-start !important; }
+        #recep-cab-donut { align-items: flex-end !important; }
+      }
+      @media(max-width:639px){
+        #recep-cab-donut { align-items: center !important; }
+      }
+    </style>
+    <div class="card-surface" style="padding:20px;margin-bottom:18px">
+      <div id="recep-cab-inner" style="display:flex;flex-direction:column;gap:20px">
+
+        <div style="flex:1;display:flex;flex-direction:column;gap:14px">
+          <div>
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-muted)">Total recibido</div>
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:48px;line-height:1;color:var(--color-primary)">$${formatNum(totalGastado)}</div>
+          </div>
+          <table style="border-collapse:collapse;background:var(--color-secondary);border-radius:8px;overflow:hidden">
+            <tbody>
+              <tr>
+                <td style="${tdH}">📦 Recepciones</td>
+                <td style="${tdH}">🧾 Sin factura</td>
+              </tr>
+              <tr>
+                <td style="${tdV()}">${numRecepciones}</td>
+                <td style="${tdV('#B85C2A')}">${sinFactura}</td>
+              </tr>
+            </tbody>
+          </table>
+          ${top5.length > 0 ? `
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-muted)">🏆 Top proveedores</div>
+            ${top5.map(([key, monto], i) => `
+              <div style="font-size:13px;display:flex;gap:6px;align-items:baseline">
+                <span style="color:var(--color-text-muted);min-width:14px">${i + 1}.</span>
+                <span style="font-weight:600;flex:1">${nombreDe(key)}</span>
+                <span style="color:var(--color-text-muted);white-space:nowrap">$${formatNum(monto)}</span>
+              </div>`).join('')}
+          </div>` : ''}
+        </div>
+
+        ${provEntries.length > 0 ? `
+        <div id="recep-cab-donut" style="display:flex;flex-direction:column;gap:10px">
+          <canvas id="recep-chart-prov" width="220" height="220"></canvas>
+          ${legendHtml}
+        </div>` : ''}
+
+      </div>
+    </div>
+  `
+
+  if (provEntries.length > 0) {
+    const buildChart = () => {
+      const canvas = document.getElementById('recep-chart-prov')
+      if (!canvas) return
+      if (window._recepChart) { window._recepChart.destroy(); window._recepChart = null }
+
+      const cs = getComputedStyle(document.documentElement)
+      const colorText      = cs.getPropertyValue('--color-text').trim()       || '#2B1A0F'
+      const colorTextMuted = cs.getPropertyValue('--color-text-muted').trim() || '#9B7B6A'
+
+      const centerTextPlugin = {
+        id: 'centerTextRecep',
+        beforeDraw(chart) {
+          const { ctx, chartArea: { top, bottom, left, right } } = chart
+          const cx = (left + right) / 2
+          const cy = (top + bottom) / 2
+          ctx.save()
+          ctx.font = "bold 12px 'DM Sans', sans-serif"
+          ctx.fillStyle = colorTextMuted
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'middle'
+          ctx.fillText('TOTAL', cx, cy - 12)
+          ctx.font = "600 20px 'Bebas Neue', sans-serif"
+          ctx.fillStyle = colorText
+          ctx.fillText('$' + formatNum(totalGastado), cx, cy + 11)
+          ctx.restore()
+        }
+      }
+      window.Chart.register(centerTextPlugin)
+
+      window._recepChart = new window.Chart(canvas, {
+        type: 'doughnut',
+        data: {
+          labels: provEntries.map(([key]) => nombreDe(key)),
+          datasets: [{
+            data: provEntries.map(([, v]) => v),
+            backgroundColor: provEntries.map((_, i) => REC_CHART_COLORS[i % REC_CHART_COLORS.length]),
+            borderWidth: 0,
+            borderRadius: 6,
+            spacing: 3
+          }]
+        },
+        options: {
+          cutout: '58%',
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => {
+                  const pct = totalGastado ? Math.round(ctx.parsed / totalGastado * 100) : 0
+                  return ` ${ctx.label}: $${formatNum(ctx.parsed)} (${pct}%)`
+                }
+              },
+              backgroundColor: 'rgba(30,10,5,0.85)',
+              titleFont: { family: 'DM Sans', size: 12 },
+              bodyFont:  { family: 'DM Sans', size: 12 },
+              padding: 10,
+              cornerRadius: 6
+            }
+          },
+          animation: { animateRotate: true, duration: 500 }
+        }
+      })
+    }
+
+    if (window.Chart) {
+      buildChart()
+    } else {
+      const s = document.createElement('script')
+      s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js'
+      s.onload = buildChart
+      document.head.appendChild(s)
+    }
+  }
+}
+
+// ── Lista agrupada mes → semana (acordeón, igual patrón que Cierres/Consumo) ───
 function renderListaRecepciones(lista) {
   const wrap = document.getElementById('recepciones-lista')
+  if (!wrap) return
+
   if (!lista.length) {
     wrap.innerHTML = `<p style="color:var(--color-text-muted);font-size:13px;margin-top:16px">No hay recepciones registradas.</p>`
     return
   }
 
-  wrap.innerHTML = `
-    <div class="tabla-wrapper">
-      <table class="tabla">
-        <thead>
-          <tr>
-            <th>Fecha</th>
-            <th>Proveedor</th>
-            <th>Folio</th>
-            <th>Remisión</th>
-            <th>Factura</th>
-            <th>Área</th>
-            <th>Estatus</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          ${lista.map(r => `
-            <tr style="cursor:pointer" onclick="verDetalleRecepcion('${r.id}')">
-              <td>${r.fecha || '—'}</td>
-              <td>${r.id_proveedor ? (window._nombreProv[r.id_proveedor] || r.id_proveedor) : 'Inventario Inicial'}</td>
-              <td>${r.folio || '—'}</td>
-              <td>${r.num_remision || '—'}</td>
-              <td>${r.num_factura || '—'}</td>
-              <td style="font-size:12px;color:var(--color-text-muted)">${r.area_almacenamiento || '—'}</td>
-              <td>
-                <span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;${window._badgeEstatus[r.estatus] || ''}">
-                  ${window._iconoEstatus[r.estatus] || ''} ${r.estatus?.replace('_', ' ') || '—'}
-                </span>
-              </td>
-              <td style="text-align:right">
-                ${r.estatus === 'SIN_FACTURA'
-                  ? `<button class="btn-accion btn-aprobar" style="font-size:11px;padding:4px 10px"
-                      onclick="event.stopPropagation();registrarFactura('${r.id}')">Registrar factura</button>`
-                  : r.estatus === 'CON_FACTURA'
-                  ? `<button class="btn-accion btn-aprobar" style="font-size:11px;padding:4px 10px"
-                      onclick="event.stopPropagation();marcarPagado('${r.id}')">Marcar pagado</button>`
-                  : ''}
-              </td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    </div>
-  `
+  const { meses, porMes } = _agruparRecepcionesPorMes(lista)
+  const añosDistintos = [...new Set(meses.map(m => m.split('-')[0]))]
+  const soloUnAño = añosDistintos.length === 1
+
+  let html = `<div class="card-surface" style="padding:16px 20px">`
+  html += soloUnAño
+    ? `<div style="font-size:12px;color:var(--color-text-muted);margin-bottom:8px">Recepciones ${añosDistintos[0]}</div>`
+    : ''
+
+  meses.forEach((mes, mesIdx) => {
+    const recMes   = porMes[mes]
+    const totMes   = recMes.reduce((s, r) => s + _recGasto(r), 0)
+    const mesLabel = _recMesLabelDe(mes, soloUnAño)
+    const mesOpen  = mesIdx === 0
+    const mesId    = `rec-mes-${mes}`
+
+    const { semanas, porSemana } = _agruparRecepcionesPorSemana(recMes)
+
+    let semanasHtml = ''
+    semanas.forEach((lunes, semIdx) => {
+      const recSem  = porSemana[lunes]
+      const totSem  = recSem.reduce((s, r) => s + _recGasto(r), 0)
+      const semOpen = mesIdx === 0 && semIdx === 0
+      const semId   = `rec-sem-${mes}-${lunes}`
+
+      const filasHtml = recSem.map(r => {
+        const provNombre = r.id_proveedor ? (window._nombreProv[r.id_proveedor] || r.id_proveedor) : 'Inventario Inicial'
+        const registradoPor = window._recNombresMap[r.created_by] || (r.created_by === 'sistema' ? 'Sistema' : (r.created_by || '—'))
+        return `
+          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:10px 12px 10px 32px;
+              border-bottom:1px solid var(--color-border);cursor:pointer;font-size:13px"
+            onclick="verDetalleRecepcion('${r.id}')"
+            onmouseenter="this.style.background='var(--color-secondary)'"
+            onmouseleave="this.style.background=''">
+            <span style="min-width:80px;font-weight:600">${r.fecha || '—'}</span>
+            <span>${provNombre}</span>
+            <span style="color:var(--color-text-muted);font-size:12px">${registradoPor}</span>
+            <span style="color:var(--color-text-muted)">${r.num_remision || '—'}</span>
+            <span style="margin-left:auto;font-weight:600">$${formatNum(_recGasto(r))}</span>
+            ${r.estatus === 'SIN_FACTURA'
+              ? `<button class="btn-accion btn-aprobar" style="font-size:11px;padding:4px 10px"
+                  onclick="event.stopPropagation();registrarFactura('${r.id}')">Registrar factura</button>`
+              : ''}
+          </div>`
+      }).join('')
+
+      semanasHtml += `
+        <div style="margin-left:16px">
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;
+              font-size:13px;border-bottom:1px solid var(--color-border)"
+            onclick="(function(el){
+              const b=document.getElementById('${semId}');
+              const open=b.style.display!=='none';
+              b.style.display=open?'none':'';
+              el.querySelector('.sem-chev').textContent=open?'▶':'▼';
+            })(this)">
+            <span class="sem-chev" style="color:var(--color-text-muted);font-size:11px">${semOpen ? '▼' : '▶'}</span>
+            <span>${_semLabelRecepcion(lunes)}</span>
+            <span style="color:var(--color-text-muted)">· ${recSem.length} recepci${recSem.length !== 1 ? 'ones' : 'ón'}</span>
+            <span style="font-weight:600;margin-left:auto">$${formatNum(totSem)}</span>
+          </div>
+          <div id="${semId}" style="display:${semOpen ? '' : 'none'}">
+            ${filasHtml}
+          </div>
+        </div>`
+    })
+
+    html += `
+      <div style="margin-bottom:8px;border:1px solid var(--color-border);border-radius:8px;overflow:hidden">
+        <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;cursor:pointer;
+            background:var(--color-secondary)"
+          onclick="(function(el){
+            const b=document.getElementById('${mesId}');
+            const open=b.style.display!=='none';
+            b.style.display=open?'none':'';
+            el.querySelector('.mes-chev').textContent=open?'▶':'▼';
+          })(this)">
+          <span class="mes-chev" style="color:var(--color-text-muted);font-size:12px">${mesOpen ? '▼' : '▶'}</span>
+          <strong style="font-size:14px">${mesLabel}</strong>
+          <span style="color:var(--color-text-muted);font-size:13px">· ${recMes.length} recepci${recMes.length !== 1 ? 'ones' : 'ón'}</span>
+          <span style="font-weight:700;color:var(--color-primary);margin-left:auto">$${formatNum(totMes)}</span>
+        </div>
+        <div id="${mesId}" style="display:${mesOpen ? '' : 'none'}">
+          ${semanasHtml}
+        </div>
+      </div>`
+  })
+
+  html += `</div>`
+
+  wrap.innerHTML = html
 }
 
 async function mostrarFormRecepcion() {
@@ -156,7 +427,7 @@ async function mostrarFormRecepcion() {
 
   const wrap = document.getElementById('form-recepcion-wrap')
   wrap.innerHTML = `
-    <div class="receta-detalle-card" style="margin-bottom:24px">
+    <div class="card-surface" style="padding:24px;margin-bottom:24px">
       <h3 style="margin-bottom:20px">Nueva recepción</h3>
 
       <div class="filtros-cascada">
@@ -510,10 +781,8 @@ async function marcarPagado(id) {
 }
 
 async function verDetalleRecepcion(id) {
-  const filtrosBar = document.querySelector('.filtros-bar')
-  const listaEl    = document.getElementById('recepciones-lista')
-  if (filtrosBar) filtrosBar.style.display = 'none'
-  if (listaEl)    listaEl.style.display    = 'none'
+  const controles = document.getElementById('recepciones-controles')
+  if (controles) controles.style.display = 'none'
 
   const tenant_id = await getTenantId()
 
@@ -538,13 +807,12 @@ async function verDetalleRecepcion(id) {
     ? (window._nombreProv[rec.id_proveedor] || rec.id_proveedor)
     : 'Inventario Inicial'
 
-  // Generar signed URL fresca si hay archivo (path relativo en BD)
+  // Generar signed URL fresca si hay archivo (path relativo en BD) — se muestra oculta por defecto
   let archivoHtml = ''
   if (rec.archivo_url) {
     let archivoDisplayUrl = null
     const ext = rec.archivo_url.split('.').pop().toLowerCase().split('?')[0]
     const esImagen = ['png','jpg','jpeg','gif','webp','bmp','svg'].includes(ext)
-    // Si es un path relativo (no comienza con http), generar signed URL
     if (!rec.archivo_url.startsWith('http')) {
       const { data: signed } = await window._db.storage.from('recepciones').createSignedUrl(rec.archivo_url, 60 * 60 * 2)
       archivoDisplayUrl = signed?.signedUrl || null
@@ -553,16 +821,22 @@ async function verDetalleRecepcion(id) {
     }
     if (archivoDisplayUrl) {
       archivoHtml = `
-        <div style="margin-top:16px;padding:12px;border:1px solid var(--color-border);border-radius:8px">
-          <span style="font-size:12px;font-weight:600;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:1px">
-            Documento adjunto
-          </span>
-          <div style="margin-top:8px;display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap">
-            ${esImagen ? `<img src="${archivoDisplayUrl}" alt="Documento" style="max-height:200px;border-radius:6px;border:1px solid var(--color-border)">` : ''}
-            <a href="${archivoDisplayUrl}" target="_blank" rel="noopener"
-              class="btn-accion btn-aprobar" style="font-size:12px;padding:6px 14px;text-decoration:none">
-              Ver documento
-            </a>
+        <div style="margin-top:16px">
+          <button class="btn-accion" style="border:1px solid var(--color-border)" onclick="
+            const c=document.getElementById('rec-doc-contenido');
+            const b=this;
+            const open=c.style.display!=='none';
+            c.style.display=open?'none':'';
+            b.textContent=open?'📎 Ver documento adjunto':'Ocultar documento';
+          ">📎 Ver documento adjunto</button>
+          <div id="rec-doc-contenido" style="display:none;margin-top:12px;padding:12px;border:1px solid var(--color-border);border-radius:8px">
+            <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap">
+              ${esImagen ? `<img src="${archivoDisplayUrl}" alt="Documento" style="max-height:200px;border-radius:6px;border:1px solid var(--color-border)">` : ''}
+              <a href="${archivoDisplayUrl}" target="_blank" rel="noopener"
+                class="btn-accion btn-aprobar" style="font-size:12px;padding:6px 14px;text-decoration:none">
+                Ver documento
+              </a>
+            </div>
           </div>
         </div>`
     }
@@ -586,10 +860,10 @@ async function verDetalleRecepcion(id) {
   totalesHtml += `</div>`
 
   wrap.innerHTML = `
-    <div class="receta-detalle-card" style="margin-bottom:24px">
+    <div class="card-surface" style="padding:24px;margin-bottom:24px">
       <div class="detalle-header">
         <div>
-          <h3>Recepción — ${rec.folio || rec.num_remision || rec.id.slice(0,8)}</h3>
+          <h3>Recepción — ${rec.num_remision || rec.id.slice(0,8)}</h3>
           <p class="detalle-categoria">${provNombre} · ${rec.fecha}</p>
         </div>
         <span class="badge-status" style="${window._badgeEstatus[rec.estatus] || ''}">
@@ -655,10 +929,8 @@ async function verDetalleRecepcion(id) {
       <div style="margin-top:16px">
         <button class="btn-accion" style="border:1px solid var(--color-border)"
           onclick="
-            const fb=document.querySelector('.filtros-bar');
-            const le=document.getElementById('recepciones-lista');
-            if(fb) fb.style.display='';
-            if(le) le.style.display='';
+            const c=document.getElementById('recepciones-controles');
+            if(c) c.style.display='';
             document.getElementById('form-recepcion-wrap').innerHTML=''
           ">Cerrar</button>
       </div>
