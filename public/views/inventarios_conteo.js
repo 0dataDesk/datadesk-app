@@ -1,3 +1,16 @@
+const IC_MESES_NOMBRES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+const IC_DIAS_NOMBRES  = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado']
+
+function icDiaLabel(fechaStr) {
+  const d = new Date(fechaStr + 'T12:00:00')
+  return `${IC_DIAS_NOMBRES[d.getDay()]} ${String(d.getDate()).padStart(2,'0')}`
+}
+
+function icMesLabel(mesStr) {
+  const [year, month] = mesStr.split('-')
+  return `${IC_MESES_NOMBRES[Number(month)-1]} ${year}`
+}
+
 // ── Vista: Inventario Físico (conteos) ───────────────────────────────────────
 async function vistaInventariosConteo() {
   const content = document.getElementById('content')
@@ -6,15 +19,21 @@ async function vistaInventariosConteo() {
   try {
     const tenant_id = await getTenantId()
 
-    const { data: inventarios, error } = await window._db
-      .from('inventarios')
-      .select('id, fecha, clasificacion, area, estado, creado_por, created_at')
-      .eq('tenant_id', tenant_id)
-      .order('fecha', { ascending: false })
+    const [{ data: inventarios, error }, { count: totalActivos }] = await Promise.all([
+      window._db
+        .from('inventarios')
+        .select('id, fecha, estado, creado_por')
+        .eq('tenant_id', tenant_id)
+        .order('fecha', { ascending: false }),
+      window._db
+        .from('productos')
+        .select('id_producto', { count: 'exact', head: true })
+        .eq('tenant_id', tenant_id)
+        .eq('activo', true)
+    ])
 
     if (error) throw error
 
-    // Contar items por inventario
     const ids = (inventarios || []).map(i => i.id)
     let itemsCounts = {}
     if (ids.length > 0) {
@@ -27,53 +46,73 @@ async function vistaInventariosConteo() {
       })
     }
 
+    const nombresMap = {}
+    try {
+      const { data: users } = await window._db.rpc('get_usuarios_nombres')
+      if (users) users.forEach(u => { if (u.email) nombresMap[u.email] = u.nombre_corto })
+    } catch (e) {}
+
+    const formatCreadoPor = (val) => {
+      if (!val) return '—'
+      return nombresMap[val] || val.split('@')[0]
+    }
+
     const estadoBadge = {
       borrador: 'background:rgba(200,137,42,0.15);color:#c8892a',
       completo: 'background:rgba(76,153,80,0.12);color:#3A8C3E'
     }
 
+    const porMes = {}
+    ;(inventarios || []).forEach(inv => {
+      const mes = inv.fecha.slice(0, 7)
+      if (!porMes[mes]) porMes[mes] = []
+      porMes[mes].push(inv)
+    })
+    const meses = Object.keys(porMes).sort().reverse()
+
+    const accordionHTML = !meses.length
+      ? `<p style="color:var(--color-text-muted);text-align:center;padding:24px">Sin inventarios registrados aún.</p>`
+      : meses.map((mes, idx) => `
+        <div class="ic-mes-grupo${idx === 0 ? ' open' : ''}" style="border:1px solid var(--color-border);border-radius:8px;margin-bottom:8px;overflow:hidden">
+          <div class="ic-mes-header" style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;cursor:pointer;background:var(--color-surface);user-select:none" onclick="this.parentElement.classList.toggle('open')">
+            <span style="font-weight:600">${icMesLabel(mes)}</span>
+            <span style="font-size:12px;color:var(--color-text-muted)">${porMes[mes].length} conteo${porMes[mes].length === 1 ? '' : 's'}</span>
+          </div>
+          <div class="ic-mes-body" style="display:none">
+            <table class="tabla" style="margin:0;border-radius:0;border-top:1px solid var(--color-border)">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th style="text-align:right">Items</th>
+                  <th>Creado por</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${porMes[mes].map(inv => `
+                  <tr style="cursor:pointer" onclick="verDetalleInventario('${inv.id}')">
+                    <td>${icDiaLabel(inv.fecha)}</td>
+                    <td style="text-align:right;font-weight:600">${itemsCounts[inv.id] || 0}/${totalActivos || 0}</td>
+                    <td style="font-size:12px;color:var(--color-text-muted)">${formatCreadoPor(inv.creado_por)}</td>
+                    <td><span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;${estadoBadge[inv.estado]||''}">${inv.estado || 'borrador'}</span></td>
+                  </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>`).join('')
+
     content.innerHTML = `
+      <style>
+        .ic-mes-grupo.open .ic-mes-body { display:block !important }
+        .ic-mes-header:hover { opacity:.85 }
+      </style>
       <div class="vista-header">
         <h2>📋 Conteos</h2>
       </div>
       <div id="inv-conteo-detalle"></div>
-      <div id="inv-conteo-tabla-wrap"><div class="tabla-wrapper card-surface">
-        <table class="tabla">
-          <thead>
-            <tr>
-              <th>Fecha</th>
-              <th>Clasificación</th>
-              <th>Área</th>
-              <th>Estado</th>
-              <th>Creado por</th>
-              <th style="text-align:right">Items</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            ${!(inventarios && inventarios.length)
-              ? `<tr><td colspan="7" style="color:var(--color-text-muted);text-align:center;padding:24px">Sin inventarios registrados aún.</td></tr>`
-              : (inventarios || []).map(inv => `
-                <tr style="cursor:pointer" onclick="verDetalleInventario('${inv.id}')">
-                  <td>${inv.fecha}</td>
-                  <td>${inv.clasificacion || 'todos'}</td>
-                  <td style="color:var(--color-text-muted)">${inv.area || '—'}</td>
-                  <td>
-                    <span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;${estadoBadge[inv.estado]||''}">
-                      ${inv.estado || 'borrador'}
-                    </span>
-                  </td>
-                  <td style="font-size:12px;color:var(--color-text-muted)">${inv.creado_por || '—'}</td>
-                  <td style="text-align:right;font-weight:600">${itemsCounts[inv.id] || 0}</td>
-                  <td style="text-align:right">
-                    <button class="btn-accion btn-aprobar" style="font-size:11px;padding:4px 10px"
-                      onclick="event.stopPropagation();verDetalleInventario('${inv.id}')">Ver análisis</button>
-                  </td>
-                </tr>`).join('')
-            }
-          </tbody>
-        </table>
-      </div></div>
+      <div id="inv-conteo-tabla-wrap" class="card-surface" style="padding:16px">
+        ${accordionHTML}
+      </div>
     `
   } catch (err) {
     content.innerHTML = `<p style="color:var(--color-highlight)">Error: ${err.message}</p>`
