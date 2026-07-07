@@ -671,6 +671,7 @@ body {
 
 .cierres-segmented {
   display: inline-flex;
+  flex-wrap: wrap;
   background: var(--color-secondary);
   border-radius: 20px;
   padding: 3px;
@@ -691,6 +692,10 @@ body {
   background: var(--color-primary);
   color: #fff;
   font-weight: 600;
+}
+.cierres-segmented-sub .btn-periodo {
+  padding: 5px 14px;
+  font-size: 12px;
 }
 
 .filtro-select {

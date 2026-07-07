@@ -143,8 +143,6 @@ function renderCierresFiltro() {
   const soloUnAño = añosDistintos.length === 1
 
   const nivel1 = window._cierresNivel1 || 'Todo'
-  const pillSub = (active) => `padding:5px 14px;border-radius:20px;border:1px solid var(--color-border);cursor:pointer;font-size:13px;
-    background:${active ? 'var(--color-primary)' : 'var(--color-card)'};color:${active ? '#fff' : 'var(--color-text)'}`
 
   let html = `
     <div class="cierres-segmented">
@@ -153,17 +151,19 @@ function renderCierresFiltro() {
     </div>`
 
   if (nivel1 === 'Mes' || nivel1 === 'Semana') {
-    html += `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+    html += `
+    <div class="cierres-segmented cierres-segmented-sub" style="margin-top:10px">
       ${meses.map(mes => `
-        <button class="btn-periodo" onclick="setCierresMes('${mes}')" style="${pillSub(window._cierresMesSel === mes)}">${_mesLabelDe(mes, soloUnAño)}</button>`).join('')}
+        <button class="btn-periodo${window._cierresMesSel === mes ? ' active' : ''}" onclick="setCierresMes('${mes}')">${_mesLabelDe(mes, soloUnAño)}</button>`).join('')}
     </div>`
   }
 
   if (nivel1 === 'Semana' && window._cierresMesSel) {
     const { semanas } = _agruparCierresPorSemana(porMes[window._cierresMesSel] || [])
-    html += `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+    html += `
+    <div class="cierres-segmented cierres-segmented-sub" style="margin-top:8px">
       ${semanas.map(lunes => `
-        <button class="btn-periodo" onclick="setCierresSemana('${lunes}')" style="${pillSub(window._cierresSemanaSel === lunes)}">${semLabel(lunes)}</button>`).join('')}
+        <button class="btn-periodo${window._cierresSemanaSel === lunes ? ' active' : ''}" onclick="setCierresSemana('${lunes}')">${semLabel(lunes)}</button>`).join('')}
     </div>`
   }
 
