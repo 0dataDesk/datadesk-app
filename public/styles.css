@@ -669,6 +669,30 @@ body {
   letter-spacing: 1px;
 }
 
+.cierres-segmented {
+  display: inline-flex;
+  background: var(--color-secondary);
+  border-radius: 20px;
+  padding: 3px;
+  gap: 2px;
+}
+.cierres-segmented .btn-periodo {
+  border: none;
+  background: transparent;
+  padding: 6px 16px;
+  border-radius: 18px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-family: var(--font-main);
+  transition: background .15s, color .15s;
+}
+.cierres-segmented .btn-periodo.active {
+  background: var(--color-primary);
+  color: #fff;
+  font-weight: 600;
+}
+
 .filtro-select {
   padding: 10px 12px;
   background: var(--color-bg);

@@ -143,18 +143,19 @@ function renderCierresFiltro() {
   const soloUnAño = añosDistintos.length === 1
 
   const nivel1 = window._cierresNivel1 || 'Todo'
-  const pill = (active) => `padding:5px 14px;border-radius:20px;border:1px solid var(--color-border);cursor:pointer;font-size:13px;
-    background:${active ? 'var(--color-primary)' : 'transparent'};color:${active ? '#fff' : 'var(--color-text)'}`
+  const pillSub = (active) => `padding:5px 14px;border-radius:20px;border:1px solid var(--color-border);cursor:pointer;font-size:13px;
+    background:${active ? 'var(--color-primary)' : 'var(--color-card)'};color:${active ? '#fff' : 'var(--color-text)'}`
 
-  let html = `<div style="display:flex;gap:8px;flex-wrap:wrap">
-    ${['Todo', 'Mes', 'Semana'].map(p => `
-      <button class="btn-periodo" onclick="setCierresNivel1('${p}')" style="${pill(nivel1 === p)}">${p}</button>`).join('')}
-  </div>`
+  let html = `
+    <div class="cierres-segmented">
+      ${['Todo', 'Mes', 'Semana'].map(p => `
+        <button class="btn-periodo${nivel1 === p ? ' active' : ''}" onclick="setCierresNivel1('${p}')">${p}</button>`).join('')}
+    </div>`
 
   if (nivel1 === 'Mes' || nivel1 === 'Semana') {
-    html += `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+    html += `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
       ${meses.map(mes => `
-        <button class="btn-periodo" onclick="setCierresMes('${mes}')" style="${pill(window._cierresMesSel === mes)}">${_mesLabelDe(mes, soloUnAño)}</button>`).join('')}
+        <button class="btn-periodo" onclick="setCierresMes('${mes}')" style="${pillSub(window._cierresMesSel === mes)}">${_mesLabelDe(mes, soloUnAño)}</button>`).join('')}
     </div>`
   }
 
@@ -162,7 +163,7 @@ function renderCierresFiltro() {
     const { semanas } = _agruparCierresPorSemana(porMes[window._cierresMesSel] || [])
     html += `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
       ${semanas.map(lunes => `
-        <button class="btn-periodo" onclick="setCierresSemana('${lunes}')" style="${pill(window._cierresSemanaSel === lunes)}">${semLabel(lunes)}</button>`).join('')}
+        <button class="btn-periodo" onclick="setCierresSemana('${lunes}')" style="${pillSub(window._cierresSemanaSel === lunes)}">${semLabel(lunes)}</button>`).join('')}
     </div>`
   }
 
@@ -230,7 +231,7 @@ async function renderCierresVista() {
         .select('nombre, cantidad, id_item')
         .eq('tenant_id', window._cierresTenant)
         .in('id_venta', ventaIds)
-      const excluidoTop3 = (id) => /^(BEB-|RBE-|REX-COM-)/.test(id || '')
+      const excluidoTop3 = (id) => /^(BEB-|RBE-|REX-COM-|RSA-|RSR-)/.test(id || '')
       const sumas = {}
       ;(items || []).forEach(it => {
         if (excluidoTop3(it.id_item)) return
@@ -272,7 +273,7 @@ async function renderCierresVista() {
             #cierres-cab-donut { align-items: center !important; }
           }
         </style>
-        <div class="receta-card" style="margin-bottom:18px">
+        <div class="card-surface" style="padding:20px;margin-bottom:18px">
           <div id="cierres-cab-inner" style="display:flex;flex-direction:column;gap:20px">
 
             <!-- Izquierda: venta total + tabla 2x2 + top 3 -->
@@ -415,7 +416,8 @@ async function renderCierresVista() {
   const añosDistintos = [...new Set(meses.map(m => m.split('-')[0]))]
   const soloUnAño = añosDistintos.length === 1
 
-  let html = soloUnAño
+  let html = `<div class="card-surface" style="padding:16px 20px">`
+  html += soloUnAño
     ? `<div style="font-size:12px;color:var(--color-text-muted);margin-bottom:8px">Cierres ${añosDistintos[0]}</div>`
     : ''
   meses.forEach((mes, mesIdx) => {
@@ -438,19 +440,18 @@ async function renderCierresVista() {
         const tot   = Number(c.total_general) || 0
         const prop  = Number(c.propina_total) || 0
         const vt    = tot - prop
-        const desc  = (descPorCierre[c.id] && descPorCierre[c.id].monto) || 0
-        const v     = vt + desc
         const tprom = c.num_tickets ? vt / c.num_tickets : 0
         return `
-          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:8px 0 8px 32px;
+          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:10px 12px 10px 32px;
               border-bottom:1px solid var(--color-border);cursor:pointer;font-size:13px"
             onclick="verDetalleCierre('${c.id}','${c.fecha}')"
-            onmouseenter="this.style.background='var(--color-bg-alt,rgba(0,0,0,0.03))'"
+            onmouseenter="this.style.background='var(--color-secondary)'"
             onmouseleave="this.style.background=''">
             <span style="min-width:90px;font-weight:600">${c.fecha}</span>
-            <span>V $${formatNum(v)} − desc $${formatNum(desc)} = VT $${formatNum(vt)} + prop $${formatNum(prop)} = Tot $${formatNum(tot)}</span>
-            <span style="color:var(--color-text-muted);margin-left:auto">${c.num_tickets} ticket${c.num_tickets !== 1 ? 's' : ''} · ~$${formatInt(tprom)}/ticket</span>
-            <span style="color:var(--color-text-muted);font-size:11px">${formatCerradoPor(c.cerrado_por)}</span>
+            <span style="font-family:'Bebas Neue',sans-serif;font-size:19px;color:var(--color-primary)">$${formatNum(vt)}</span>
+            <span style="color:var(--color-text-muted)">${c.num_tickets} ticket${c.num_tickets !== 1 ? 's' : ''}</span>
+            <span style="color:var(--color-text-muted)">~$${formatInt(tprom)}/ticket</span>
+            <span style="color:var(--color-text-muted);font-size:11px;margin-left:auto">${formatCerradoPor(c.cerrado_por)}</span>
           </div>`
       }).join('')
 
@@ -478,7 +479,7 @@ async function renderCierresVista() {
     html += `
       <div style="margin-bottom:8px;border:1px solid var(--color-border);border-radius:8px;overflow:hidden">
         <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;cursor:pointer;
-            background:var(--color-bg-card)"
+            background:var(--color-secondary)"
           onclick="(function(el){
             const b=document.getElementById('${mesId}');
             const open=b.style.display!=='none';
@@ -496,9 +497,60 @@ async function renderCierresVista() {
       </div>`
   })
 
-  html += `<div style="font-size:11px;color:var(--color-text-muted);margin-top:12px">V = Venta bruta · Desc = Descuento · VT = Venta neta · Prop = Propina · Tot = Total cobrado</div>`
+  html += `</div>`
 
   listaEl.innerHTML = html
+}
+
+function calcularDesgloseCompletoPorMetodo(ventasCierre) {
+  const porMetodo = {}
+  const ensure = (m) => {
+    if (!porMetodo[m]) porMetodo[m] = { count: 0, v: 0, desc: 0, vt: 0, prop: 0, tot: 0 }
+  }
+  const acumular = (m, count, v, desc, vt, prop, tot) => {
+    ensure(m)
+    porMetodo[m].count += count
+    porMetodo[m].v     += v
+    porMetodo[m].desc  += desc
+    porMetodo[m].vt    += vt
+    porMetodo[m].prop  += prop
+    porMetodo[m].tot   += tot
+  }
+
+  ;(ventasCierre || []).forEach(v => {
+    const tot  = Number(v.total) || 0
+    const prop = Number(v.propina) || 0
+    const pct  = Number(v.descuento_porcentaje) || 0
+    const sub  = Number(v.subtotal) || 0
+    const desc = pct > 0 ? Math.round(sub * pct) / 100 : 0
+    const vt   = tot - prop
+    const vBruto = vt + desc
+
+    const m = (v.metodo_pago || '').toLowerCase()
+
+    if (m === 'delivery') {
+      const tipo = Array.isArray(v.pagos_detalle) && v.pagos_detalle[0] ? v.pagos_detalle[0].tipo : 'otro'
+      acumular('delivery_' + tipo, 1, vBruto, desc, vt, prop, tot)
+    } else if (m === 'mixto' || m === 'dividido' || (Number(v.monto_efectivo) > 0 && Number(v.monto_tarjeta) > 0)) {
+      const mEf = Number(v.monto_efectivo) || 0
+      const mTa = Number(v.monto_tarjeta) || 0
+      const base = mEf + mTa || tot
+      const ratioEf = base ? mEf / base : 0
+      const ratioTa = base ? mTa / base : 0
+
+      if (mEf > 0) acumular('efectivo', 1, vBruto * ratioEf, desc * ratioEf, vt * ratioEf, prop * ratioEf, mEf)
+      if (mTa > 0) {
+        const detalle = Array.isArray(v.pagos_detalle) ? v.pagos_detalle : []
+        const entradaTarjeta = detalle.find(d => d.tipo === 'debito' || d.tipo === 'credito')
+        const tipoTarjeta = entradaTarjeta ? entradaTarjeta.tipo : 'tarjeta'
+        acumular(tipoTarjeta, 1, vBruto * ratioTa, desc * ratioTa, vt * ratioTa, prop * ratioTa, mTa)
+      }
+    } else {
+      acumular(v.metodo_pago || 'Sin método', 1, vBruto, desc, vt, prop, tot)
+    }
+  })
+
+  return porMetodo
 }
 
 async function verDetalleCierre(id_cierre, fecha) {
@@ -506,6 +558,7 @@ async function verDetalleCierre(id_cierre, fecha) {
   const detalleWrap = document.getElementById('cierre-detalle-wrap')
   if (!listaWrap || !detalleWrap) return
 
+  document.getElementById('cierres-filtro').style.display = 'none'
   document.getElementById('cierres-cabecero').style.display = 'none'
   listaWrap.style.display   = 'none'
   detalleWrap.style.display = ''
@@ -580,11 +633,15 @@ async function verDetalleCierre(id_cierre, fecha) {
   }
 
   const fmtHora  = iso => new Date(iso).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
-  const desglose = cierre?.desglose_metodo || {}
 
   const ventasConDesc  = (ventas || []).filter(v => v.descuento_porcentaje > 0)
   const montoDescTotal = ventasConDesc.reduce((s, v) => s + Math.round((Number(v.subtotal) || 0) * (Number(v.descuento_porcentaje) || 0)) / 100, 0)
-  const subtotalBruto  = ventasConDesc.reduce((s, v) => s + (Number(v.subtotal) || 0), 0)
+
+  const propinaTotalCierre = (ventas || []).reduce((s, v) => s + (Number(v.propina) || 0), 0)
+  const ventaNetaCierre    = (ventas || []).reduce((s, v) => s + (Number(v.total) || 0) - (Number(v.propina) || 0), 0)
+  const ventaBrutaCierre   = ventaNetaCierre + montoDescTotal
+
+  const desgloseCompleto = calcularDesgloseCompletoPorMetodo(ventas || [])
 
   window._cierreDetalleActual = { fecha, cierre, ventas: ventas || [] }
   window._cierreItemsPorVenta = itemsPorVenta
@@ -595,12 +652,13 @@ async function verDetalleCierre(id_cierre, fecha) {
       color:var(--color-text-muted);margin-bottom:8px">${txt}</div>`
 
   detalleWrap.innerHTML = `
-    <div class="receta-card" style="margin-top:16px">
+    <div class="card-surface" style="padding:24px;margin-top:16px">
 
       <!-- Cabecera: volver + título + PDF -->
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:20px">
         <div style="display:flex;align-items:center;gap:12px">
           <button class="btn-accion" style="border:1px solid var(--color-border)" onclick="
+            document.getElementById('cierres-filtro').style.display='';
             document.getElementById('cierres-cabecero').style.display='';
             document.getElementById('cierres-lista-wrap').style.display='';
             document.getElementById('cierre-detalle-wrap').style.display='none'">← Volver</button>
@@ -609,40 +667,40 @@ async function verDetalleCierre(id_cierre, fecha) {
         <button class="btn-accion" style="border:1px solid var(--color-border)" onclick="exportarCierrePDF()">Exportar PDF</button>
       </div>
 
-      <!-- Propina y Descuentos como columnas -->
-      <div style="display:flex;gap:32px;margin-bottom:20px;flex-wrap:wrap">
-        <div>
-          <div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--color-text-muted)">💰 Propina</div>
-          <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--color-text)">$${formatNum(Number(cierre?.propina_total) || 0)}</div>
-        </div>
-        <div>
-          <div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--color-text-muted)">🏷️ Descuentos</div>
-          <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:#3A8C3E">$${formatNum(montoDescTotal)}</div>
-        </div>
-      </div>
-
-      <!-- Resumen por método de pago -->
+      <!-- Resumen por método de pago (cabecero del detalle) -->
       ${secLabel('Resumen por método de pago')}
       <div style="overflow-x:auto;margin-bottom:24px">
         <table class="tabla">
           <thead>
             <tr>
               <th>Método de pago</th>
-              <th style="text-align:right">Tickets</th>
-              <th style="text-align:right">Total</th>
+              <th style="text-align:right">Cant. tk</th>
+              <th style="text-align:right">V</th>
+              <th style="text-align:right">Desc</th>
+              <th style="text-align:right">VT</th>
+              <th style="text-align:right">Prop</th>
+              <th style="text-align:right">Tot</th>
             </tr>
           </thead>
           <tbody>
-            ${Object.entries(desglose).map(([m, d]) => `
+            ${Object.entries(desgloseCompleto).map(([m, d]) => `
               <tr>
                 <td>${formatMetodoKey(m)}</td>
                 <td style="text-align:right">${d.count}</td>
-                <td style="text-align:right;font-weight:600">$${formatNum(d.suma)}</td>
+                <td style="text-align:right">$${formatNum(d.v)}</td>
+                <td style="text-align:right;${d.desc > 0 ? 'color:#3A8C3E;font-weight:600' : ''}">${d.desc > 0 ? '-$' + formatNum(d.desc) : '—'}</td>
+                <td style="text-align:right">$${formatNum(d.vt)}</td>
+                <td style="text-align:right">${d.prop > 0 ? '$' + formatNum(d.prop) : '—'}</td>
+                <td style="text-align:right;font-weight:600">$${formatNum(d.tot)}</td>
               </tr>`).join('')}
             <tr style="border-top:2px solid var(--color-primary)">
-              <td style="padding-top:12px"><strong style="font-size:15px;color:var(--color-primary)">TOTAL</strong></td>
-              <td style="text-align:right;padding-top:12px"><strong style="font-size:15px">${cierre?.num_tickets || 0} tickets</strong></td>
-              <td style="text-align:right;padding-top:12px"><strong style="font-size:18px;color:var(--color-primary)">$${formatNum(cierre?.total_general || 0)}</strong></td>
+              <td style="padding-top:12px"><strong style="font-size:14px;color:var(--color-primary)">TOTAL</strong></td>
+              <td style="text-align:right;padding-top:12px"><strong>${cierre?.num_tickets || 0}</strong></td>
+              <td style="text-align:right;padding-top:12px"><strong>$${formatNum(ventaBrutaCierre)}</strong></td>
+              <td style="text-align:right;padding-top:12px"><strong style="color:#3A8C3E">-$${formatNum(montoDescTotal)}</strong></td>
+              <td style="text-align:right;padding-top:12px"><strong>$${formatNum(ventaNetaCierre)}</strong></td>
+              <td style="text-align:right;padding-top:12px"><strong>$${formatNum(propinaTotalCierre)}</strong></td>
+              <td style="text-align:right;padding-top:12px"><strong style="font-size:16px;color:var(--color-primary)">$${formatNum(cierre?.total_general || 0)}</strong></td>
             </tr>
           </tbody>
         </table>
