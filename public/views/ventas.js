@@ -1,4 +1,4 @@
-﻿async function vistaVentas() {
+async function vistaVentas() {
   const content = document.getElementById('content')
   content.innerHTML = `<p style="color:var(--color-text-muted)">Cargando ventas...</p>`
   const tenant_id = await getTenantId()
@@ -45,6 +45,17 @@ async function renderVentas(container, tenantId) {
     pendiente: 'background:rgba(200,137,42,0.15);color:#c8892a'
   }
 
+  const estadoColor = {
+    cerrada:   '#3A8C3E',
+    cancelada: '#B85C2A',
+    pendiente: '#c8892a'
+  }
+
+  const entregaEmoji = {
+    barra:  '🍽️',
+    llevar: '🛵'
+  }
+
   function fmtFecha(iso) {
     if (!iso) return '—'
     const d = new Date(iso)
@@ -83,32 +94,25 @@ async function renderVentas(container, tenantId) {
   const mostrarCierre   = ['superadmin','admin','gerente'].includes(window._rol)
   const mostrarEliminar = window._rol === 'superadmin'
 
+  const listaVentas = ventas || []
+
+  // — Métricas del día (siempre se calculan, aunque sea en cero) —
+  const propinaDia = listaVentas.reduce((s, v) => s + Number(v.propina || 0), 0)
+  const descuentoDia = listaVentas.reduce((s, v) => {
+    const sub = Number(v.subtotal) || 0
+    const pct = Number(v.descuento_porcentaje) || 0
+    return s + (pct > 0 ? Math.round(sub * pct) / 100 : 0)
+  }, 0)
+  const totalDia = listaVentas.reduce((s, v) => s + Number(v.total || 0), 0) - propinaDia
+  const ticketProm = listaVentas.length ? totalDia / listaVentas.length : 0
+
   let html = `
     <div class="vista-header">
       <h2>🧾 Ventas</h2>
       ${mostrarCierre ? `<button class="btn-accion" onclick="mostrarCierreCaja('${tenantId}')">Cierre de caja</button>` : ''}
     </div>
-  `
-
-  if (!ventas || ventas.length === 0) {
-    html += `<p style="color:var(--color-text-muted)">No hay ventas registradas.</p>`
-    container.innerHTML = html
-    return
-  }
-
-  // — Métricas del día —
-  const propinaDia = (ventas || []).reduce((s, v) => s + Number(v.propina || 0), 0)
-  const descuentoDia = (ventas || []).reduce((s, v) => {
-    const sub = Number(v.subtotal) || 0
-    const pct = Number(v.descuento_porcentaje) || 0
-    return s + (pct > 0 ? Math.round(sub * pct) / 100 : 0)
-  }, 0)
-  const totalDia = (ventas || []).reduce((s, v) => s + Number(v.total || 0), 0) - propinaDia
-  const ticketProm = ventas.length ? totalDia / ventas.length : 0
-
-  html += `
     <div id="ventas-cabecero-metricas">
-    <div class="receta-card" style="margin-bottom:18px">
+    <div class="card-surface" style="padding:20px;margin-bottom:18px">
       <div style="display:flex;gap:32px;flex-wrap:wrap;align-items:flex-start">
         <div>
           <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-muted)">Total del día</div>
@@ -131,9 +135,36 @@ async function renderVentas(container, tenantId) {
     </div>
   `
 
+  if (!listaVentas.length) {
+    html += `<p style="color:var(--color-text-muted)">No hay ventas registradas.</p>`
+    container.innerHTML = html
+    // — Realtime — (también cuando el día empieza en ceros, para reaccionar a la primera venta)
+    if (window._ventasChannel) window._db.removeChannel(window._ventasChannel)
+    try {
+      const channel = window._db
+        .channel('ventas-realtime')
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'ventas',
+          filter: `tenant_id=eq.${tenantId}`
+        }, () => {
+          renderVentas(container, tenantId)
+        })
+        .subscribe((status) => {
+          if (status === 'CHANNEL_ERROR') {
+            window._db.removeChannel(channel)
+            window._ventasChannel = null
+          }
+        })
+      window._ventasChannel = channel
+    } catch (_) {}
+    return
+  }
+
   // — Lista acordeón —
   let listaHtml = ''
-  ventas.forEach(v => {
+  listaVentas.forEach(v => {
     const badge    = estadoBadge[v.estado] || ''
     const items    = itemsPorVenta[v.id] || []
     const folio    = v.folio || v.id
@@ -182,7 +213,7 @@ async function renderVentas(container, tenantId) {
     `
 
     listaHtml += `
-      <div id="venta-${v.id}" style="border-bottom:2px solid var(--color-border);padding:12px 0;cursor:pointer"
+      <div id="venta-${v.id}" style="border-bottom:1px solid var(--color-border);border-left:4px solid ${estadoColor[v.estado] || '#9B7B6A'};padding:12px 0 12px 12px;cursor:pointer"
         onclick="(function(el){
           const panel = el.querySelector('[id^=panel-]');
           const chevron = el.querySelector('.venta-chevron');
@@ -199,7 +230,7 @@ async function renderVentas(container, tenantId) {
           <span class="venta-chevron" style="font-size:11px;color:var(--color-text-muted);min-width:12px">▼</span>
         </div>
         <div style="font-size:12px;color:var(--color-text-muted);margin-top:4px">
-          ${v.tipo_entrega || '—'} · ${v.metodo_pago === 'delivery'
+          ${entregaEmoji[v.tipo_entrega] || ''} ${v.tipo_entrega || '—'} · ${v.metodo_pago === 'delivery'
             ? `<span style="background:rgba(200,137,42,0.15);color:#c8892a;padding:1px 8px;border-radius:10px;font-size:11px;font-weight:600">${formatMetodoPago(v.metodo_pago, v.pagos_detalle)}</span>`
             : (v.metodo_pago || '—')}
         </div>
@@ -208,7 +239,7 @@ async function renderVentas(container, tenantId) {
     `
   })
 
-  html += `<div id="lista-ventas-wrap">${listaHtml}</div>`
+  html += `<div class="card-surface" style="padding:8px 16px"><div id="lista-ventas-wrap">${listaHtml}</div></div>`
   container.innerHTML = html
 
   // — Realtime —
@@ -269,7 +300,7 @@ function metodoDisplay(v) {
     ? `Efectivo $${formatNum(v.monto_efectivo)} + Tarjeta $${formatNum(v.monto_tarjeta)}`
     : (v.metodo_pago || '—')
 }
-function rangoDiaMexico(fecha) {
+function rangoDiaMexico(fecha) {
   return {
     inicio: new Date(`${fecha}T00:00:00-06:00`).toISOString(),
     fin:    new Date(`${fecha}T23:59:59-06:00`).toISOString()
@@ -579,5 +610,3 @@ async function eliminarVenta(id, folio, tenantId) {
     alert('Error al eliminar: ' + err.message)
   }
 }
-
-
