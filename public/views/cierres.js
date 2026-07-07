@@ -664,7 +664,6 @@ async function verDetalleCierre(id_cierre, fecha) {
             document.getElementById('cierre-detalle-wrap').style.display='none'">← Volver</button>
           <h3 style="margin:0">Cierre — ${fecha}</h3>
         </div>
-        <button class="btn-accion" style="border:1px solid var(--color-border)" onclick="exportarCierrePDF()">Exportar PDF</button>
       </div>
 
       <!-- Resumen por método de pago (cabecero del detalle) -->
@@ -757,92 +756,6 @@ async function verDetalleCierre(id_cierre, fecha) {
 
     </div>
   `
-}
-
-function exportarCierrePDF() {
-  const { fecha, cierre, ventas } = window._cierreDetalleActual || {}
-  if (!cierre) return
-  const desglose     = cierre.desglose_metodo || {}
-  const fmtHora      = iso => new Date(iso).toLocaleTimeString('es-MX')
-  const ventasConDesc = (ventas || []).filter(v => v.descuento_porcentaje > 0)
-  const montoDesc    = ventasConDesc.reduce((s, v) =>
-    s + Math.round((Number(v.subtotal) || 0) * (Number(v.descuento_porcentaje) || 0)) / 100, 0)
-
-  const html = `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>Cierre ${fecha}</title>
-<style>
-  body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 13px; color: #2B1A0F; margin: 0; padding: 40px; background: #FAF7F2; }
-  .header { border-bottom: 3px solid #C8892A; padding-bottom: 16px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: flex-end; }
-  .header h1 { font-size: 22px; margin: 0; }
-  .header small { color: #9B7B6A; font-size: 12px; }
-  .sec-label { font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#9B7B6A;margin:20px 0 8px; }
-  table { width: 100%; border-collapse: collapse; margin-bottom: 20px; background: #fff; }
-  thead th { padding: 8px 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: #9B7B6A; border-bottom: 2px solid #E8DDD5; }
-  td { padding: 8px 12px; border-bottom: 1px solid #E8DDD5; }
-  .total-row td { border-top: 2px solid #C8892A; font-weight: 700; }
-  .desc-row td { color: #3A8C3E; font-weight: 600; background: rgba(76,153,80,0.06); }
-  .footer { margin-top: 30px; font-size: 11px; color: #9B7B6A; text-align: center; }
-</style></head><body>
-  <div class="header">
-    <div><h1>Cierre de caja — Furia</h1><small>Fecha: ${fecha}</small></div>
-    <div style="font-size:11px;color:#9B7B6A">${cierre.num_tickets} tickets</div>
-  </div>
-
-  <div class="sec-label">Resumen por método de pago</div>
-  <table>
-    <thead><tr><th>Método de pago</th><th style="text-align:right">Tickets</th><th style="text-align:right">Total</th></tr></thead>
-    <tbody>
-      ${Object.entries(desglose).map(([m, d]) =>
-        `<tr><td>${formatMetodoKey(m)}</td><td style="text-align:right">${d.count}</td><td style="text-align:right">$${formatNum(d.suma)}</td></tr>`
-      ).join('')}
-      ${ventasConDesc.length > 0
-        ? `<tr class="desc-row"><td>🏷 Descuentos</td><td style="text-align:right">${ventasConDesc.length}</td><td style="text-align:right">-$${formatNum(montoDesc)}</td></tr>`
-        : ''}
-      <tr class="total-row">
-        <td>TOTAL</td>
-        <td style="text-align:right">${cierre.num_tickets}</td>
-        <td style="text-align:right;color:#C8892A">$${formatNum(cierre.total_general)}</td>
-      </tr>
-    </tbody>
-  </table>
-
-  <div class="sec-label">Detalle de ventas</div>
-  <table>
-    <thead>
-      <tr>
-        <th>Folio</th><th>Método</th>
-        <th style="text-align:right">Total</th>
-        <th style="text-align:right">Descuento</th>
-        <th style="text-align:right">Propina</th>
-        <th>Hora</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${(ventas || []).map(v => {
-        const pct      = Number(v.descuento_porcentaje) || 0
-        const descMonto = pct > 0 ? Math.round((Number(v.subtotal) || 0) * pct) / 100 : 0
-        return `<tr>
-          <td>${v.folio || '—'}</td>
-          <td>${formatMetodoPago(v.metodo_pago, v.pagos_detalle)}</td>
-          <td style="text-align:right">$${formatNum(v.total)}</td>
-          <td style="text-align:right;color:${pct > 0 ? '#3A8C3E' : 'inherit'}">
-            ${pct > 0 ? `-$${formatNum(descMonto)} (${pct}%)` : '—'}
-          </td>
-          <td style="text-align:right">${v.propina ? '$' + formatNum(v.propina) : '—'}</td>
-          <td>${fmtHora(v.created_at)}</td>
-        </tr>`
-      }).join('')}
-    </tbody>
-  </table>
-
-  <div class="footer">Documento generado por dataDesk · ${new Date().toLocaleDateString('es-MX')}</div>
-</body></html>`
-
-  const ventana = window.open('', '_blank')
-  ventana.document.write(html)
-  ventana.document.close()
-  ventana.focus()
-  setTimeout(() => ventana.print(), 500)
 }
 
 function toggleItemsCierre(rowId) {
