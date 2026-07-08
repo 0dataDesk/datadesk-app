@@ -192,6 +192,9 @@ async function setCierresSemana(lunes) {
 }
 
 async function renderCierresVista() {
+  const miGen = (window._cierresRenderGen = (window._cierresRenderGen || 0) + 1)
+  const esVigente = () => miGen === window._cierresRenderGen
+
   const cierresFiltrados  = _filtrarCierresPorPeriodo()
   const descPorCierre     = window._cierresDescMap || {}
   const formatCerradoPor  = window._cierresFormatCerradoPor || (v => v || '—')
@@ -240,6 +243,8 @@ async function renderCierresVista() {
       top3 = Object.entries(sumas).sort((a, b) => b[1] - a[1]).slice(0, 5)
     }
   }
+
+  if (!esVigente()) return
 
   // — Cabecero —
   const cabeceroEl = document.getElementById('cierres-cabecero')
@@ -328,6 +333,7 @@ async function renderCierresVista() {
 
       if (metodosEntries.length > 0) {
         const buildChart = () => {
+          if (!esVigente()) return
           const canvas = document.getElementById('cierre-chart-metodos')
           if (!canvas) return
           if (window._cierresChart) { window._cierresChart.destroy(); window._cierresChart = null }
