@@ -213,30 +213,30 @@ async function renderCierresVista() {
 
   // Métricas acumuladas
   let ventaTotal = 0, propinaTotal = 0, descTotal = 0, ticketsTotal = 0
-  const metodosSuma = {}
   cierresFiltrados.forEach(c => {
     ventaTotal   += Number(c.total_general) || 0
     propinaTotal += Number(c.propina_total) || 0
     ticketsTotal += Number(c.num_tickets)   || 0
     if (descPorCierre[c.id]) descTotal += descPorCierre[c.id].monto
-    Object.entries(c.desglose_metodo || {}).forEach(([m, d]) => {
-      metodosSuma[m] = (metodosSuma[m] || 0) + (Number(d.suma) || 0)
-    })
   })
   const ventaNeta  = ventaTotal - propinaTotal
   const ticketProm = ticketsTotal ? ventaNeta / ticketsTotal : 0
-  const metodosEntries   = Object.entries(metodosSuma)
-  const totalMetodosSum  = metodosEntries.reduce((s, [, v]) => s + v, 0)
 
-  // — Top 3 vendidos del periodo —
+  // — Desglose por método (venta neta, sin propina) + Top 5 vendidos del periodo —
+  // Ambos se calculan de las ventas crudas del período (misma consulta, sin duplicar el viaje a BD).
+  let metodosSuma = {}
   let top3 = []
   if (cierresFiltrados.length > 0) {
     const idsCierre = cierresFiltrados.map(c => c.id)
     const { data: ventasTop } = await window._db
       .from('ventas')
-      .select('id')
+      .select('id, metodo_pago, total, propina, subtotal, descuento_porcentaje, monto_efectivo, monto_tarjeta, pagos_detalle')
       .eq('tenant_id', window._cierresTenant)
       .in('id_cierre', idsCierre)
+
+    const desgloseCrudo = calcularDesgloseCompletoPorMetodo(ventasTop || [])
+    Object.entries(desgloseCrudo).forEach(([m, d]) => { metodosSuma[m] = d.vt })
+
     const ventaIds = (ventasTop || []).map(v => v.id)
     if (ventaIds.length > 0) {
       const { data: items } = await window._db
@@ -253,6 +253,8 @@ async function renderCierresVista() {
       top3 = Object.entries(sumas).sort((a, b) => b[1] - a[1]).slice(0, 5)
     }
   }
+  const metodosEntries   = Object.entries(metodosSuma)
+  const totalMetodosSum  = metodosEntries.reduce((s, [, v]) => s + v, 0)
 
   if (!esVigente()) return
 
