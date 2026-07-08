@@ -244,7 +244,7 @@ async function renderCierresVista() {
         .select('nombre, cantidad, id_item')
         .eq('tenant_id', window._cierresTenant)
         .in('id_venta', ventaIds)
-      const excluidoTop3 = (id) => /^(BEB-|RBE-|REX-COM-|RSA-|RSR-)/.test(id || '')
+      const excluidoTop3 = (id) => /^(BEB-|RBE-|REX-COM-|RSA-|RSR-|DES-|EMP-)/.test(id || '')
       const sumas = {}
       ;(items || []).forEach(it => {
         if (excluidoTop3(it.id_item)) return
