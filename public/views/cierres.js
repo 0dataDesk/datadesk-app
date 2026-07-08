@@ -104,8 +104,8 @@ async function vistaCierres() {
     content.innerHTML = `
       <div class="vista-header"><h2>🔒 Cierres</h2></div>
       <div id="cierres-filtro" style="margin-bottom:16px"></div>
-      <div id="cierres-cabecero"></div>
-      <div id="cierres-lista-wrap"></div>
+      <div id="cierres-cabecero"><p style="color:var(--color-text-muted)">Cargando resumen...</p></div>
+      <div id="cierres-lista-wrap"><p style="color:var(--color-text-muted)">Cargando cierres...</p></div>
       <div id="cierre-detalle-wrap" style="display:none"></div>
     `
 
@@ -170,11 +170,19 @@ function renderCierresFiltro() {
   cont.innerHTML = html
 }
 
+function _cierresMostrarCargando() {
+  const cabeceroEl = document.getElementById('cierres-cabecero')
+  const listaEl    = document.getElementById('cierres-lista-wrap')
+  if (cabeceroEl) cabeceroEl.innerHTML = `<p style="color:var(--color-text-muted)">Cargando resumen...</p>`
+  if (listaEl)    listaEl.innerHTML    = `<p style="color:var(--color-text-muted)">Cargando cierres...</p>`
+}
+
 async function setCierresNivel1(nivel) {
   window._cierresNivel1    = nivel
   window._cierresMesSel    = null
   window._cierresSemanaSel = null
   renderCierresFiltro()
+  _cierresMostrarCargando()
   await renderCierresVista()
 }
 
@@ -182,12 +190,14 @@ async function setCierresMes(mes) {
   window._cierresMesSel    = mes
   window._cierresSemanaSel = null
   renderCierresFiltro()
+  _cierresMostrarCargando()
   await renderCierresVista()
 }
 
 async function setCierresSemana(lunes) {
   window._cierresSemanaSel = lunes
   renderCierresFiltro()
+  _cierresMostrarCargando()
   await renderCierresVista()
 }
 
