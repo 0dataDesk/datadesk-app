@@ -76,7 +76,7 @@ async function vistaConsumo() {
     content.innerHTML = `
       <div class="vista-header">
         <h2>🧮 Consumo</h2>
-        <button class="btn-accion btn-aprobar" onclick="abrirModalGenerarConsumo()">Generar consumo teórico</button>
+        <button id="btn-generar-consumo" class="btn-accion btn-aprobar" onclick="abrirModalGenerarConsumo()">Generar consumo teórico</button>
       </div>
 
       <div id="consumo-controles">
@@ -201,14 +201,16 @@ async function cargarConsumoData() {
   const idsProducto = [...new Set(filas.map(f => f.id_producto))]
   const { data: productos } = await window._db
     .from('productos')
-    .select('id_producto, producto, grupo')
+    .select('id_producto, producto, grupo, unidad_medida')
     .eq('tenant_id', tenant_id)
     .in('id_producto', idsProducto)
   const nombreMap = {}
   const grupoMap  = {}
+  const unidadMap = {}
   ;(productos || []).forEach(p => {
     nombreMap[p.id_producto] = p.producto
     grupoMap[p.id_producto]  = p.grupo || 'Sin grupo'
+    unidadMap[p.id_producto] = p.unidad_medida || ''
   })
 
   const porDia = {}
@@ -222,6 +224,7 @@ async function cargarConsumoData() {
         id_producto: idp,
         nombre: nombreMap[idp] || idp,
         grupo:  grupoMap[idp] || 'Sin grupo',
+        unidad: unidadMap[idp] || '',
         cantidad: 0,
         subtotal: 0
       }
@@ -369,6 +372,8 @@ function verDetalleConsumoDia(fecha) {
   window._consumoDiaSel = fecha
   controles.style.display   = 'none'
   detalleWrap.style.display = ''
+  const btnGenerar = document.getElementById('btn-generar-consumo')
+  if (btnGenerar) btnGenerar.style.display = 'none'
 
   const dia = (window._consumoDiasData || []).find(d => d.fecha === fecha)
   if (!dia) {
@@ -412,13 +417,14 @@ function verDetalleConsumoDia(fecha) {
         <div class="ic-grupo-body" style="display:none">
           <table class="tabla" style="margin:0;border-radius:0;border-top:1px solid var(--color-border)">
             <thead>
-              <tr><th>Producto</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Costo unitario</th><th style="text-align:right">Subtotal</th></tr>
+              <tr><th>Producto</th><th style="text-align:right">Cantidad</th><th>Unidad</th><th style="text-align:right">Costo unitario</th><th style="text-align:right">Subtotal</th></tr>
             </thead>
             <tbody>
               ${prods.map(p => `
                 <tr>
                   <td>${p.nombre}</td>
-                  <td style="text-align:right">${formatNum(p.cantidad)}</td>
+                  <td style="text-align:right">${formatInt(p.cantidad)}</td>
+                  <td style="color:var(--color-text-muted)">${p.unidad}</td>
                   <td style="text-align:right">$${formatNum(p.costoUnitario)}</td>
                   <td style="text-align:right;font-weight:600">$${formatNum(p.subtotal)}</td>
                 </tr>`).join('')}
@@ -460,5 +466,7 @@ function volverDeConsumoDetalle() {
   const detalleWrap = document.getElementById('consumo-detalle-wrap')
   if (controles)   controles.style.display   = ''
   if (detalleWrap) { detalleWrap.style.display = 'none'; detalleWrap.innerHTML = '' }
+  const btnGenerar = document.getElementById('btn-generar-consumo')
+  if (btnGenerar) btnGenerar.style.display = ''
   window._consumoDiaSel = null
 }
