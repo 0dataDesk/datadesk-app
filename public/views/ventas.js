@@ -109,7 +109,7 @@ async function renderVentas(container, tenantId) {
   let html = `
     <div class="vista-header">
       <h2>🧾 Ventas</h2>
-      ${mostrarCierre ? `<button class="btn-accion" style="background:var(--color-accent);color:#fff;border:none" onclick="mostrarCierreCaja('${tenantId}')">Cierre de caja</button>` : ''}
+      ${mostrarCierre ? `<button id="btn-abrir-cierre" class="btn-accion" style="background:var(--color-accent);color:#fff;border:none;${window._cierrePanelAbierto ? 'display:none' : ''}" onclick="mostrarCierreCaja('${tenantId}')">Cierre de caja</button>` : ''}
     </div>
     <div id="ventas-cabecero-metricas">
     <div class="card-surface" style="padding:20px;margin-bottom:18px">
@@ -307,16 +307,24 @@ function rangoDiaMexico(fecha) {
   }
 }
 
-async function mostrarCierreCaja(tenantId) {
+function cerrarPanelCierre() {
   const panel = document.getElementById('cierre-panel')
+  if (panel) panel.remove()
+  window._cierrePanelAbierto = false
   const listaWrap = document.getElementById('lista-ventas-wrap')
-  if (panel) {
-    panel.remove()
-    if (listaWrap) listaWrap.style.display = ''
-    const cabeceroMetricas = document.getElementById('ventas-cabecero-metricas')
-    if (cabeceroMetricas) cabeceroMetricas.style.display = ''
-    return
-  }
+  if (listaWrap) listaWrap.style.display = ''
+  const cabeceroMetricas = document.getElementById('ventas-cabecero-metricas')
+  if (cabeceroMetricas) cabeceroMetricas.style.display = ''
+  const btnTop = document.getElementById('btn-abrir-cierre')
+  if (btnTop) btnTop.style.display = ''
+}
+
+async function mostrarCierreCaja(tenantId) {
+  if (document.getElementById('cierre-panel')) { cerrarPanelCierre(); return }
+
+  window._cierrePanelAbierto = true
+  const btnTop = document.getElementById('btn-abrir-cierre')
+  if (btnTop) btnTop.style.display = 'none'
 
   const container = document.getElementById('content')
   const header = container.querySelector('.vista-header')
@@ -327,8 +335,8 @@ async function mostrarCierreCaja(tenantId) {
   panelDiv.style.marginBottom = '18px'
   panelDiv.innerHTML = `
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px">
-      <strong style="font-size:15px">Cierre de caja</strong>
-      <span id="cierre-fecha-titulo" style="font-size:14px;color:var(--color-text-muted)"></span>
+      <button class="btn-accion" style="border:1px solid var(--color-border)" onclick="cerrarPanelCierre()">← Volver</button>
+      <h3 id="cierre-fecha-titulo" style="margin:0;font-size:16px"></h3>
       <button class="btn-accion" id="cierre-cerrar-btn" style="display:none;background:var(--color-primary);color:#fff;border:none;margin-left:auto"
         onclick="confirmarCierreDia(window._cierreFecha, '${tenantId}')">Cerrar día</button>
     </div>
@@ -340,6 +348,7 @@ async function mostrarCierreCaja(tenantId) {
     container.appendChild(panelDiv)
   }
 
+  const listaWrap = document.getElementById('lista-ventas-wrap')
   if (listaWrap) listaWrap.style.display = 'none'
   const cabeceroMetricas = document.getElementById('ventas-cabecero-metricas')
   if (cabeceroMetricas) cabeceroMetricas.style.display = 'none'
@@ -370,7 +379,7 @@ async function mostrarCierreCaja(tenantId) {
   window._cierreFecha = fecha
 
   const tituloEl = document.getElementById('cierre-fecha-titulo')
-  if (tituloEl) tituloEl.textContent = `Cerrando: ${fecha.slice(8,10)}/${fecha.slice(5,7)}/${fecha.slice(0,4)}`
+  if (tituloEl) tituloEl.textContent = `${fecha.slice(8,10)}/${fecha.slice(5,7)}/${fecha.slice(0,4)}`
 
   const { data: ventasDia, error } = await window._db
     .from('ventas')
@@ -465,11 +474,11 @@ async function mostrarCierreCaja(tenantId) {
         <thead>
           <tr>
             <th>Método de pago</th>
-            <th style="text-align:right">Cant. tk</th>
-            <th style="text-align:right">VT</th>
-            <th style="text-align:right">Desc</th>
-            <th style="text-align:right">Prop</th>
-            <th style="text-align:right">Tot</th>
+            <th style="text-align:right">Tickets</th>
+            <th style="text-align:right">Venta neta</th>
+            <th style="text-align:right">Descuento</th>
+            <th style="text-align:right">Propina</th>
+            <th style="text-align:right">Total</th>
           </tr>
         </thead>
         <tbody>
