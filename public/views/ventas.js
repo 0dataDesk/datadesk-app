@@ -109,7 +109,7 @@ async function renderVentas(container, tenantId) {
   let html = `
     <div class="vista-header">
       <h2>🧾 Ventas</h2>
-      ${mostrarCierre ? `<button class="btn-accion" onclick="mostrarCierreCaja('${tenantId}')">Cierre de caja</button>` : ''}
+      ${mostrarCierre ? `<button class="btn-accion" style="background:var(--color-accent);color:#fff;border:none" onclick="mostrarCierreCaja('${tenantId}')">Cierre de caja</button>` : ''}
     </div>
     <div id="ventas-cabecero-metricas">
     <div class="card-surface" style="padding:20px;margin-bottom:18px">
@@ -318,23 +318,19 @@ async function mostrarCierreCaja(tenantId) {
     return
   }
 
-  const hoy = new Date().toISOString().split('T')[0]
   const container = document.getElementById('content')
   const header = container.querySelector('.vista-header')
   const panelDiv = document.createElement('div')
   panelDiv.id = 'cierre-panel'
-  panelDiv.className = 'receta-card'
+  panelDiv.className = 'card-surface'
+  panelDiv.style.padding = '24px'
   panelDiv.style.marginBottom = '18px'
   panelDiv.innerHTML = `
-    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px">
       <strong style="font-size:15px">Cierre de caja</strong>
-      <input type="date" id="cierre-fecha" value="${hoy}" style="border:1px solid var(--color-border);background:var(--color-bg-card);color:var(--color-text);border-radius:6px;padding:4px 10px">
-      <button class="btn-accion btn-aprobar" id="cierre-export-btn" style="display:none"
-        onclick="exportarCierreExcel(document.getElementById('cierre-fecha').value, window._cierreVentas)">Exportar Excel</button>
-      <button class="btn-accion" id="cierre-pdf-btn" style="display:none;border:1px solid var(--color-border)"
-        onclick="exportarVentasPDF()">Exportar PDF</button>
-      <button class="btn-accion" id="cierre-cerrar-btn" style="display:none;background:var(--color-primary);color:#fff;border:none"
-        onclick="confirmarCierreDia(document.getElementById('cierre-fecha').value, '${tenantId}')">Cerrar día</button>
+      <span id="cierre-fecha-titulo" style="font-size:14px;color:var(--color-text-muted)"></span>
+      <button class="btn-accion" id="cierre-cerrar-btn" style="display:none;background:var(--color-primary);color:#fff;border:none;margin-left:auto"
+        onclick="confirmarCierreDia(window._cierreFecha, '${tenantId}')">Cerrar día</button>
     </div>
     <div id="cierre-resultado"></div>
   `
@@ -348,114 +344,214 @@ async function mostrarCierreCaja(tenantId) {
   const cabeceroMetricas = document.getElementById('ventas-cabecero-metricas')
   if (cabeceroMetricas) cabeceroMetricas.style.display = 'none'
 
-  const cargarCierre = async (fecha) => {
-    const resultado = document.getElementById('cierre-resultado')
-    resultado.innerHTML = `<p style="color:var(--color-text-muted)">Cargando...</p>`
-    document.getElementById('cierre-export-btn').style.display = 'none'
-    document.getElementById('cierre-pdf-btn').style.display = 'none'
-    document.getElementById('cierre-cerrar-btn').style.display = 'none'
+  const resultado = document.getElementById('cierre-resultado')
+  resultado.innerHTML = `<p style="color:var(--color-text-muted)">Buscando ventas pendientes de cierre...</p>`
 
-    const { data: ventasDia, error } = await window._db
-      .from('ventas')
-      .select('folio, metodo_pago, total, monto_efectivo, monto_tarjeta, propina, subtotal, descuento_porcentaje, estado, created_at, pagos_detalle')
+  // La fecha ya no se elige a mano: se detecta sola (el día más antiguo con ventas
+  // cerradas sin cierre). Esto evita cerrar un día equivocado por accidente.
+  const { data: pendiente, error: errP } = await window._db
+    .from('ventas')
+    .select('created_at')
+    .eq('tenant_id', tenantId)
+    .eq('estado', 'cerrada')
+    .is('id_cierre', null)
+    .order('created_at', { ascending: true })
+    .limit(1)
+
+  if (errP) { resultado.innerHTML = `<p style="color:var(--color-highlight)">Error: ${errP.message}</p>`; return }
+  if (!pendiente || !pendiente.length) {
+    resultado.innerHTML = `<p style="color:var(--color-text-muted)">No hay ventas cerradas pendientes de cierre.</p>`
+    return
+  }
+
+  // Fecha local (México, UTC-6) del primer pendiente
+  const fechaLocalMs = new Date(pendiente[0].created_at).getTime() - 6 * 3600 * 1000
+  const fecha = new Date(fechaLocalMs).toISOString().split('T')[0]
+  window._cierreFecha = fecha
+
+  const tituloEl = document.getElementById('cierre-fecha-titulo')
+  if (tituloEl) tituloEl.textContent = `Cerrando: ${fecha.slice(8,10)}/${fecha.slice(5,7)}/${fecha.slice(0,4)}`
+
+  const { data: ventasDia, error } = await window._db
+    .from('ventas')
+    .select('id, folio, metodo_pago, total, monto_efectivo, monto_tarjeta, propina, subtotal, descuento_porcentaje, estado, created_at, pagos_detalle')
+    .eq('tenant_id', tenantId)
+    .eq('estado', 'cerrada')
+    .is('id_cierre', null)
+    .gte('created_at', rangoDiaMexico(fecha).inicio)
+    .lt('created_at', rangoDiaMexico(fecha).fin)
+    .order('created_at')
+
+  if (error) { resultado.innerHTML = `<p style="color:var(--color-highlight)">Error: ${error.message}</p>`; return }
+  if (!ventasDia || !ventasDia.length) {
+    resultado.innerHTML = `<p style="color:var(--color-text-muted)">Sin ventas cerradas pendientes para ${fecha}.</p>`
+    return
+  }
+
+  window._cierreVentas = ventasDia
+
+  // Items por venta, para el detalle expandible (mismo patrón visual que Cierres)
+  const ids = ventasDia.map(v => v.id)
+  const itemsPorVenta = {}
+  if (ids.length > 0) {
+    const { data: items } = await window._db
+      .from('venta_items')
+      .select('id_venta, nombre, cantidad, importe, modificadores')
       .eq('tenant_id', tenantId)
-      .eq('estado', 'cerrada')
-      .is('id_cierre', null)
-      .gte('created_at', rangoDiaMexico(fecha).inicio)
-      .lt('created_at', rangoDiaMexico(fecha).fin)
-      .order('created_at')
+      .in('id_venta', ids)
+    ;(items || []).forEach(it => {
+      if (!itemsPorVenta[it.id_venta]) itemsPorVenta[it.id_venta] = []
+      itemsPorVenta[it.id_venta].push(it)
+    })
+  }
 
-    if (error) { resultado.innerHTML = `<p style="color:var(--color-highlight)">Error: ${error.message}</p>`; return }
-    if (!ventasDia || !ventasDia.length) {
-      resultado.innerHTML = `<p style="color:var(--color-text-muted)">Sin ventas cerradas pendientes para ${fecha}.</p>`
-      return
+  function fmtItemsVenta(items, venta) {
+    const lineas = items.map(it => {
+      let modsText = ''
+      if (it.modificadores) {
+        const m = it.modificadores
+        const parts = []
+        const sin = (m.ingredientes || []).filter(i => !i.on).map(i => i.nombre)
+        if (sin.length) parts.push('Sin: ' + sin.join(', '))
+        const extras = (m.extras || []).filter(e => (e.qty || 0) > 0).map(e => e.nombre)
+        if (extras.length) parts.push(extras.join(', '))
+        const salsas = (m.salsas || []).map(s => s.nombre)
+        if (salsas.length) parts.push(salsas.join(', '))
+        if (m.nota) parts.push('📝 ' + m.nota)
+        if (parts.length) modsText = `<div style="font-size:11px;color:var(--color-text-muted);margin-left:12px">${parts.join(' · ')}</div>`
+      }
+      return `<div style="padding:3px 0;font-size:13px">${it.nombre} ×${it.cantidad} — <strong>$${it.importe}</strong>${modsText}</div>`
+    }).join('')
+
+    let descFooter = ''
+    if (venta && venta.descuento_porcentaje > 0) {
+      const sub       = Number(venta.subtotal) || 0
+      const pct       = Number(venta.descuento_porcentaje)
+      const descMonto = Math.round(sub * pct) / 100
+      descFooter = `
+        <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--color-border)">
+          <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--color-text-muted)">
+            <span>Subtotal</span><span>$${formatNum(sub)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:13px;color:#3A8C3E;font-weight:600">
+            <span>Descuento (${pct}%)</span><span>-$${formatNum(descMonto)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:700;margin-top:4px">
+            <span>Total</span><span>$${formatNum(venta.total)}</span>
+          </div>
+        </div>`
     }
+    return lineas + descFooter
+  }
 
-    window._cierreVentas = ventasDia
-    window._cierreFecha  = fecha
+  const totalGeneral   = ventasDia.reduce((s, v) => s + Number(v.total), 0)
+  const propinaTotal   = ventasDia.reduce((s, v) => s + (Number(v.propina) || 0), 0)
+  const ventaNetaTotal = totalGeneral - propinaTotal
 
-    const totalGeneral = ventasDia.reduce((s, v) => s + Number(v.total), 0)
-    const porMetodo = calcularDesglosePorMetodo(ventasDia)
-    window._cierrePorMetodo = porMetodo
+  const ventasConDesc  = ventasDia.filter(v => v.descuento_porcentaje > 0)
+  const montoDescTotal = ventasConDesc.reduce((s, v) => s + Math.round((Number(v.subtotal) || 0) * (Number(v.descuento_porcentaje) || 0)) / 100, 0)
 
-    const propinaPorMetodo = ventasDia.reduce((acc, v) => {
-      const p = Number(v.propina) || 0
-      if (!p) return acc
-      const m = v.metodo_pago || 'otro'
-      if (!acc[m]) acc[m] = 0
-      acc[m] += p
-      return acc
-    }, {})
-    const propinaTotalVista = ventasDia.reduce((s, v) => s + (Number(v.propina) || 0), 0)
-    const ventaNetaTotal = totalGeneral - propinaTotalVista
-    const ticketPromedio = ventasDia.length ? ventaNetaTotal / ventasDia.length : 0
+  // Filas fijas: Efectivo, Débito, Crédito, Delivery Rappi/Uber/Didi — siempre visibles aunque estén en cero.
+  const desglose = calcularDesgloseCompletoPorMetodo(ventasDia)
+  const filasCanonicas = ['efectivo', 'debito', 'credito', 'delivery_rappi', 'delivery_uber', 'delivery_didi']
+  const extras = Object.keys(desglose).filter(k => !filasCanonicas.includes(k))
+  const filasFinal = [...filasCanonicas, ...extras]
 
-    const ventasConDesc = ventasDia.filter(v => v.descuento_porcentaje > 0)
-    const montoDescontado = ventasConDesc.reduce((s, v) => {
-      const sub = Number(v.subtotal) || 0
-      const pct = Number(v.descuento_porcentaje) || 0
-      return s + Math.round(sub * pct) / 100
-    }, 0)
-    const subtotalBruto = ventasConDesc.reduce((s, v) => s + (Number(v.subtotal) || 0), 0)
+  const fmtHora = iso => new Date(iso).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
 
-    const fmtHora = iso => new Date(iso).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
-
-    const html = `
-      <table class="tabla" style="margin-bottom:8px">
-        <thead><tr><th>Método de pago</th><th style="text-align:right">Tickets</th><th style="text-align:right">Total</th><th style="text-align:right">Propina</th><th style="text-align:right">Venta neta</th></tr></thead>
+  const html = `
+    <div style="overflow-x:auto;margin-bottom:20px">
+      <table class="tabla">
+        <thead>
+          <tr>
+            <th>Método de pago</th>
+            <th style="text-align:right">Cant. tk</th>
+            <th style="text-align:right">VT</th>
+            <th style="text-align:right">Desc</th>
+            <th style="text-align:right">Prop</th>
+            <th style="text-align:right">Tot</th>
+          </tr>
+        </thead>
         <tbody>
-          ${Object.entries(porMetodo).map(([m, d]) => {
-            const prop = propinaPorMetodo[m] || 0
-            return `<tr>
-              <td>${formatMetodoKey(m)}</td>
-              <td style="text-align:right">${d.count}</td>
-              <td style="text-align:right;font-weight:600">$${formatNum(d.suma)}</td>
-              <td style="text-align:right">${prop ? '$' + formatNum(prop) : '—'}</td>
-              <td style="text-align:right">$${formatNum(d.suma - prop)}</td>
-            </tr>`}).join('')}
-          ${ventasConDesc.length > 0 ? `
-          <tr style="border-top:1px solid var(--color-border);background:rgba(76,153,80,0.06)">
-            <td style="padding:10px 16px;color:#3A8C3E;font-weight:600">🏷 Descuentos</td>
-            <td style="text-align:right;padding:10px 16px;color:#3A8C3E">${ventasConDesc.length}</td>
-            <td style="text-align:right;padding:10px 16px;color:#3A8C3E;font-weight:600">-$${formatNum(montoDescontado)}</td>
-            <td style="text-align:right;padding:10px 16px;color:var(--color-text-muted);font-size:12px" colspan="2">s. bruto $${formatNum(subtotalBruto)}</td>
-          </tr>` : ''}
-          <tr style="border-top:2px solid var(--color-primary);font-size:15px;background:var(--color-bg)">
-            <td style="padding:14px 16px"><strong style="font-size:20px;color:var(--color-primary)">TOTAL</strong></td>
-            <td style="text-align:right;padding:14px 16px"><strong style="font-size:20px;color:var(--color-primary)">${ventasDia.length} tickets</strong></td>
-            <td style="text-align:right;padding:14px 16px"><strong style="font-size:20px;color:var(--color-primary)">$${formatNum(totalGeneral)}</strong></td>
-            <td style="text-align:right;padding:14px 16px"><strong style="font-size:20px;color:var(--color-primary)">${propinaTotalVista ? '$' + formatNum(propinaTotalVista) : '—'}</strong></td>
-            <td style="text-align:right;padding:14px 16px"><strong style="font-size:20px;color:var(--color-primary)">$${formatNum(ventaNetaTotal)}</strong></td>
+          ${filasFinal.map(m => {
+            const d = desglose[m] || { count: 0, vt: 0, desc: 0, prop: 0, tot: 0 }
+            return `
+              <tr>
+                <td>${formatMetodoKey(m)}</td>
+                <td style="text-align:right">${d.count}</td>
+                <td style="text-align:right">$${formatNum(d.vt)}</td>
+                <td style="text-align:right;${d.desc > 0 ? 'color:#3A8C3E;font-weight:600' : ''}">${d.desc > 0 ? '-$' + formatNum(d.desc) : '—'}</td>
+                <td style="text-align:right">${d.prop > 0 ? '$' + formatNum(d.prop) : '—'}</td>
+                <td style="text-align:right;font-weight:600">$${formatNum(d.tot)}</td>
+              </tr>`
+          }).join('')}
+          <tr style="border-top:2px solid var(--color-primary)">
+            <td style="padding-top:12px"><strong style="font-size:15px;color:var(--color-primary)">TOTAL</strong></td>
+            <td style="text-align:right;padding-top:12px"><strong>${ventasDia.length}</strong></td>
+            <td style="text-align:right;padding-top:12px"><strong>$${formatNum(ventaNetaTotal)}</strong></td>
+            <td style="text-align:right;padding-top:12px"><strong style="color:#3A8C3E">${montoDescTotal > 0 ? '-$' + formatNum(montoDescTotal) : '—'}</strong></td>
+            <td style="text-align:right;padding-top:12px"><strong>${propinaTotal > 0 ? '$' + formatNum(propinaTotal) : '—'}</strong></td>
+            <td style="text-align:right;padding-top:12px"><strong style="font-size:16px;color:var(--color-primary)">$${formatNum(totalGeneral)}</strong></td>
           </tr>
         </tbody>
       </table>
-      <p style="text-align:right;font-size:13px;color:var(--color-text-muted);margin:0 0 14px">
-        Ticket promedio: <strong style="color:var(--color-text)">$${formatNum(ticketPromedio)}</strong>
-      </p>
+    </div>
+    <p style="text-align:right;font-size:13px;color:var(--color-text-muted);margin:0 0 14px">
+      Ticket promedio: <strong style="color:var(--color-text)">$${formatNum(ventasDia.length ? ventaNetaTotal / ventasDia.length : 0)}</strong>
+    </p>
+
+    <div style="overflow-x:auto">
       <table class="tabla">
-        <thead><tr><th>Folio</th><th>Método</th><th style="text-align:right">Total</th><th style="text-align:right">Propina</th><th>Hora</th></tr></thead>
+        <thead>
+          <tr>
+            <th style="width:20px"></th>
+            <th>Folio</th>
+            <th>Método</th>
+            <th style="text-align:right">Total</th>
+            <th style="text-align:right">Descuento</th>
+            <th style="text-align:right">Propina</th>
+            <th>Hora</th>
+          </tr>
+        </thead>
         <tbody>
-          ${ventasDia.map(v => `
-            <tr>
+          ${ventasDia.map(v => {
+            const items     = itemsPorVenta[v.id] || []
+            const hasItems  = items.length > 0
+            const pct       = Number(v.descuento_porcentaje) || 0
+            const sub       = Number(v.subtotal) || 0
+            const descMonto = pct > 0 ? Math.round(sub * pct) / 100 : 0
+            const descCell  = pct > 0
+              ? `<span style="color:#3A8C3E;font-weight:600">-$${formatNum(descMonto)}</span><br>
+                 <span style="font-size:11px;color:var(--color-text-muted)">${pct}%</span>`
+              : '—'
+            return `
+            <tr style="cursor:${hasItems ? 'pointer' : 'default'}"
+              onclick="${hasItems ? `toggleItemsCierre('vtitems-${v.id}')` : ''}">
+              <td style="color:var(--color-text-muted);font-size:12px">${hasItems ? '▶' : ''}</td>
               <td>${v.folio || '—'}</td>
               <td>${metodoDisplay(v)}</td>
-              <td style="text-align:right">$${formatNum(v.total)}${v.descuento_porcentaje > 0 ? ` <span style="font-size:11px;color:#3A8C3E;font-weight:600">-${v.descuento_porcentaje}%</span>` : ''}</td>
+              <td style="text-align:right;font-weight:600">$${formatNum(v.total)}</td>
+              <td style="text-align:right">${descCell}</td>
               <td style="text-align:right">${v.propina ? '$' + formatNum(v.propina) : '—'}</td>
               <td style="color:var(--color-text-muted)">${fmtHora(v.created_at)}</td>
-            </tr>`).join('')}
+            </tr>
+            ${hasItems
+              ? `<tr id="vtitems-${v.id}" style="display:none">
+                   <td colspan="7" style="padding:8px 12px 12px 32px;background:var(--color-secondary)">
+                     ${fmtItemsVenta(items, v)}
+                   </td>
+                 </tr>`
+              : ''}`
+          }).join('')}
         </tbody>
       </table>
-    `
-    resultado.innerHTML = html
-    document.getElementById('cierre-export-btn').style.display = ''
-    document.getElementById('cierre-pdf-btn').style.display = ''
-    if (['superadmin','admin','gerente'].includes(window._rol)) {
-      document.getElementById('cierre-cerrar-btn').style.display = ''
-    }
-  }
+    </div>
+  `
+  resultado.innerHTML = html
 
-  document.getElementById('cierre-fecha').addEventListener('change', e => cargarCierre(e.target.value))
-  await cargarCierre(hoy)
+  if (['superadmin','admin','gerente'].includes(window._rol)) {
+    document.getElementById('cierre-cerrar-btn').style.display = ''
+  }
 }
 
 async function confirmarCierreDia(fecha, tenantId) {
@@ -508,70 +604,6 @@ async function confirmarCierreDia(fecha, tenantId) {
   alert('Día cerrado correctamente.')
   document.getElementById('cierre-panel')?.remove()
   await vistaVentas()
-}
-
-function exportarVentasPDF() {
-  const fecha     = window._cierreFecha || '—'
-  const ventas    = window._cierreVentas || []
-  const porMetodo = window._cierrePorMetodo || {}
-  const total     = ventas.reduce((s, v) => s + Number(v.total), 0)
-  const fmtHora   = iso => new Date(iso).toLocaleTimeString('es-MX')
-
-  const html = `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>Ventas ${fecha}</title>
-<style>
-  body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 13px; color: #2B1A0F; margin: 0; padding: 40px; background: #FAF7F2; }
-  .header { border-bottom: 3px solid #C8892A; padding-bottom: 16px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: flex-end; }
-  .header h1 { font-size: 22px; margin: 0; }
-  .header small { color: #9B7B6A; font-size: 12px; }
-  table { width: 100%; border-collapse: collapse; margin-bottom: 20px; background: #fff; }
-  thead th { padding: 8px 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: #9B7B6A; border-bottom: 2px solid #E8DDD5; }
-  td { padding: 8px 12px; border-bottom: 1px solid #E8DDD5; }
-  .total-row td { border-top: 2px solid #C8892A; font-weight: 700; }
-  .footer { margin-top: 30px; font-size: 11px; color: #9B7B6A; text-align: center; }
-</style></head><body>
-  <div class="header">
-    <div><h1>Resumen de Ventas — Furia</h1><small>Fecha: ${fecha}</small></div>
-    <div style="font-size:11px;color:#9B7B6A">${ventas.length} tickets</div>
-  </div>
-  <table>
-    <thead><tr><th>Método de pago</th><th style="text-align:right">Tickets</th><th style="text-align:right">Total</th></tr></thead>
-    <tbody>
-      ${Object.entries(porMetodo).map(([m, d]) => `<tr><td>${formatMetodoKey(m)}</td><td style="text-align:right">${d.count}</td><td style="text-align:right">$${formatNum(d.suma)}</td></tr>`).join('')}
-      ${(() => {
-        const desc = ventas.filter(v => v.descuento_porcentaje > 0)
-        if (!desc.length) return ''
-        const monto = desc.reduce((s, v) => s + Math.round((Number(v.subtotal)||0) * (Number(v.descuento_porcentaje)||0)) / 100, 0)
-        return `<tr style="color:#3A8C3E"><td>🏷 Descuentos</td><td style="text-align:right">${desc.length}</td><td style="text-align:right">-$${formatNum(monto)}</td></tr>`
-      })()}
-      <tr class="total-row"><td>TOTAL</td><td style="text-align:right">${ventas.length}</td><td style="text-align:right;color:#C8892A">$${formatNum(total)}</td></tr>
-    </tbody>
-  </table>
-  <table>
-    <thead><tr><th>Folio</th><th>Método</th><th style="text-align:right">Total</th><th style="text-align:right">Propina</th><th>Hora</th></tr></thead>
-    <tbody>${ventas.map(v => `<tr><td>${v.folio||'—'}</td><td>${metodoDisplay(v)}</td><td style="text-align:right">$${formatNum(v.total)}${v.descuento_porcentaje > 0 ? ` <span style="color:#3A8C3E;font-size:10px">-${v.descuento_porcentaje}%</span>` : ''}</td><td style="text-align:right">${v.propina ? '$' + formatNum(v.propina) : '—'}</td><td>${fmtHora(v.created_at)}</td></tr>`).join('')}</tbody>
-  </table>
-  <div class="footer">Documento generado por dataDesk · ${new Date().toLocaleDateString('es-MX')}</div>
-</body></html>`
-
-  const ventana = window.open('', '_blank')
-  ventana.document.write(html)
-  ventana.document.close()
-  ventana.focus()
-  setTimeout(() => ventana.print(), 500)
-}
-
-function exportarCierreExcel(fecha, ventasDia) {
-  const filas = ventasDia.map(v => ({
-    Folio: v.folio,
-    'Método de pago': metodoDisplay(v),
-    Total: Number(v.total),
-    Hora: new Date(v.created_at).toLocaleTimeString('es-MX')
-  }))
-  const ws = XLSX.utils.json_to_sheet(filas)
-  const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, ws, 'Cierre')
-  XLSX.writeFile(wb, `cierre_caja_${window._tenantActivo || 'tenant'}_${fecha}.xlsx`)
 }
 
 async function eliminarVenta(id, folio, tenantId) {
