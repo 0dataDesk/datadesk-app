@@ -225,6 +225,88 @@ async function _recCalcularCostosPromedio(tenant_id, idsProducto) {
   return resultado
 }
 
+async function _recBuscarIdReceta(tenant_id, idProducto, nombreProducto) {
+  // 1) misma id (convención correcta: subreceta vive como receta y producto con el mismo id)
+  const { data: directa } = await window._db
+    .from('catalogo_recetas').select('id_receta')
+    .eq('tenant_id', tenant_id).eq('activo', true).eq('id_receta', idProducto).limit(1)
+  if (directa && directa.length) return directa[0].id_receta
+
+  // 2) contraparte RSA-/RSR- con el mismo número (ej. RSR-006 <-> RSA-006)
+  const m = idProducto.match(/^(RSR|RSA)-(\d+)$/)
+  if (m) {
+    const otroPrefijo = m[1] === 'RSR' ? 'RSA' : 'RSR'
+    const candidato = otroPrefijo + '-' + m[2]
+    const { data: porNumero } = await window._db
+      .from('catalogo_recetas').select('id_receta')
+      .eq('tenant_id', tenant_id).eq('activo', true).eq('id_receta', candidato).limit(1)
+    if (porNumero && porNumero.length) return porNumero[0].id_receta
+  }
+
+  // 3) por nombre exacto (ej. "House Ranch" receta <-> "house ranch" producto)
+  if (nombreProducto) {
+    const { data: porNombre } = await window._db
+      .from('catalogo_recetas').select('id_receta')
+      .eq('tenant_id', tenant_id).eq('activo', true).ilike('nombre_platillo', nombreProducto).limit(1)
+    if (porNombre && porNombre.length) return porNombre[0].id_receta
+  }
+
+  return null
+}
+
+async function _recResolverCostoUnitario(tenant_id, idProducto, nombreProducto, visitados, cache) {
+  if (cache[idProducto] !== undefined) return cache[idProducto]
+  if (visitados.has(idProducto)) { cache[idProducto] = null; return null } // ciclo, no seguir
+
+  visitados.add(idProducto)
+
+  // Costo real por compras (recepciones), siempre tiene prioridad si existe
+  const costosDirectos = await _recCalcularCostosPromedio(tenant_id, [idProducto])
+  if (costosDirectos[idProducto]) {
+    const r = { promedio: costosDirectos[idProducto].promedio, derivado: false }
+    cache[idProducto] = r
+    return r
+  }
+
+  // Sin compras: ¿es una subreceta con receta propia? (mismo id, RSA/RSR, o por nombre)
+  const idReceta = await _recBuscarIdReceta(tenant_id, idProducto, nombreProducto)
+  if (!idReceta) { cache[idProducto] = null; return null }
+
+  const { data: subIngredientes } = await window._db
+    .from('receta_ingredientes')
+    .select('id_producto, producto, cantidad')
+    .eq('tenant_id', tenant_id)
+    .eq('id_receta', idReceta)
+    .neq('activo', false)
+
+  if (!subIngredientes || !subIngredientes.length) { cache[idProducto] = null; return null }
+
+  let sumaCosto = 0, sumaCantidad = 0, completo = true
+  for (const sub of subIngredientes) {
+    const cant = Number(sub.cantidad) || 0
+    sumaCantidad += cant
+    if (!sub.id_producto) { completo = false; continue }
+    const c = await _recResolverCostoUnitario(tenant_id, sub.id_producto, sub.producto, visitados, cache)
+    if (c) sumaCosto += cant * c.promedio
+    else   completo = false
+  }
+
+  const resultado = (completo && sumaCantidad > 0) ? { promedio: sumaCosto / sumaCantidad, derivado: true } : null
+  cache[idProducto] = resultado
+  return resultado
+}
+
+async function _recResolverCostosIngredientes(tenant_id, ingredientes) {
+  const cache = {}
+  const resultado = {}
+  for (const ing of ingredientes) {
+    if (!ing.id_producto) continue
+    const c = await _recResolverCostoUnitario(tenant_id, ing.id_producto, ing.producto, new Set(), cache)
+    if (c) resultado[ing.id_producto] = c
+  }
+  return resultado
+}
+
 async function cargarDetalleReceta(receta) {
   const wrap = document.getElementById('receta-detalle-wrap')
   wrap.innerHTML = `<p style="color:var(--color-text-muted);margin-top:24px">Cargando receta...</p>`
@@ -271,8 +353,7 @@ async function cargarDetalleReceta(receta) {
     let costoTotalReceta = 0
     let ingredientesSinCosto = 0
     if (window._recPuedeVerCosteo && !esReventaCosteo && (ingredientes || []).length) {
-      const idsIngredientes = [...new Set((ingredientes || []).map(i => i.id_producto).filter(Boolean))]
-      costosPromedio = await _recCalcularCostosPromedio(tenant_id, idsIngredientes)
+      costosPromedio = await _recResolverCostosIngredientes(tenant_id, ingredientes || [])
       ;(ingredientes || []).forEach(i => {
         const c = costosPromedio[i.id_producto]
         if (c && i.cantidad != null) {
@@ -293,41 +374,54 @@ async function cargarDetalleReceta(receta) {
               <th>Cantidad</th>
               <th>Unidad</th>
               <th>Nota</th>
-              ${window._recPuedeVerCosteo && !esReventaCosteo ? `
-              <th style="text-align:right">Costo/unidad (prom. 30d)</th>
-              <th style="text-align:right">Variación</th>
-              <th style="text-align:right">Subtotal</th>` : ''}
             </tr>
           </thead>
           <tbody>
-            ${(ingredientes || []).map(i => {
-              const c = costosPromedio[i.id_producto]
-              const subtotal = c && i.cantidad != null ? Number(i.cantidad) * c.promedio : null
-              return `
+            ${(ingredientes || []).map(i => `
               <tr>
                 <td>${i.producto || ''}</td>
                 <td>${i.cantidad != null ? i.cantidad : ''}</td>
                 <td style="color:var(--color-text-muted)">${unidadPorProducto[i.id_producto] || ''}</td>
                 <td style="color:var(--color-text-muted);font-size:12px">${i.notas_ingrediente || ''}</td>
-                ${window._recPuedeVerCosteo && !esReventaCosteo ? `
-                <td style="text-align:right">${c ? '$' + formatNum(c.promedio) : '<span style="color:var(--color-text-muted)">—</span>'}</td>
-                <td style="text-align:right${c && c.variacion > 15 ? ';color:#B85C2A;font-weight:600' : ''}">${c ? formatNum(c.variacion, 0) + '%' : '—'}</td>
-                <td style="text-align:right;font-weight:600">${subtotal != null ? '$' + formatNum(subtotal) : '—'}</td>` : ''}
-              </tr>`}).join('')}
+              </tr>`).join('')}
           </tbody>
-          ${window._recPuedeVerCosteo && !esReventaCosteo ? `
-          <tfoot>
-            <tr>
-              <td colspan="6" style="text-align:right;font-weight:700;border-top:2px solid var(--color-border);padding-top:10px">Costo total de la receta</td>
-              <td style="text-align:right;font-weight:700;color:var(--color-primary);border-top:2px solid var(--color-border);padding-top:10px">$${formatNum(costoTotalReceta)}</td>
-            </tr>
-          </tfoot>` : ''}
         </table>
-        ${window._recPuedeVerCosteo && !esReventaCosteo && ingredientesSinCosto > 0 ? `
-        <p style="font-size:11px;color:var(--color-text-muted);margin-top:6px">
-          * ${ingredientesSinCosto} insumo${ingredientesSinCosto !== 1 ? 's' : ''} sin recepciones en los últimos 30 días — no se incluye en el total.
-        </p>` : ''}
       </div>`
+
+    // ── Costeo: recuadro aparte (solo superadmin / Ramiro) ───────────────
+    const htmlCosteo = (window._recPuedeVerCosteo && !esReventaCosteo && (ingredientes || []).length) ? `
+      <div style="background:var(--color-secondary);border-radius:10px;padding:16px;margin-top:16px">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--color-text-muted);margin-bottom:10px">
+          Costeo (prom. compras 30 días)
+        </div>
+        <table class="tabla" style="background:transparent">
+          <thead>
+            <tr><th>Ingrediente</th><th style="text-align:right">Costo/unidad</th></tr>
+          </thead>
+          <tbody>
+            ${(ingredientes || []).map(i => {
+              const c = costosPromedio[i.id_producto]
+              return `
+              <tr>
+                <td>${i.producto || ''}${c && c.derivado ? ' <span style="font-size:10px;color:var(--color-text-muted)">(subreceta)</span>' : ''}</td>
+                <td style="text-align:right">
+                  ${c
+                    ? `<span style="padding:2px 10px;border-radius:12px;background:var(--color-card);font-weight:600">$${formatNum(c.promedio)}</span>`
+                    : `<span style="color:var(--color-text-muted)">—</span>`}
+                </td>
+              </tr>`
+            }).join('')}
+          </tbody>
+        </table>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:14px;border-top:1.5px solid var(--color-border)">
+          <span style="font-weight:700">Costo total de la receta</span>
+          <span style="font-family:'Bebas Neue',sans-serif;font-size:26px;color:var(--color-primary)">$${formatNum(costoTotalReceta)}</span>
+        </div>
+        ${ingredientesSinCosto > 0 ? `
+        <p style="font-size:11px;color:var(--color-text-muted);margin-top:8px">
+          * ${ingredientesSinCosto} insumo${ingredientesSinCosto !== 1 ? 's' : ''} sin costo disponible (sin recepciones recientes, o subreceta sin receta capturada) — no se incluye en el total.
+        </p>` : ''}
+      </div>` : ''
 
     // ── Procedimiento agrupado por sección ───────────────────────────────
     const steps = pasos || []
@@ -440,6 +534,7 @@ async function cargarDetalleReceta(receta) {
             <div>
               <h4>Ingredientes</h4>
               ${htmlIngredientes}
+              ${htmlCosteo}
             </div>
             <div>
               <h4>Procedimiento</h4>
