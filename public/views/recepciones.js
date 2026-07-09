@@ -495,7 +495,7 @@ async function mostrarFormRecepcion() {
 
       <div style="display:flex;gap:10px;margin-top:20px">
         <button class="btn-accion btn-aprobar" onclick="guardarRecepcion()">Guardar recepción</button>
-        <button class="btn-accion" style="border:1px solid var(--color-border)"
+        <button class="btn-accion" style="border:1px solid var(--color-border);background:var(--color-secondary)"
           onclick="document.getElementById('form-recepcion-wrap').innerHTML=''">Cancelar</button>
       </div>
     </div>
@@ -896,7 +896,7 @@ async function verDetalleRecepcion(id) {
       ${totalesHtml}
 
       <div style="margin-top:16px">
-        <button class="btn-accion" style="border:1px solid var(--color-border)"
+        <button class="btn-accion" style="border:1px solid var(--color-border);background:var(--color-secondary)"
           onclick="
             const c=document.getElementById('recepciones-controles');
             if(c) c.style.display='';

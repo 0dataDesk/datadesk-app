@@ -119,7 +119,7 @@ function abrirModalGenerarConsumo() {
       </div>
       <div id="consumo-modal-resultado" style="font-size:13px;margin-bottom:12px"></div>
       <div style="display:flex;justify-content:flex-end;gap:8px">
-        <button class="btn-accion" style="border:1px solid var(--color-border)" onclick="cerrarModalGenerarConsumo()">Cancelar</button>
+        <button class="btn-accion" style="border:1px solid var(--color-border);background:var(--color-secondary)" onclick="cerrarModalGenerarConsumo()">Cancelar</button>
         <button id="consumo-modal-confirmar" class="btn-accion btn-aprobar" onclick="confirmarGenerarConsumo()">Generar</button>
       </div>
     </div>
@@ -444,7 +444,7 @@ function verDetalleConsumoDia(fecha) {
     </style>
     <div class="card-surface" style="padding:24px;margin-top:16px">
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
-        <button class="btn-accion" style="border:1px solid var(--color-border)" onclick="volverDeConsumoDetalle()">← Volver</button>
+        <button class="btn-accion" style="border:1px solid var(--color-border);background:var(--color-secondary)" onclick="volverDeConsumoDetalle()">← Volver</button>
         <h3 style="margin:0">Consumo — ${fecha}</h3>
       </div>
 

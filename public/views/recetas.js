@@ -682,7 +682,7 @@ async function cargarDetalleReceta(receta) {
         ${window._recPuedeEditar ? `
           <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
             <input type="file" accept="image/*" id="receta-foto-input-${receta.id_receta}" style="display:none" onchange="subirFotoReceta('${receta.id_receta}', this)">
-            <button class="btn-accion" style="border:1px solid var(--color-border)" onclick="document.getElementById('receta-foto-input-${receta.id_receta}').click()">
+            <button class="btn-accion" style="border:1px solid var(--color-border);background:var(--color-secondary)" onclick="document.getElementById('receta-foto-input-${receta.id_receta}').click()">
               ${fotoUrl ? 'Cambiar foto' : '📷 Subir foto'}
             </button>
             <span id="receta-foto-msg-${receta.id_receta}" style="font-size:12px;color:#3A8C3E"></span>

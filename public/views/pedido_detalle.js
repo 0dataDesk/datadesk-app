@@ -78,7 +78,7 @@ async function vistaPedidoDetalle(id_pedido) {
         <select class="filtro-select" style="font-size:12px"
           onchange="cambiarStatusPedido('${id_pedido}', this.value)">${statusOpciones}</select>
         <button class="btn-accion btn-aprobar" onclick="exportarPedidoPDF('${id_pedido}')">Exportar PDF</button>
-        <button class="btn-accion" style="border:1px solid var(--color-border)" onclick="vistaPedidos()">← Volver</button>
+        <button class="btn-accion" style="border:1px solid var(--color-border);background:var(--color-secondary)" onclick="vistaPedidos()">← Volver</button>
       </div>
     </div>
 

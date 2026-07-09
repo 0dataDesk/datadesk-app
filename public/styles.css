@@ -746,11 +746,12 @@ body {
 .rec-tile .rec-tile-sub { font-size: 12px; color: var(--color-text-muted); }
 
 .rec-volver-btn {
-  background: none;
+  background: var(--color-secondary);
   border: 1px solid var(--color-border);
   border-radius: 20px;
   padding: 6px 14px;
   font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
   color: var(--color-text);
   margin-bottom: 12px;
@@ -758,7 +759,7 @@ body {
   align-items: center;
   gap: 6px;
 }
-.rec-volver-btn:hover { border-color: var(--color-accent); }
+.rec-volver-btn:hover { border-color: var(--color-accent); background: var(--color-card); }
 
 .receta-detalle-grid {
   display: grid;

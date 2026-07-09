@@ -402,7 +402,7 @@ window.generarPedidoSugerido = async function(idProveedor, nombreProv) {
           onclick="confirmarPedidoSugerido('${idProveedor}',${JSON.stringify(itemsConCantidad.map((i,idx)=>({idx,id_producto:i.id_producto,producto:i.producto,ultimo_costo:i.ultimo_costo||null}))).replace(/"/g,'&quot;')})">
           Confirmar pedido
         </button>
-        <button class="btn-accion" style="border:1px solid var(--color-border)"
+        <button class="btn-accion" style="border:1px solid var(--color-border);background:var(--color-secondary)"
           onclick="document.getElementById('sugerido-pedido-wrap').innerHTML=''">Cancelar</button>
         <span id="ped-sug-msg" style="font-size:13px;color:#3A8C3E"></span>
       </div>

@@ -674,7 +674,7 @@ async function verDetalleCierre(id_cierre, fecha) {
       <!-- Cabecera: volver + título + PDF -->
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:20px">
         <div style="display:flex;align-items:center;gap:12px">
-          <button class="btn-accion" style="border:1px solid var(--color-border)" onclick="
+          <button class="btn-accion" style="border:1px solid var(--color-border);background:var(--color-secondary)" onclick="
             document.getElementById('cierres-filtro').style.display='';
             document.getElementById('cierres-cabecero').style.display='';
             document.getElementById('cierres-lista-wrap').style.display='';

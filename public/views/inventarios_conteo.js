@@ -294,7 +294,7 @@ async function verDetalleInventario(idInventario) {
           <div>
             <h3>Conteo — ${inv.fecha}</h3>
           </div>
-          <button class="btn-accion" style="border:1px solid var(--color-border)"
+          <button class="btn-accion" style="border:1px solid var(--color-border);background:var(--color-secondary)"
             onclick="
               document.getElementById('inv-conteo-tabla-wrap').style.display='';
               document.getElementById('inv-conteo-detalle').innerHTML=''

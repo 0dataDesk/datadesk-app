@@ -335,7 +335,7 @@ async function mostrarCierreCaja(tenantId) {
   panelDiv.style.marginBottom = '18px'
   panelDiv.innerHTML = `
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px">
-      <button class="btn-accion" style="border:1px solid var(--color-border)" onclick="cerrarPanelCierre()">← Volver</button>
+      <button class="btn-accion" style="border:1px solid var(--color-border);background:var(--color-secondary)" onclick="cerrarPanelCierre()">← Volver</button>
       <h3 id="cierre-fecha-titulo" style="margin:0;font-size:16px"></h3>
       <button class="btn-accion" id="cierre-cerrar-btn" style="display:none;background:var(--color-primary);color:#fff;border:none;margin-left:auto"
         onclick="confirmarCierreDia(window._cierreFecha, '${tenantId}')">Cerrar día</button>

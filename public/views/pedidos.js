@@ -132,7 +132,7 @@ async function vistaNuevoPedido() {
   content.innerHTML = `
     <div class="vista-header">
       <h2>Nuevo Pedido — ${id_pedido}</h2>
-      <button class="btn-accion" style="border:1px solid var(--color-border)" onclick="vistaPedidos()">← Volver</button>
+      <button class="btn-accion" style="border:1px solid var(--color-border);background:var(--color-secondary)" onclick="vistaPedidos()">← Volver</button>
     </div>
 
     <div class="filtros-bar" style="margin-bottom:20px">
