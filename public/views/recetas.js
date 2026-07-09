@@ -4,7 +4,6 @@ const REC_CAT_META = {
     'Pollo':            { emoji: '🍗', color: '#C8892A' },
     'Acompañamientos':  { emoji: '🍟', color: '#4A7A3A' },
     'Bebidas':          { emoji: '🥤', color: '#3D9BA8' },
-    'Aderezos':         { emoji: '🥫', color: '#8A5FB0' },
     'Subrecetas':       { emoji: '⚗️', color: '#6A9BB5' }
   },
   tita: {
@@ -27,8 +26,39 @@ const REC_CAT_META = {
 }
 const REC_CAT_DEFAULT = { emoji: '📦', color: '#9B7B6A' }
 
+// Nombre a mostrar de una categoría (distinto del valor guardado en BD, cuando aplica)
+const REC_CAT_LABEL = {
+  furia: { 'Hamburguesas': 'Hamburguesas de Res' }
+}
+
+// Bloques de navegación (nivel superior a categoría). Tenants sin bloques definidos
+// arrancan directo en categorías (comportamiento anterior).
+const REC_BLOQUES = {
+  furia: {
+    'Carta':      { emoji: '📋', categorias: ['Hamburguesas', 'Pollo', 'Acompañamientos'] },
+    'Producción': { emoji: '🏭', categorias: ['Bebidas', 'Subrecetas'] }
+  }
+}
+
+// Subcategorías dentro de "Subrecetas" (por ahora solo furia)
+const REC_SUBCAT_META = {
+  'Aderezos y Salsas': { emoji: '🥫' },
+  'Complementos':      { emoji: '🧩' }
+}
+
+// Tiles compuestas: una sola tarjeta con 2 botones que abren cada uno su propia receta
+const REC_PARES = {
+  'RAC-004': { par: 'RAC-007', titulo: 'Papas',   labelA: 'Clásicas', labelB: 'Chicas' },
+  'RHB-011': { par: 'RAC-008', titulo: 'Tenders', labelA: 'Normal',   labelB: 'Chicos' }
+}
+const REC_PARES_SECUNDARIOS = new Set(Object.values(REC_PARES).map(p => p.par))
+
 function _recCatMeta(tenant, categoria) {
   return (REC_CAT_META[tenant] || {})[categoria] || REC_CAT_DEFAULT
+}
+
+function _recCatLabel(tenant, categoria) {
+  return (REC_CAT_LABEL[tenant] || {})[categoria] || categoria
 }
 
 function indicePrioridad(tenant, categoria) {
@@ -63,9 +93,13 @@ async function vistaRecetas() {
     window._recPuedeEditar   = ['admin', 'editor', 'cocina'].includes(rol)
     window._recPuedeVerCosteo = rol === 'superadmin' || window._email === 'rafepa1978@gmail.com'
 
-    window._recNivel         = 'categoria'
+    const tieneBloques = !!REC_BLOQUES[tenantActual]
+
+    window._recNivel         = tieneBloques ? 'bloque' : 'categoria'
     window._recFuenteSel     = ''
+    window._recBloqueSel     = null
     window._recCategoriaSel  = null
+    window._recSubcategoriaSel = null
     window._recRecetaSel     = null
 
     content.innerHTML = `
@@ -95,18 +129,57 @@ function _recRecetasFiltradas() {
 function renderRecetasNivel() {
   const wrap = document.getElementById('rec-nivel-wrap')
   if (!wrap) return
-  if (window._recNivel === 'platillo') return renderRecPlatillos(wrap)
-  if (window._recNivel === 'detalle')  return renderRecDetalleNivel(wrap)
+  if (window._recNivel === 'bloque')       return renderRecBloques(wrap)
+  if (window._recNivel === 'subcategoria') return renderRecSubcategorias(wrap)
+  if (window._recNivel === 'platillo')     return renderRecPlatillos(wrap)
+  if (window._recNivel === 'detalle')      return renderRecDetalleNivel(wrap)
   renderRecCategorias(wrap)
 }
 
+function _recTileEmojiArriba(emoji, titulo, subtitulo, colorBorde, onclick, destacado) {
+  return `
+    <button class="rec-tile" style="border-left:4px solid ${colorBorde};text-align:center;position:relative" onclick="${onclick}">
+      ${destacado ? '<span style="position:absolute;top:6px;right:8px;font-size:14px">⭐</span>' : ''}
+      <div style="font-size:26px;margin-bottom:6px">${emoji}</div>
+      <div class="rec-tile-titulo">${titulo}</div>
+      ${subtitulo ? `<div class="rec-tile-sub">${subtitulo}</div>` : ''}
+    </button>`
+}
+
+// ── Nivel 1: Bloques (Carta / Producción) ────────────────────────────────────
+function renderRecBloques(wrap) {
+  const bloques = REC_BLOQUES[window._recTenantActual] || {}
+  const recetasVisibles = _recRecetasFiltradas()
+
+  wrap.innerHTML = `
+    <div class="rec-tiles-grid">
+      ${Object.entries(bloques).map(([nombreBloque, info]) => {
+        const count = recetasVisibles.filter(r => info.categorias.includes(r.categoria)).length
+        return _recTileEmojiArriba(
+          info.emoji, nombreBloque, `${count} platillo${count === 1 ? '' : 's'}`,
+          'var(--color-border)', `recIrCategoriasDeBloque('${nombreBloque.replace(/'/g,"\\'")}')`
+        )
+      }).join('')}
+    </div>`
+}
+
+window.recIrCategoriasDeBloque = function(bloque) {
+  window._recNivel = 'categoria'
+  window._recBloqueSel = bloque
+  window._recCategoriaSel = null
+  renderRecetasNivel()
+}
+
+// ── Nivel 2: Categorías ───────────────────────────────────────────────────────
 function renderRecCategorias(wrap) {
   const fuentesDef = FUENTES_POR_TENANT[window._recTenantActual] || []
   const recetasVisibles = _recRecetasFiltradas()
+  const bloqueInfo = window._recBloqueSel ? (REC_BLOQUES[window._recTenantActual] || {})[window._recBloqueSel] : null
 
   const porCategoria = {}
   recetasVisibles.forEach(r => {
     const c = r.categoria || 'Sin categoría'
+    if (bloqueInfo && !bloqueInfo.categorias.includes(c)) return
     if (!porCategoria[c]) porCategoria[c] = []
     porCategoria[c].push(r)
   })
@@ -115,6 +188,7 @@ function renderRecCategorias(wrap) {
   )
 
   wrap.innerHTML = `
+    ${window._recBloqueSel ? `<button class="rec-volver-btn" onclick="recIrBloques()">← ${window._recBloqueSel}</button>` : ''}
     ${fuentesDef.length > 1 ? `
     <div class="filtros-bar" style="margin-bottom:16px">
       <select id="rec-f-fuente" class="filtro-select">
@@ -126,11 +200,11 @@ function renderRecCategorias(wrap) {
     <div class="rec-tiles-grid">
       ${categorias.map(c => {
         const meta = _recCatMeta(window._recTenantActual, c)
-        return `
-        <button class="rec-tile" style="border-left:4px solid ${meta.color}" onclick="recIrPlatillos('${c.replace(/'/g,"\\'")}')">
-          <div class="rec-tile-titulo">${meta.emoji} ${c}</div>
-          <div class="rec-tile-sub">${porCategoria[c].length} platillo${porCategoria[c].length === 1 ? '' : 's'}</div>
-        </button>`
+        const label = _recCatLabel(window._recTenantActual, c)
+        return _recTileEmojiArriba(
+          meta.emoji, label, `${porCategoria[c].length} platillo${porCategoria[c].length === 1 ? '' : 's'}`,
+          meta.color, `recIrPlatillos('${c.replace(/'/g,"\\'")}')`
+        )
       }).join('')}
     </div>` : `<p style="color:var(--color-text-muted);font-size:13px">No hay recetas para mostrar.</p>`}
   `
@@ -142,46 +216,134 @@ function renderRecCategorias(wrap) {
   })
 }
 
+window.recIrBloques = function() {
+  window._recNivel = 'bloque'
+  window._recBloqueSel = null
+  window._recCategoriaSel = null
+  renderRecetasNivel()
+}
+
+// ── Nivel 3 (solo Subrecetas): Subcategorías ─────────────────────────────────
+function renderRecSubcategorias(wrap) {
+  const categoria = window._recCategoriaSel
+  const meta = _recCatMeta(window._recTenantActual, categoria)
+  const recetas = _recRecetasFiltradas().filter(r => (r.categoria || '') === categoria)
+
+  const porSubcat = {}
+  recetas.forEach(r => {
+    const s = r.subcategoria || 'Complementos'
+    if (!porSubcat[s]) porSubcat[s] = []
+    porSubcat[s].push(r)
+  })
+  const subcats = Object.keys(porSubcat).sort((a, b) => a.localeCompare(b))
+
+  wrap.innerHTML = `
+    <button class="rec-volver-btn" onclick="recIrCategoriasDesdeSubcat()">← ${_recCatLabel(window._recTenantActual, categoria)}</button>
+    <h3 style="margin:8px 0 12px">${meta.emoji} ${_recCatLabel(window._recTenantActual, categoria)}</h3>
+    <div class="rec-tiles-grid">
+      ${subcats.map(s => {
+        const sMeta = REC_SUBCAT_META[s] || { emoji: '📦' }
+        return _recTileEmojiArriba(
+          sMeta.emoji, s, `${porSubcat[s].length} platillo${porSubcat[s].length === 1 ? '' : 's'}`,
+          meta.color, `recIrPlatillosDeSubcat('${s.replace(/'/g,"\\'")}')`
+        )
+      }).join('')}
+    </div>`
+}
+
+window.recIrCategoriasDesdeSubcat = function() {
+  window._recNivel = 'categoria'
+  window._recSubcategoriaSel = null
+  renderRecetasNivel()
+}
+
+window.recIrPlatillosDeSubcat = function(subcategoria) {
+  window._recNivel = 'platillo'
+  window._recSubcategoriaSel = subcategoria
+  renderRecetasNivel()
+}
+
+// ── Nivel 4: Platillos ────────────────────────────────────────────────────────
 function renderRecPlatillos(wrap) {
   const categoria = window._recCategoriaSel
   const meta = _recCatMeta(window._recTenantActual, categoria)
-  const recetas = _recRecetasFiltradas()
-    .filter(r => (r.categoria || 'Sin categoría') === categoria)
-    .sort((a, b) => a.nombre_platillo.localeCompare(b.nombre_platillo))
+  const esSubrecetas = categoria === 'Subrecetas' && window._recTenantActual === 'furia'
+
+  let recetas = _recRecetasFiltradas().filter(r => (r.categoria || 'Sin categoría') === categoria)
+  if (esSubrecetas) {
+    const sub = window._recSubcategoriaSel || 'Complementos'
+    recetas = recetas.filter(r => (r.subcategoria || 'Complementos') === sub)
+  }
+  recetas = recetas
+    .filter(r => !REC_PARES_SECUNDARIOS.has(r.id_receta))
+    .sort((a, b) => {
+      const oa = a.orden == null ? 999 : a.orden
+      const ob = b.orden == null ? 999 : b.orden
+      if (oa !== ob) return oa - ob
+      return a.nombre_platillo.localeCompare(b.nombre_platillo)
+    })
+
+  const volverLabel = esSubrecetas
+    ? window._recSubcategoriaSel
+    : _recCatLabel(window._recTenantActual, categoria)
 
   wrap.innerHTML = `
-    <button class="rec-volver-btn" onclick="recIrCategorias()">← Categorías</button>
-    <h3 style="margin:8px 0 12px">${meta.emoji} ${categoria}</h3>
+    <button class="rec-volver-btn" onclick="${esSubrecetas ? `recIrSubcategorias()` : `recIrCategorias()`}">← ${volverLabel}</button>
+    <h3 style="margin:8px 0 12px">${meta.emoji} ${esSubrecetas ? window._recSubcategoriaSel : _recCatLabel(window._recTenantActual, categoria)}</h3>
     ${recetas.length ? `
     <div class="rec-tiles-grid">
-      ${recetas.map(r => `
-        <button class="rec-tile" style="border-left:4px solid ${meta.color}" onclick="recIrDetalle('${r.id_receta}')">
-          <div class="rec-tile-titulo">${r.nombre_platillo}</div>
-        </button>`).join('')}
+      ${recetas.map(r => {
+        const par = REC_PARES[r.id_receta]
+        if (par) {
+          const recetaB = (window._recetas || []).find(x => x.id_receta === par.par)
+          return `
+            <div class="rec-tile" style="padding:0;overflow:hidden;display:flex;flex-direction:column;text-align:center">
+              <div style="padding:14px 12px 8px;font-weight:600">${par.titulo}</div>
+              <div style="display:flex;border-top:1px solid var(--color-border)">
+                <button onclick="recIrDetalle('${r.id_receta}')" style="flex:1;padding:12px 6px;border:none;border-right:1px solid var(--color-border);background:transparent;cursor:pointer;font-size:13px;font-weight:600;color:var(--color-text)">${par.labelA}</button>
+                ${recetaB ? `<button onclick="recIrDetalle('${recetaB.id_receta}')" style="flex:1;padding:12px 6px;border:none;background:transparent;cursor:pointer;font-size:13px;font-weight:600;color:var(--color-text)">${par.labelB}</button>` : ''}
+              </div>
+            </div>`
+        }
+        return `
+          <button class="rec-tile" style="border-left:4px solid ${meta.color};position:relative" onclick="recIrDetalle('${r.id_receta}')">
+            ${r.destacado ? '<span style="position:absolute;top:6px;right:8px;font-size:14px">⭐</span>' : ''}
+            <div class="rec-tile-titulo">${r.nombre_platillo}</div>
+          </button>`
+      }).join('')}
     </div>` : `<p style="color:var(--color-text-muted);font-size:13px">Sin platillos en esta categoría.</p>`}
   `
-}
-
-function renderRecDetalleNivel(wrap) {
-  const receta = (window._recetas || []).find(r => String(r.id_receta) === String(window._recRecetaSel))
-  wrap.innerHTML = `
-    <button class="rec-volver-btn" onclick="recIrPlatillos('${(window._recCategoriaSel || '').replace(/'/g,"\\'")}')">← ${window._recCategoriaSel || 'Volver'}</button>
-    <div id="receta-detalle-wrap"></div>
-  `
-  if (receta) cargarDetalleReceta(receta)
 }
 
 window.recIrCategorias = function() {
   window._recNivel = 'categoria'
   window._recCategoriaSel = null
+  window._recSubcategoriaSel = null
+  window._recRecetaSel = null
+  renderRecetasNivel()
+}
+
+window.recIrSubcategorias = function() {
+  window._recNivel = 'subcategoria'
   window._recRecetaSel = null
   renderRecetasNivel()
 }
 
 window.recIrPlatillos = function(categoria) {
-  window._recNivel = 'platillo'
+  const esSubrecetas = categoria === 'Subrecetas' && window._recTenantActual === 'furia'
+  const recetasCategoria = _recRecetasFiltradas().filter(r => (r.categoria || '') === categoria)
+  const haySubcats = esSubrecetas && recetasCategoria.some(r => r.subcategoria)
+
   window._recCategoriaSel = categoria
   window._recRecetaSel = null
+
+  if (haySubcats) {
+    window._recNivel = 'subcategoria'
+    window._recSubcategoriaSel = null
+  } else {
+    window._recNivel = 'platillo'
+    window._recSubcategoriaSel = null
+  }
   renderRecetasNivel()
 }
 
@@ -189,6 +351,20 @@ window.recIrDetalle = function(idReceta) {
   window._recNivel = 'detalle'
   window._recRecetaSel = idReceta
   renderRecetasNivel()
+}
+
+function renderRecDetalleNivel(wrap) {
+  const receta = (window._recetas || []).find(r => String(r.id_receta) === String(window._recRecetaSel))
+  const esSubrecetas = window._recCategoriaSel === 'Subrecetas' && window._recTenantActual === 'furia'
+  const volverLabel = esSubrecetas
+    ? (window._recSubcategoriaSel || 'Subrecetas')
+    : _recCatLabel(window._recTenantActual, window._recCategoriaSel || '')
+
+  wrap.innerHTML = `
+    <button class="rec-volver-btn" onclick="${esSubrecetas ? 'recIrPlatillosDeSubcat(window._recSubcategoriaSel)' : `recIrPlatillos('${(window._recCategoriaSel || '').replace(/'/g,"\\'")}')`}">← ${volverLabel}</button>
+    <div id="receta-detalle-wrap"></div>
+  `
+  if (receta) cargarDetalleReceta(receta)
 }
 
 async function _recCalcularCostosPromedio(tenant_id, idsProducto) {
@@ -390,7 +566,7 @@ async function cargarDetalleReceta(receta) {
 
     // ── Costeo: recuadro aparte (solo superadmin / Ramiro) ───────────────
     const htmlCosteo = (window._recPuedeVerCosteo && !esReventaCosteo && (ingredientes || []).length) ? `
-      <div style="background:var(--color-secondary);border-radius:10px;padding:16px;margin-top:16px">
+      <div style="background:var(--color-secondary);border-radius:10px;padding:16px">
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--color-text-muted);margin-bottom:10px">
           Costeo (prom. compras 30 días)
         </div>
@@ -517,8 +693,8 @@ async function cargarDetalleReceta(receta) {
       <div class="receta-detalle-card">
         <div class="detalle-header">
           <div>
-            <h3>${receta.nombre_platillo}</h3>
-            <p class="detalle-categoria">${receta.categoria || ''}</p>
+            <h3>${receta.nombre_platillo}${receta.destacado ? ' ⭐' : ''}</h3>
+            <p class="detalle-categoria">${_recCatLabel(window._recTenantActual, receta.categoria || '')}${receta.subcategoria ? ' · ' + receta.subcategoria : ''}</p>
           </div>
         </div>
 
@@ -530,18 +706,19 @@ async function cargarDetalleReceta(receta) {
             ⚠ Esta receta tiene ${ingSinCantidad.length} ingrediente${ingSinCantidad.length > 1 ? 's' : ''} sin cantidad capturada.
           </div>` : ''}
 
-          <div class="receta-detalle-grid">
+          <div class="receta-detalle-grid" style="${window._recPuedeVerCosteo ? '' : 'grid-template-columns:1fr'}">
             <div>
               <h4>Ingredientes</h4>
               ${htmlIngredientes}
-              ${htmlCosteo}
             </div>
-            <div>
-              <h4>Procedimiento</h4>
-              ${htmlPasos}
-              <h4>Notas adicionales</h4>
-              ${htmlNotas}
-            </div>
+            ${window._recPuedeVerCosteo ? `<div>${htmlCosteo}</div>` : ''}
+          </div>
+
+          <div style="margin-top:28px">
+            <h4>Procedimiento</h4>
+            ${htmlPasos}
+            <h4>Notas adicionales</h4>
+            ${htmlNotas}
           </div>
         ` : `
           ${htmlSabores}
