@@ -228,7 +228,7 @@ function renderItemsPedido(preciosPorProv) {
     porGrupo[grupo].forEach(item => {
       const i = globalIdx++
       const presentacion = item.cantidad_unidad
-        ? `${item.unidad_precio} × ${item.cantidad_unidad} ${item.unidad_base}`
+        ? `${item.unidad_precio} × ${formatInt(item.cantidad_unidad)} ${item.unidad_base}`
         : item.unidad_precio
       const precio = item.precio != null ? `$${formatNum(item.precio)}` : '—'
 

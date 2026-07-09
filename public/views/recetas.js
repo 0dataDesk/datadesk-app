@@ -556,7 +556,7 @@ async function cargarDetalleReceta(receta) {
             ${(ingredientes || []).map(i => `
               <tr>
                 <td>${i.producto || ''}</td>
-                <td>${i.cantidad != null ? i.cantidad : ''}</td>
+                <td>${i.cantidad != null ? formatInt(i.cantidad) : ''}</td>
                 <td style="color:var(--color-text-muted)">${unidadPorProducto[i.id_producto] || ''}</td>
                 <td style="color:var(--color-text-muted);font-size:12px">${i.notas_ingrediente || ''}</td>
               </tr>`).join('')}

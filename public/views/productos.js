@@ -19,7 +19,7 @@ function _prHighlight(texto, termino) {
 
 function _prBadge(n, size) {
   const fs = size || 12
-  return `<span style="padding:2px 10px;border-radius:20px;font-size:${fs}px;font-weight:700;background:rgba(154,123,106,0.15);color:var(--color-text-muted)">${n}</span>`
+  return `<span style="padding:2px 10px;border-radius:20px;font-size:${fs}px;font-weight:700;background:rgba(154,123,106,0.15);color:var(--color-text-muted)">${formatInt(n)}</span>`
 }
 
 async function vistaProductos() {

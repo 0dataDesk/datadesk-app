@@ -366,19 +366,19 @@ async function mostrarBienvenida() {
       <h3 class="seccion-titulo">Recetas</h3>
       <div class="dashboard-grid">
         <div class="dashboard-card">
-          <div class="card-valor">${r.total}</div>
+          <div class="card-valor">${formatInt(r.total)}</div>
           <div class="card-label">Total</div>
         </div>
         <div class="dashboard-card aprobado">
-          <div class="card-valor">${r.aprobadas}</div>
+          <div class="card-valor">${formatInt(r.aprobadas)}</div>
           <div class="card-label">Aprobadas</div>
         </div>
         <div class="dashboard-card pendiente">
-          <div class="card-valor">${r.pendientes}</div>
+          <div class="card-valor">${formatInt(r.pendientes)}</div>
           <div class="card-label">Pendientes</div>
         </div>
         <div class="dashboard-card archivado">
-          <div class="card-valor">${r.archivadas}</div>
+          <div class="card-valor">${formatInt(r.archivadas)}</div>
           <div class="card-label">Archivadas</div>
         </div>
       </div>
@@ -386,19 +386,19 @@ async function mostrarBienvenida() {
       <h3 class="seccion-titulo">Productos</h3>
       <div class="dashboard-grid">
         <div class="dashboard-card">
-          <div class="card-valor">${p.total}</div>
+          <div class="card-valor">${formatInt(p.total)}</div>
           <div class="card-label">Total</div>
         </div>
         <div class="dashboard-card aprobado">
-          <div class="card-valor">${p.aprobados}</div>
+          <div class="card-valor">${formatInt(p.aprobados)}</div>
           <div class="card-label">Aprobados</div>
         </div>
         <div class="dashboard-card pendiente">
-          <div class="card-valor">${p.pendientes}</div>
+          <div class="card-valor">${formatInt(p.pendientes)}</div>
           <div class="card-label">Pendientes</div>
         </div>
         <div class="dashboard-card archivado">
-          <div class="card-valor">${p.archivados}</div>
+          <div class="card-valor">${formatInt(p.archivados)}</div>
           <div class="card-label">Archivados</div>
         </div>
       </div>

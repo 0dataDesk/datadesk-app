@@ -144,7 +144,7 @@ async function vistaPrecios() {
         html += `
           <div class="precios-seccion" id="${secId}">
             <div class="precios-seccion-header" onclick="toggleSeccion('${bodyId}')">
-              <span>${grupo} <span class="precios-seccion-count">${count}</span></span>
+              <span>${grupo} <span class="precios-seccion-count">${formatInt(count)}</span></span>
               <span class="precios-seccion-chevron" id="chev-${bodyId}">${idx === 0 ? '▾' : '▸'}</span>
             </div>
             <div class="precios-seccion-body" id="${bodyId}" style="display:${idx === 0 ? 'block' : 'none'}">
@@ -192,7 +192,7 @@ async function vistaPrecios() {
               : '—'
 
             const presentacion = f.cantidad_unidad !== null && f.unidad_base
-              ? `${f.unidad_precio} × ${f.cantidad_unidad} ${f.unidad_base}`
+              ? `${f.unidad_precio} × ${formatInt(f.cantidad_unidad)} ${f.unidad_base}`
               : (f.unidad_precio || '—')
 
             html += `

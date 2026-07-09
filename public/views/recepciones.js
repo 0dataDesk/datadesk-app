@@ -237,15 +237,21 @@ function renderCabeceroRecepciones(lista) {
   const tdH = `padding:10px 16px 4px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);white-space:nowrap`
   const tdV = (color = 'var(--color-text)') => `padding:2px 16px 10px;font-family:'Bebas Neue',sans-serif;font-size:20px;color:${color}`
 
-  const legendHtml = provEntries.length
-    ? `<div style="display:grid;grid-template-columns:repeat(2,auto);gap:4px 20px;font-size:12px;justify-content:start">
-        ${provEntries.slice(0, 8).map(([key, monto], i) => {
+  const barrasHtml = provEntries.length
+    ? `<div style="display:flex;flex-direction:column;gap:10px">
+        ${provEntries.map(([key, monto], i) => {
           const pct = totalGastado ? Math.round(monto / totalGastado * 100) : 0
           const color = REC_CHART_COLORS[i % REC_CHART_COLORS.length]
-          return `<div style="display:flex;align-items:center;gap:5px;white-space:nowrap">
-            <span style="color:${color};font-size:14px;line-height:1">●</span>
-            <span>${nombreDe(key)} ${pct}% ($${formatNum(monto)})</span>
-          </div>`
+          return `
+            <div>
+              <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
+                <span>${nombreDe(key)}</span>
+                <span style="font-weight:600">$${formatNum(monto)} · ${pct}%</span>
+              </div>
+              <div style="background:var(--color-secondary);border-radius:6px;height:8px;overflow:hidden">
+                <div style="width:${pct}%;height:100%;background:${color};border-radius:6px"></div>
+              </div>
+            </div>`
         }).join('')}
        </div>`
     : ''
@@ -254,10 +260,6 @@ function renderCabeceroRecepciones(lista) {
     <style>
       @media(min-width:640px){
         #recep-cab-inner { flex-direction: row !important; align-items: flex-start !important; }
-        #recep-cab-donut { align-items: flex-end !important; }
-      }
-      @media(max-width:639px){
-        #recep-cab-donut { align-items: center !important; }
       }
     </style>
     <div class="card-surface" style="padding:20px;margin-bottom:18px">
@@ -283,89 +285,14 @@ function renderCabeceroRecepciones(lista) {
         </div>
 
         ${provEntries.length > 0 ? `
-        <div id="recep-cab-donut" style="display:flex;flex-direction:column;gap:10px">
-          <canvas id="recep-chart-prov" width="220" height="220"></canvas>
-          ${legendHtml}
+        <div style="flex:1;min-width:220px">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-muted);margin-bottom:10px">Gasto por proveedor</div>
+          ${barrasHtml}
         </div>` : ''}
 
       </div>
     </div>
   `
-
-  if (provEntries.length > 0) {
-    const buildChart = () => {
-      const canvas = document.getElementById('recep-chart-prov')
-      if (!canvas) return
-      if (window._recepChart) { window._recepChart.destroy(); window._recepChart = null }
-
-      const cs = getComputedStyle(document.documentElement)
-      const colorText      = cs.getPropertyValue('--color-text').trim()       || '#2B1A0F'
-      const colorTextMuted = cs.getPropertyValue('--color-text-muted').trim() || '#9B7B6A'
-
-      const centerTextPlugin = {
-        id: 'centerTextRecep',
-        beforeDraw(chart) {
-          const { ctx, chartArea: { top, bottom, left, right } } = chart
-          const cx = (left + right) / 2
-          const cy = (top + bottom) / 2
-          ctx.save()
-          ctx.font = "bold 12px 'DM Sans', sans-serif"
-          ctx.fillStyle = colorTextMuted
-          ctx.textAlign = 'center'
-          ctx.textBaseline = 'middle'
-          ctx.fillText('TOTAL', cx, cy - 12)
-          ctx.font = "600 20px 'Bebas Neue', sans-serif"
-          ctx.fillStyle = colorText
-          ctx.fillText('$' + formatNum(totalGastado), cx, cy + 11)
-          ctx.restore()
-        }
-      }
-      window.Chart.register(centerTextPlugin)
-
-      window._recepChart = new window.Chart(canvas, {
-        type: 'doughnut',
-        data: {
-          labels: provEntries.map(([key]) => nombreDe(key)),
-          datasets: [{
-            data: provEntries.map(([, v]) => v),
-            backgroundColor: provEntries.map((_, i) => REC_CHART_COLORS[i % REC_CHART_COLORS.length]),
-            borderWidth: 0,
-            borderRadius: 6,
-            spacing: 3
-          }]
-        },
-        options: {
-          cutout: '58%',
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              callbacks: {
-                label: (ctx) => {
-                  const pct = totalGastado ? Math.round(ctx.parsed / totalGastado * 100) : 0
-                  return ` ${ctx.label}: $${formatNum(ctx.parsed)} (${pct}%)`
-                }
-              },
-              backgroundColor: 'rgba(30,10,5,0.85)',
-              titleFont: { family: 'DM Sans', size: 12 },
-              bodyFont:  { family: 'DM Sans', size: 12 },
-              padding: 10,
-              cornerRadius: 6
-            }
-          },
-          animation: { animateRotate: true, duration: 500 }
-        }
-      })
-    }
-
-    if (window.Chart) {
-      buildChart()
-    } else {
-      const s = document.createElement('script')
-      s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js'
-      s.onload = buildChart
-      document.head.appendChild(s)
-    }
-  }
 }
 
 // ── Lista agrupada mes → semana (acordeón, igual patrón que Cierres/Consumo) ───
@@ -877,8 +804,6 @@ async function verDetalleRecepcion(id) {
   let archivoHtml = ''
   if (rec.archivo_url) {
     let archivoDisplayUrl = null
-    const ext = rec.archivo_url.split('.').pop().toLowerCase().split('?')[0]
-    const esImagen = ['png','jpg','jpeg','gif','webp','bmp','svg'].includes(ext)
     if (!rec.archivo_url.startsWith('http')) {
       const { data: signed } = await window._db.storage.from('recepciones').createSignedUrl(rec.archivo_url, 60 * 60 * 2)
       archivoDisplayUrl = signed?.signedUrl || null
@@ -888,22 +813,10 @@ async function verDetalleRecepcion(id) {
     if (archivoDisplayUrl) {
       archivoHtml = `
         <div style="margin-top:16px">
-          <button class="btn-accion" style="border:1px solid var(--color-border)" onclick="
-            const c=document.getElementById('rec-doc-contenido');
-            const b=this;
-            const open=c.style.display!=='none';
-            c.style.display=open?'none':'';
-            b.textContent=open?'📎 Ver documento adjunto':'Ocultar documento';
-          ">📎 Ver documento adjunto</button>
-          <div id="rec-doc-contenido" style="display:none;margin-top:12px;padding:12px;border:1px solid var(--color-border);border-radius:8px">
-            <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap">
-              ${esImagen ? `<img src="${archivoDisplayUrl}" alt="Documento" style="max-height:200px;border-radius:6px;border:1px solid var(--color-border)">` : ''}
-              <a href="${archivoDisplayUrl}" target="_blank" rel="noopener"
-                class="btn-accion btn-aprobar" style="font-size:12px;padding:6px 14px;text-decoration:none">
-                Ver documento
-              </a>
-            </div>
-          </div>
+          <a href="${archivoDisplayUrl}" target="_blank" rel="noopener"
+            class="btn-accion" style="border:1px solid var(--color-border);text-decoration:none;display:inline-block">
+            📎 Ver documento adjunto
+          </a>
         </div>`
     }
   }
@@ -959,35 +872,25 @@ async function verDetalleRecepcion(id) {
             if (desv !== null) {
               if (desv > 5) {
                 rowStyle = 'background:rgba(184,92,42,0.08)'
-                desvHtml = `<span style="color:#B85C2A;font-weight:700">▲ ${desv}%</span>`
+                desvHtml = `<span style="color:#B85C2A;font-weight:700">▲ ${formatNum(desv, 1)}%</span>`
               } else if (desv >= 1) {
                 rowStyle = 'background:rgba(200,137,42,0.08)'
-                desvHtml = `<span style="color:#c8892a;font-weight:600">▲ ${desv}%</span>`
+                desvHtml = `<span style="color:#c8892a;font-weight:600">▲ ${formatNum(desv, 1)}%</span>`
               } else {
-                desvHtml = `<span style="color:var(--color-text-muted)">${desv}%</span>`
+                desvHtml = `<span style="color:var(--color-text-muted)">${formatNum(desv, 1)}%</span>`
               }
             }
             return `
               <tr style="${rowStyle}">
                 <td>${prodMap[i.id_producto]?.producto || i.id_producto}</td>
-                <td style="text-align:right">${i.cantidad_recibida} ${prodMap[i.id_producto]?.unidad_medida || ''}</td>
-                <td style="text-align:right;color:var(--color-text-muted)">${i.cantidad_solicitada || '—'}</td>
+                <td style="text-align:right">${formatInt(i.cantidad_recibida)} ${prodMap[i.id_producto]?.unidad_medida || ''}</td>
+                <td style="text-align:right;color:var(--color-text-muted)">${i.cantidad_solicitada != null ? formatInt(i.cantidad_solicitada) : '—'}</td>
                 <td style="text-align:right">$${formatNum(i.costo_unitario || 0)}</td>
                 <td style="text-align:right;font-weight:600">$${formatNum(total)}</td>
                 <td style="text-align:right">${desvHtml}</td>
               </tr>`
           }).join('')}
         </tbody>
-        <tfoot>
-          <tr>
-            <td colspan="3"></td>
-            <td style="text-align:right;font-weight:600;border-top:2px solid var(--color-border);padding-top:10px">SUBTOTAL</td>
-            <td style="text-align:right;font-weight:700;color:var(--color-primary);border-top:2px solid var(--color-border);padding-top:10px">
-              ${fmtMXN(subtotalItems)}
-            </td>
-            <td style="border-top:2px solid var(--color-border)"></td>
-          </tr>
-        </tfoot>
       </table>
 
       ${totalesHtml}

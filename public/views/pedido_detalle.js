@@ -47,7 +47,7 @@ async function vistaPedidoDetalle(id_pedido) {
       <tr>
         <td>${item.nombre_proveedor_producto}</td>
         <td style="font-size:11px;color:var(--color-text-muted)">${item.codigo_proveedor || '—'}</td>
-        <td style="text-align:right">${item.cantidad_pedida} ${item.unidad_pedida}</td>
+        <td style="text-align:right">${formatInt(item.cantidad_pedida)} ${item.unidad_pedida}</td>
         <td style="text-align:right">${item.precio_cotizado != null ? '$' + formatNum(item.precio_cotizado) : '—'}</td>
         <td style="text-align:right">
           ${puedeRecibir
@@ -163,7 +163,7 @@ async function exportarPedidoPDF(id_pedido) {
       <tr>
         <td style="padding:8px 12px;border-bottom:1px solid #eee">${item.nombre_proveedor_producto}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #eee;color:#888;font-size:12px">${item.codigo_proveedor || '—'}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right">${item.cantidad_pedida}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right">${formatInt(item.cantidad_pedida)}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right">${item.unidad_pedida}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right">${item.precio_cotizado != null ? '$' + formatNum(item.precio_cotizado) : '—'}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;font-weight:600">${sub > 0 ? '$' + formatNum(sub) : '—'}</td>
@@ -243,7 +243,7 @@ async function exportarPedidoPDF(id_pedido) {
       <tr class="total-row">
         <td colspan="4"></td>
         <td style="text-align:right">TOTAL ESTIMADO</td>
-        <td style="text-align:right;color:#C8892A">$${total.toFixed(2)}</td>
+        <td style="text-align:right;color:#C8892A">$${formatNum(total)}</td>
       </tr>
     </tfoot>
   </table>

@@ -315,7 +315,7 @@ async function renderCierresVista() {
                     <td style="${tdH}">📊 T. Promedio</td>
                   </tr>
                   <tr>
-                    <td style="${tdV()}">${ticketsTotal}</td>
+                    <td style="${tdV()}">${formatInt(ticketsTotal)}</td>
                     <td style="${tdV()}">$${formatInt(ticketProm)}</td>
                   </tr>
                 </tbody>
@@ -355,7 +355,7 @@ async function renderCierresVista() {
           const colorTextMuted = cs.getPropertyValue('--color-text-muted').trim() || '#9B7B6A'
 
           const centerTextPlugin = {
-            id: 'centerText',
+            id: 'centerText_' + Date.now(),
             beforeDraw(chart) {
               const { ctx, chartArea: { top, bottom, left, right } } = chart
               const cx = (left + right) / 2
@@ -372,10 +372,9 @@ async function renderCierresVista() {
               ctx.restore()
             }
           }
-          window.Chart.register(centerTextPlugin)
-
           window._cierresChart = new window.Chart(canvas, {
             type: 'doughnut',
+            plugins: [centerTextPlugin],
             data: {
               labels: metodosEntries.map(([m]) => formatMetodoKey(m)),
               datasets: [{
@@ -467,7 +466,7 @@ async function renderCierresVista() {
             onmouseleave="this.style.background=''">
             <span style="min-width:90px;font-weight:600">${c.fecha}</span>
             <span style="font-family:'Bebas Neue',sans-serif;font-size:19px;color:var(--color-primary)">$${formatNum(vt)}</span>
-            <span style="color:var(--color-text-muted)">${c.num_tickets} ticket${c.num_tickets !== 1 ? 's' : ''}</span>
+            <span style="color:var(--color-text-muted)">${formatInt(c.num_tickets)} ticket${c.num_tickets !== 1 ? 's' : ''}</span>
             <span style="color:var(--color-text-muted)">~$${formatInt(tprom)}/ticket</span>
             <span style="color:var(--color-text-muted);font-size:11px;margin-left:auto">${formatCerradoPor(c.cerrado_por)}</span>
           </div>`
@@ -626,7 +625,7 @@ async function verDetalleCierre(id_cierre, fecha) {
         if (m.nota) parts.push('📝 ' + m.nota)
         if (parts.length) modsText = `<div style="font-size:11px;color:var(--color-text-muted);margin-left:12px">${parts.join(' · ')}</div>`
       }
-      return `<div style="padding:3px 0;font-size:13px">${it.nombre} ×${it.cantidad} — <strong>$${it.importe}</strong>${modsText}</div>`
+      return `<div style="padding:3px 0;font-size:13px">${it.nombre} ×${formatInt(it.cantidad)} — <strong>$${formatNum(it.importe)}</strong>${modsText}</div>`
     }).join('')
 
     let descFooter = ''
@@ -703,7 +702,7 @@ async function verDetalleCierre(id_cierre, fecha) {
             ${Object.entries(desgloseCompleto).map(([m, d]) => `
               <tr>
                 <td>${formatMetodoKey(m)}</td>
-                <td style="text-align:right">${d.count}</td>
+                <td style="text-align:right">${formatInt(d.count)}</td>
                 <td style="text-align:right">$${formatNum(d.v)}</td>
                 <td style="text-align:right;${d.desc > 0 ? 'color:#3A8C3E;font-weight:600' : ''}">${d.desc > 0 ? '-$' + formatNum(d.desc) : '—'}</td>
                 <td style="text-align:right">$${formatNum(d.vt)}</td>
@@ -712,7 +711,7 @@ async function verDetalleCierre(id_cierre, fecha) {
               </tr>`).join('')}
             <tr style="border-top:2px solid var(--color-primary)">
               <td style="padding-top:12px"><strong style="font-size:14px;color:var(--color-primary)">TOTAL</strong></td>
-              <td style="text-align:right;padding-top:12px"><strong>${cierre?.num_tickets || 0}</strong></td>
+              <td style="text-align:right;padding-top:12px"><strong>${formatInt(cierre?.num_tickets || 0)}</strong></td>
               <td style="text-align:right;padding-top:12px"><strong>$${formatNum(ventaBrutaCierre)}</strong></td>
               <td style="text-align:right;padding-top:12px"><strong style="color:#3A8C3E">-$${formatNum(montoDescTotal)}</strong></td>
               <td style="text-align:right;padding-top:12px"><strong>$${formatNum(ventaNetaCierre)}</strong></td>

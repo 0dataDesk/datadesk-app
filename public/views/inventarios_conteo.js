@@ -94,7 +94,7 @@ async function vistaInventariosConteo() {
                 ${porMes[mes].map(inv => `
                   <tr style="cursor:pointer" onclick="verDetalleInventario('${inv.id}')">
                     <td>${icDiaLabel(inv.fecha)}</td>
-                    <td style="text-align:right;font-weight:600">${itemsCounts[inv.id] || 0}/${totalActivos || 0}</td>
+                    <td style="text-align:right;font-weight:600">${formatInt(itemsCounts[inv.id] || 0)}/${formatInt(totalActivos || 0)}</td>
                     <td style="font-size:12px;color:var(--color-text-muted)">${formatCreadoPor(inv.creado_por)}</td>
                     <td><span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;${estadoBadge[inv.estado]||''}">${inv.estado || 'borrador'}</span></td>
                   </tr>`).join('')}
@@ -126,7 +126,7 @@ async function vistaInventariosConteo() {
 function icBadge(contados, total, size) {
   const ok = contados === total && total > 0
   const fs = size || 11
-  return `<span style="padding:2px 10px;border-radius:20px;font-size:${fs}px;font-weight:700;${ok ? 'background:rgba(76,153,80,0.15);color:#3A8C3E' : 'background:rgba(200,137,42,0.15);color:#c8892a'}">${contados}/${total}</span>`
+  return `<span style="padding:2px 10px;border-radius:20px;font-size:${fs}px;font-weight:700;${ok ? 'background:rgba(76,153,80,0.15);color:#3A8C3E' : 'background:rgba(200,137,42,0.15);color:#c8892a'}">${formatInt(contados)}/${formatInt(total)}</span>`
 }
 
 async function verDetalleInventario(idInventario) {
@@ -534,7 +534,7 @@ function mostrarFormLevantamiento() {
     const cap   = levInsumos.filter(p => esCaptured(p.id_producto)).length
     const total = levInsumos.length
     const el = document.getElementById('lev-progreso')
-    if (el) el.textContent = `${cap} de ${total} insumos capturados`
+    if (el) el.textContent = `${formatInt(cap)} de ${formatInt(total)} insumos capturados`
   }
 
   // ── Render grupos nav ────────────────────────────────────────────────────────

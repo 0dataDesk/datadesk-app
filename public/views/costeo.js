@@ -200,7 +200,7 @@ async function vistaCosteo() {
           html += `
             <tr${claseIncompleta}>
               <td data-label="Ingrediente">${f.producto || ''}</td>
-              <td class="costeo-col-num" data-label="Cantidad">${f.cantidad ?? '—'}</td>
+              <td class="costeo-col-num" data-label="Cantidad">${f.cantidad != null ? formatInt(f.cantidad) : '—'}</td>
               <td class="costeo-col-num" data-label="Unidad">${f.unidad || '—'}</td>
               ${celdasProv}
               <td class="costeo-col-mejor" data-label="Mejor $">

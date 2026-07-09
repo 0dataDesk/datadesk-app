@@ -186,7 +186,7 @@ async function renderVentas(container, tenantId) {
       }
       const esPromo = it.id_item in promoPrecioPorItem && Number(it.precio_unitario) === promoPrecioPorItem[it.id_item]
       const promoBadge = esPromo ? `<span style="background:rgba(200,137,42,0.15);color:#c8892a;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:600;text-transform:uppercase;margin-left:6px">PROMO</span>` : ''
-      return `<div style="padding:3px 0;font-size:13px">${it.nombre}${promoBadge} ×${it.cantidad} — <strong>$${it.importe}</strong>${modsText}</div>`
+      return `<div style="padding:3px 0;font-size:13px">${it.nombre}${promoBadge} ×${formatInt(it.cantidad)} — <strong>$${formatNum(it.importe)}</strong>${modsText}</div>`
     }).join('')
 
     const propina   = Number(v.propina) || 0
@@ -429,7 +429,7 @@ async function mostrarCierreCaja(tenantId) {
         if (m.nota) parts.push('📝 ' + m.nota)
         if (parts.length) modsText = `<div style="font-size:11px;color:var(--color-text-muted);margin-left:12px">${parts.join(' · ')}</div>`
       }
-      return `<div style="padding:3px 0;font-size:13px">${it.nombre} ×${it.cantidad} — <strong>$${it.importe}</strong>${modsText}</div>`
+      return `<div style="padding:3px 0;font-size:13px">${it.nombre} ×${formatInt(it.cantidad)} — <strong>$${formatNum(it.importe)}</strong>${modsText}</div>`
     }).join('')
 
     let descFooter = ''
@@ -487,7 +487,7 @@ async function mostrarCierreCaja(tenantId) {
             return `
               <tr>
                 <td>${formatMetodoKey(m)}</td>
-                <td style="text-align:right">${d.count}</td>
+                <td style="text-align:right">${formatInt(d.count)}</td>
                 <td style="text-align:right">$${formatNum(d.vt)}</td>
                 <td style="text-align:right;${d.desc > 0 ? 'color:#3A8C3E;font-weight:600' : ''}">${d.desc > 0 ? '-$' + formatNum(d.desc) : '—'}</td>
                 <td style="text-align:right">${d.prop > 0 ? '$' + formatNum(d.prop) : '—'}</td>

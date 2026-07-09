@@ -384,7 +384,7 @@ function _iaRenderCabecero() {
         <div>
           <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-muted)">Insumos en alerta</div>
           <div style="font-family:'Bebas Neue',sans-serif;font-size:42px;line-height:1;color:${enAlerta ? '#B85C2A' : 'var(--color-primary)'}">
-            ${enAlerta}<span style="font-size:18px;color:var(--color-text-muted)"> / ${total}</span>
+            ${formatInt(enAlerta)}<span style="font-size:18px;color:var(--color-text-muted)"> / ${formatInt(total)}</span>
           </div>
         </div>
         <table style="border-collapse:collapse;background:var(--color-secondary);border-radius:8px;overflow:hidden">
@@ -394,8 +394,8 @@ function _iaRenderCabecero() {
               <td style="padding:8px 16px 2px;font-size:10px;font-weight:600;text-transform:uppercase;color:var(--color-text-muted);white-space:nowrap">🟡 Bajos</td>
             </tr>
             <tr>
-              <td style="padding:0 16px 8px;font-family:'Bebas Neue',sans-serif;font-size:24px;color:#B85C2A">${criticos}</td>
-              <td style="padding:0 16px 8px;font-family:'Bebas Neue',sans-serif;font-size:24px;color:#c8892a">${bajos}</td>
+              <td style="padding:0 16px 8px;font-family:'Bebas Neue',sans-serif;font-size:24px;color:#B85C2A">${formatInt(criticos)}</td>
+              <td style="padding:0 16px 8px;font-family:'Bebas Neue',sans-serif;font-size:24px;color:#c8892a">${formatInt(bajos)}</td>
             </tr>
           </tbody>
         </table>
@@ -457,8 +457,8 @@ function _iaBadgeGrupo(items) {
     return `<span style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;background:rgba(154,123,106,0.15);color:var(--color-text-muted)">${items.length} insumos</span>`
   }
   const partes = []
-  if (criticos) partes.push(`<span style="padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;background:rgba(184,92,42,0.15);color:#B85C2A">🔴 ${criticos} crít.</span>`)
-  if (bajos)    partes.push(`<span style="padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;background:rgba(200,137,42,0.15);color:#c8892a">🟡 ${bajos} bajo${bajos !== 1 ? 's' : ''}</span>`)
+  if (criticos) partes.push(`<span style="padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;background:rgba(184,92,42,0.15);color:#B85C2A">🔴 ${formatInt(criticos)} crít.</span>`)
+  if (bajos)    partes.push(`<span style="padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;background:rgba(200,137,42,0.15);color:#c8892a">🟡 ${formatInt(bajos)} bajo${bajos !== 1 ? 's' : ''}</span>`)
   return partes.join(' ')
 }
 
