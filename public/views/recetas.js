@@ -93,11 +93,8 @@ async function vistaRecetas() {
     window._recPuedeEditar   = ['admin', 'editor', 'cocina'].includes(rol)
     window._recPuedeVerCosteo = rol === 'superadmin' || window._email === 'rafepa1978@gmail.com'
 
-    const tieneBloques = !!REC_BLOQUES[tenantActual]
-
-    window._recNivel         = tieneBloques ? 'bloque' : 'categoria'
+    window._recNivel         = 'categoria'
     window._recFuenteSel     = ''
-    window._recBloqueSel     = null
     window._recCategoriaSel  = null
     window._recSubcategoriaSel = null
     window._recRecetaSel     = null
@@ -129,7 +126,6 @@ function _recRecetasFiltradas() {
 function renderRecetasNivel() {
   const wrap = document.getElementById('rec-nivel-wrap')
   if (!wrap) return
-  if (window._recNivel === 'bloque')       return renderRecBloques(wrap)
   if (window._recNivel === 'subcategoria') return renderRecSubcategorias(wrap)
   if (window._recNivel === 'platillo')     return renderRecPlatillos(wrap)
   if (window._recNivel === 'detalle')      return renderRecDetalleNivel(wrap)
@@ -146,49 +142,56 @@ function _recTileEmojiArriba(emoji, titulo, subtitulo, colorBorde, onclick, dest
     </button>`
 }
 
-// ── Nivel 1: Bloques (Carta / Producción) ────────────────────────────────────
-function renderRecBloques(wrap) {
-  const bloques = REC_BLOQUES[window._recTenantActual] || {}
-  const recetasVisibles = _recRecetasFiltradas()
-
-  wrap.innerHTML = `
-    <div class="rec-tiles-grid">
-      ${Object.entries(bloques).map(([nombreBloque, info]) => {
-        const count = recetasVisibles.filter(r => info.categorias.includes(r.categoria)).length
-        return _recTileEmojiArriba(
-          info.emoji, nombreBloque, `${count} platillo${count === 1 ? '' : 's'}`,
-          'var(--color-border)', `recIrCategoriasDeBloque('${nombreBloque.replace(/'/g,"\\'")}')`
-        )
-      }).join('')}
-    </div>`
-}
-
-window.recIrCategoriasDeBloque = function(bloque) {
-  window._recNivel = 'categoria'
-  window._recBloqueSel = bloque
-  window._recCategoriaSel = null
-  renderRecetasNivel()
-}
-
-// ── Nivel 2: Categorías ───────────────────────────────────────────────────────
+// ── Categorías, agrupadas visualmente en secciones (Carta / Producción) cuando aplica ─
 function renderRecCategorias(wrap) {
   const fuentesDef = FUENTES_POR_TENANT[window._recTenantActual] || []
   const recetasVisibles = _recRecetasFiltradas()
-  const bloqueInfo = window._recBloqueSel ? (REC_BLOQUES[window._recTenantActual] || {})[window._recBloqueSel] : null
+  const bloques = REC_BLOQUES[window._recTenantActual]
 
   const porCategoria = {}
   recetasVisibles.forEach(r => {
     const c = r.categoria || 'Sin categoría'
-    if (bloqueInfo && !bloqueInfo.categorias.includes(c)) return
     if (!porCategoria[c]) porCategoria[c] = []
     porCategoria[c].push(r)
   })
-  const categorias = Object.keys(porCategoria).sort((a, b) =>
-    indicePrioridad(window._recTenantActual, a) - indicePrioridad(window._recTenantActual, b)
-  )
+
+  const renderTiles = (listaCategorias) => {
+    const cats = listaCategorias.filter(c => porCategoria[c])
+    if (!cats.length) return ''
+    return `
+      <div class="rec-tiles-grid">
+        ${cats.map(c => {
+          const meta = _recCatMeta(window._recTenantActual, c)
+          const label = _recCatLabel(window._recTenantActual, c)
+          return _recTileEmojiArriba(
+            meta.emoji, label, `${porCategoria[c].length} platillo${porCategoria[c].length === 1 ? '' : 's'}`,
+            meta.color, `recIrPlatillos('${c.replace(/'/g,"\\'")}')`
+          )
+        }).join('')}
+      </div>`
+  }
+
+  let cuerpoHtml = ''
+  if (bloques) {
+    cuerpoHtml = Object.entries(bloques).map(([nombreBloque, info]) => {
+      const tilesHtml = renderTiles(info.categorias)
+      if (!tilesHtml) return ''
+      return `
+        <div style="margin-bottom:28px">
+          <h3 style="display:flex;align-items:center;gap:8px;font-size:15px;margin-bottom:14px;color:var(--color-text)">
+            <span>${info.emoji}</span> ${nombreBloque}
+          </h3>
+          ${tilesHtml}
+        </div>`
+    }).join('')
+  } else {
+    const categoriasOrdenadas = Object.keys(porCategoria).sort((a, b) =>
+      indicePrioridad(window._recTenantActual, a) - indicePrioridad(window._recTenantActual, b)
+    )
+    cuerpoHtml = renderTiles(categoriasOrdenadas)
+  }
 
   wrap.innerHTML = `
-    ${window._recBloqueSel ? `<button class="rec-volver-btn" onclick="recIrBloques()">← ${window._recBloqueSel}</button>` : ''}
     ${fuentesDef.length > 1 ? `
     <div class="filtros-bar" style="margin-bottom:16px">
       <select id="rec-f-fuente" class="filtro-select">
@@ -196,17 +199,7 @@ function renderRecCategorias(wrap) {
         ${fuentesDef.map(f => `<option value="${f.fuente}"${f.fuente === window._recFuenteSel ? ' selected' : ''}>${f.etiqueta}</option>`).join('')}
       </select>
     </div>` : ''}
-    ${categorias.length ? `
-    <div class="rec-tiles-grid">
-      ${categorias.map(c => {
-        const meta = _recCatMeta(window._recTenantActual, c)
-        const label = _recCatLabel(window._recTenantActual, c)
-        return _recTileEmojiArriba(
-          meta.emoji, label, `${porCategoria[c].length} platillo${porCategoria[c].length === 1 ? '' : 's'}`,
-          meta.color, `recIrPlatillos('${c.replace(/'/g,"\\'")}')`
-        )
-      }).join('')}
-    </div>` : `<p style="color:var(--color-text-muted);font-size:13px">No hay recetas para mostrar.</p>`}
+    ${cuerpoHtml || `<p style="color:var(--color-text-muted);font-size:13px">No hay recetas para mostrar.</p>`}
   `
 
   const fFuente = document.getElementById('rec-f-fuente')
@@ -214,13 +207,6 @@ function renderRecCategorias(wrap) {
     window._recFuenteSel = fFuente.value
     renderRecCategorias(wrap)
   })
-}
-
-window.recIrBloques = function() {
-  window._recNivel = 'bloque'
-  window._recBloqueSel = null
-  window._recCategoriaSel = null
-  renderRecetasNivel()
 }
 
 // ── Nivel 3 (solo Subrecetas): Subcategorías ─────────────────────────────────
@@ -540,7 +526,8 @@ async function cargarDetalleReceta(receta) {
       })
     }
 
-    // ── Ingredientes (unidad desde catálogo) ─────────────────────────────
+    // ── Ingredientes (unidad desde catálogo) + Costeo fusionado en la misma tabla ──
+    const puedeVerCosteo = window._recPuedeVerCosteo && !esReventaCosteo && (ingredientes || []).length
     const htmlIngredientes = `
       <div class="tabla-wrapper">
         <table class="tabla">
@@ -549,55 +536,42 @@ async function cargarDetalleReceta(receta) {
               <th>Ingrediente</th>
               <th>Cantidad</th>
               <th>Unidad</th>
+              ${puedeVerCosteo ? '<th style="text-align:right">Costo/unidad</th>' : ''}
               <th>Nota</th>
             </tr>
           </thead>
           <tbody>
-            ${(ingredientes || []).map(i => `
-              <tr>
-                <td>${i.producto || ''}</td>
-                <td>${i.cantidad != null ? formatInt(i.cantidad) : ''}</td>
-                <td style="color:var(--color-text-muted)">${unidadPorProducto[i.id_producto] || ''}</td>
-                <td style="color:var(--color-text-muted);font-size:12px">${i.notas_ingrediente || ''}</td>
-              </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>`
-
-    // ── Costeo: recuadro aparte (solo superadmin / Ramiro) ───────────────
-    const htmlCosteo = (window._recPuedeVerCosteo && !esReventaCosteo && (ingredientes || []).length) ? `
-      <div style="background:var(--color-secondary);border-radius:10px;padding:16px">
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--color-text-muted);margin-bottom:10px">
-          Costeo (prom. compras 30 días)
-        </div>
-        <table class="tabla" style="background:transparent">
-          <thead>
-            <tr><th>Ingrediente</th><th style="text-align:right">Costo/unidad</th></tr>
-          </thead>
-          <tbody>
             ${(ingredientes || []).map(i => {
-              const c = costosPromedio[i.id_producto]
+              const c = puedeVerCosteo ? costosPromedio[i.id_producto] : null
               return `
               <tr>
                 <td>${i.producto || ''}${c && c.derivado ? ' <span style="font-size:10px;color:var(--color-text-muted)">(subreceta)</span>' : ''}</td>
+                <td>${i.cantidad != null ? formatInt(i.cantidad) : ''}</td>
+                <td style="color:var(--color-text-muted)">${unidadPorProducto[i.id_producto] || ''}</td>
+                ${puedeVerCosteo ? `
                 <td style="text-align:right">
                   ${c
-                    ? `<span style="padding:2px 10px;border-radius:12px;background:var(--color-card);font-weight:600">$${formatNum(c.promedio)}</span>`
+                    ? `<span style="padding:2px 10px;border-radius:12px;background:var(--color-secondary);font-weight:600">$${formatNum(c.promedio)}</span>`
                     : `<span style="color:var(--color-text-muted)">—</span>`}
-                </td>
+                </td>` : ''}
+                <td style="color:var(--color-text-muted);font-size:12px">${i.notas_ingrediente || ''}</td>
               </tr>`
             }).join('')}
           </tbody>
+          ${puedeVerCosteo ? `
+          <tfoot>
+            <tr>
+              <td colspan="3" style="text-align:right;font-weight:700;border-top:2px solid var(--color-border);padding-top:12px">Costo total de la receta</td>
+              <td style="text-align:right;font-weight:700;color:var(--color-primary);border-top:2px solid var(--color-border);padding-top:12px">$${formatNum(costoTotalReceta)}</td>
+              <td style="border-top:2px solid var(--color-border);padding-top:12px"></td>
+            </tr>
+          </tfoot>` : ''}
         </table>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:14px;border-top:1.5px solid var(--color-border)">
-          <span style="font-weight:700">Costo total de la receta</span>
-          <span style="font-family:'Bebas Neue',sans-serif;font-size:26px;color:var(--color-primary)">$${formatNum(costoTotalReceta)}</span>
-        </div>
-        ${ingredientesSinCosto > 0 ? `
-        <p style="font-size:11px;color:var(--color-text-muted);margin-top:8px">
+        ${puedeVerCosteo && ingredientesSinCosto > 0 ? `
+        <p style="font-size:11px;color:var(--color-text-muted);margin-top:6px">
           * ${ingredientesSinCosto} insumo${ingredientesSinCosto !== 1 ? 's' : ''} sin costo disponible (sin recepciones recientes, o subreceta sin receta capturada) — no se incluye en el total.
         </p>` : ''}
-      </div>` : ''
+      </div>`
 
     // ── Procedimiento agrupado por sección ───────────────────────────────
     const steps = pasos || []
@@ -704,22 +678,22 @@ async function cargarDetalleReceta(receta) {
             ⚠ Esta receta tiene ${ingSinCantidad.length} ingrediente${ingSinCantidad.length > 1 ? 's' : ''} sin cantidad capturada.
           </div>` : ''}
 
-          <div class="receta-detalle-grid" style="${window._recPuedeVerCosteo ? '' : 'grid-template-columns:1fr'}">
+          <div class="receta-detalle-grid">
             <div>
               <h4>Ingredientes</h4>
               ${htmlIngredientes}
-            </div>
-            ${window._recPuedeVerCosteo ? `<div>${htmlCosteo}</div>` : ''}
-            <div>
-              <h4>Procedimiento</h4>
-              ${htmlPasos}
-              <h4>Notas adicionales</h4>
-              ${htmlNotas}
             </div>
             <div>
               <h4>Foto</h4>
               ${htmlFoto}
             </div>
+          </div>
+
+          <div style="margin-top:28px">
+            <h4>Procedimiento</h4>
+            ${htmlPasos}
+            <h4>Notas adicionales</h4>
+            ${htmlNotas}
           </div>
         ` : `
           <div style="max-width:340px;margin-bottom:20px">${htmlFoto}</div>
