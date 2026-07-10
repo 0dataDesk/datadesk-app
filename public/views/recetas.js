@@ -698,8 +698,6 @@ async function cargarDetalleReceta(receta) {
           </div>
         </div>
 
-        ${htmlFoto}
-
         ${!esReventa ? `
           ${hayCantidadFaltante ? `
           <div class="banner-aviso">
@@ -712,15 +710,19 @@ async function cargarDetalleReceta(receta) {
               ${htmlIngredientes}
             </div>
             ${window._recPuedeVerCosteo ? `<div>${htmlCosteo}</div>` : ''}
-          </div>
-
-          <div style="margin-top:28px">
-            <h4>Procedimiento</h4>
-            ${htmlPasos}
-            <h4>Notas adicionales</h4>
-            ${htmlNotas}
+            <div>
+              <h4>Procedimiento</h4>
+              ${htmlPasos}
+              <h4>Notas adicionales</h4>
+              ${htmlNotas}
+            </div>
+            <div>
+              <h4>Foto</h4>
+              ${htmlFoto}
+            </div>
           </div>
         ` : `
+          <div style="max-width:340px;margin-bottom:20px">${htmlFoto}</div>
           ${htmlSabores}
           <h4>Notas adicionales</h4>
           ${htmlNotas}

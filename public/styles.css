@@ -771,17 +771,22 @@ body {
   .receta-detalle-grid { grid-template-columns: 1fr 1fr; }
 }
 
-.receta-foto-wrap { margin: 16px 0; }
+.receta-foto-wrap { margin: 0; }
 .receta-foto {
   width: 100%;
-  max-height: 280px;
+  aspect-ratio: 1 / 1;
+  max-height: 340px;
   object-fit: cover;
   border-radius: var(--radius);
   display: block;
 }
 .receta-foto-placeholder {
   width: 100%;
-  padding: 32px;
+  aspect-ratio: 1 / 1;
+  max-height: 340px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: 1.5px dashed var(--color-border);
   border-radius: var(--radius);
   text-align: center;
