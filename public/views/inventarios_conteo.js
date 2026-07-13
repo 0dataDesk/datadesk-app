@@ -382,6 +382,10 @@ function mostrarFormLevantamiento() {
   const hoy = new Date().toISOString().split('T')[0]
 
   wrap.innerHTML = `
+    <style>
+      .ic-grupo.open .ic-grupo-body { display:block !important }
+      .ic-grupo-header:hover { opacity:.85 }
+    </style>
     <div class="card-surface" style="padding:24px;margin-bottom:24px">
 
       <div id="lev-filtros" style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:20px">
@@ -418,9 +422,6 @@ function mostrarFormLevantamiento() {
           <input type="search" id="lev-search" placeholder="Buscar insumo…" autocomplete="off"
             style="width:100%;max-width:400px;padding:10px 14px;border:1.5px solid var(--color-border);border-radius:8px;background:var(--color-card);color:var(--color-text);font-size:15px">
         </div>
-
-        <!-- pills de grupos -->
-        <div id="lev-grupos-nav" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px"></div>
 
         <!-- progreso -->
         <div id="lev-progreso" style="font-size:13px;color:var(--color-text-muted);margin-bottom:12px"></div>
@@ -460,11 +461,11 @@ function mostrarFormLevantamiento() {
   `
 
   // Estado interno de la vista
-  let levInsumos      = []
-  let levInventarioId = null
-  let levGrupoActivo  = 'todos'
-  let levValores      = {}
-  let levGrupos       = []
+  let levInsumos       = []
+  let levInventarioId  = null
+  let levValores       = {}
+  let levGrupos        = []
+  let levGruposAbiertos = {}
 
   const errEl = () => document.getElementById('lev-err')
 
@@ -492,15 +493,20 @@ function mostrarFormLevantamiento() {
 
       levInsumos      = productos || []
       levInventarioId = null
-      levGrupoActivo  = 'todos'
       levValores      = {}
       levGrupos       = [...new Set(levInsumos.map(p => p.grupo || 'Sin grupo'))]
+
+      // El primer grupo con insumos sin capturar arranca abierto (mismo
+      // criterio que el acordeón de merma en incidencias.js)
+      levGruposAbiertos = {}
+      const primerPendiente = levGrupos.find(g =>
+        levInsumos.some(p => (p.grupo || 'Sin grupo') === g && !esCaptured(p.id_producto)))
+      if (primerPendiente) levGruposAbiertos[primerPendiente] = true
 
       document.getElementById('lev-filtros').style.display = 'none'
       document.getElementById('lev-cuerpo').style.display  = ''
 
-      renderGruposNav()
-      renderLista(insumosVisibles())
+      renderLista()
       actualizarProgreso()
     } catch (e) {
       errEl().textContent = 'Error: ' + e.message
@@ -512,15 +518,6 @@ function mostrarFormLevantamiento() {
     const input = document.getElementById('lev-qty-' + id)
     const v = input ? input.value : levValores[id]
     return v !== '' && v != null && !isNaN(parseFloat(v))
-  }
-
-  function insumosVisibles() {
-    const texto = document.getElementById('lev-search')?.value.toLowerCase().trim() || ''
-    return levInsumos.filter(p => {
-      const enGrupo = levGrupoActivo === 'todos' || (p.grupo || 'Sin grupo') === levGrupoActivo
-      const enTexto = !texto || p.producto.toLowerCase().includes(texto)
-      return enGrupo && enTexto
-    })
   }
 
   function guardarValoresDom() {
@@ -537,76 +534,73 @@ function mostrarFormLevantamiento() {
     if (el) el.textContent = `${formatInt(cap)} de ${formatInt(total)} insumos capturados`
   }
 
-  // ── Render grupos nav ────────────────────────────────────────────────────────
-  function renderGruposNav() {
-    const nav = document.getElementById('lev-grupos-nav')
-    if (!nav) return
-
-    const mkPill = (label, val, count, cap) => {
-      const activo = levGrupoActivo === val ? `background:var(--color-primary);color:#FAF7F2;border-color:var(--color-primary)` : `background:var(--color-card);color:var(--color-text)`
-      return `<button onclick="window._levFiltrarGrupo(${JSON.stringify(val)})"
-        style="padding:6px 14px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;border:1.5px solid var(--color-border);white-space:nowrap;${activo}">
-        ${label} <span style="opacity:0.65;font-weight:400">${cap}/${count}</span>
-      </button>`
-    }
-
-    const todosCap = levInsumos.filter(p => esCaptured(p.id_producto)).length
-    let html = mkPill('Todos', 'todos', levInsumos.length, todosCap)
-    levGrupos.forEach(g => {
-      const items = levInsumos.filter(p => (p.grupo || 'Sin grupo') === g)
-      const cap   = items.filter(p => esCaptured(p.id_producto)).length
-      html += mkPill(g, g, items.length, cap)
-    })
-    nav.innerHTML = html
+  // ── Render lista ─────────────────────────────────────────────────────────────
+  function levGKey(grupo) {
+    return grupo.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '')
   }
 
-  // ── Render lista ─────────────────────────────────────────────────────────────
-  function renderLista(insumos) {
+  function renderInsumoRow(p) {
+    const captured = esCaptured(p.id_producto)
+    const borderColor = captured ? '#3A8C3E' : 'var(--color-border)'
+    const bgCard = captured ? 'var(--color-secondary)' : 'var(--color-card)'
+    const grupo = p.grupo || 'Sin grupo'
+    return `
+      <div id="lev-card-${p.id_producto}"
+        style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--color-border);background:${bgCard}">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:15px;font-weight:600">${p.producto}</div>
+          ${p.clasificacion_abc ? `<div style="font-size:12px;color:var(--color-text-muted)">${p.clasificacion_abc}</div>` : ''}
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0">
+          <input type="number" id="lev-qty-${p.id_producto}"
+            placeholder="—" min="0" step="any" inputmode="decimal"
+            value="${levValores[p.id_producto] ?? ''}"
+            style="width:88px;padding:10px 6px;border:2px solid ${borderColor};border-radius:8px;font-size:22px;font-weight:700;text-align:center;color:var(--color-primary);background:var(--color-card);-webkit-appearance:none"
+            oninput="window._levOnQty('${String(p.id_producto).replace(/'/g, "\\'")}', '${grupo.replace(/'/g, "\\'")}', this)">
+          <span style="font-size:11px;color:var(--color-text-muted)">${p.unidad_medida || ''}</span>
+        </div>
+      </div>`
+  }
+
+  function renderLista() {
     const lista = document.getElementById('lev-lista')
     if (!lista) return
 
-    if (!insumos.length) {
+    if (!levInsumos.length) {
       lista.innerHTML = `<p style="color:var(--color-text-muted);text-align:center;padding:24px 0">Sin insumos para mostrar.</p>`
       return
     }
 
-    const porGrupo = {}
-    insumos.forEach(p => {
-      const g = p.grupo || 'Sin grupo'
-      if (!porGrupo[g]) porGrupo[g] = []
-      porGrupo[g].push(p)
-    })
+    const texto = document.getElementById('lev-search')?.value.toLowerCase().trim() || ''
 
-    lista.innerHTML = Object.entries(porGrupo).map(([grupo, items]) => {
+    if (texto) {
+      // Buscador: cruza insumos de TODOS los grupos a la vez (aplanado),
+      // sin importar si el acordeón de ese grupo está cerrado.
+      const matches = levInsumos.filter(p => p.producto.toLowerCase().includes(texto))
+      lista.innerHTML = !matches.length
+        ? `<p style="color:var(--color-text-muted);text-align:center;padding:24px 0">Sin insumos para mostrar.</p>`
+        : matches.map(renderInsumoRow).join('')
+      return
+    }
+
+    lista.innerHTML = levGrupos.map(grupo => {
+      const items = levInsumos.filter(p => (p.grupo || 'Sin grupo') === grupo)
+      if (!items.length) return ''
       const cap = items.filter(p => esCaptured(p.id_producto)).length
-      const gKey = grupo.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '')
+      const gKey = levGKey(grupo)
+      const abierto = !!levGruposAbiertos[grupo]
       return `
-        <div style="margin-bottom:4px">
-          <div style="padding:7px 0 4px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--color-text-muted);display:flex;justify-content:space-between">
-            <span>${grupo}</span>
-            <span id="lev-gc-${gKey}" style="color:var(--color-primary)">${cap}/${items.length}</span>
+        <div class="ic-grupo${abierto ? ' open' : ''}"
+          style="border:1px solid var(--color-border);border-radius:8px;margin-bottom:8px;overflow:hidden">
+          <div class="ic-grupo-header"
+            style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;cursor:pointer;background:var(--color-surface);user-select:none"
+            onclick="window._levToggleGrupo('${grupo.replace(/'/g, "\\'")}', this.parentElement)">
+            <span style="font-weight:600">${grupo}</span>
+            <span id="lev-gc-${gKey}" style="font-size:12px;color:var(--color-text-muted)">${cap}/${items.length}</span>
           </div>
-          ${items.map(p => {
-            const captured = esCaptured(p.id_producto)
-            const borderColor = captured ? '#3A8C3E' : 'var(--color-border)'
-            const bgCard = captured ? 'var(--color-secondary)' : 'var(--color-card)'
-            return `
-              <div id="lev-card-${p.id_producto}"
-                style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--color-border);background:${bgCard}">
-                <div style="flex:1;min-width:0">
-                  <div style="font-size:15px;font-weight:600">${p.producto}</div>
-                  ${p.clasificacion_abc ? `<div style="font-size:12px;color:var(--color-text-muted)">${p.clasificacion_abc}</div>` : ''}
-                </div>
-                <div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0">
-                  <input type="number" id="lev-qty-${p.id_producto}"
-                    placeholder="—" min="0" step="any" inputmode="decimal"
-                    value="${levValores[p.id_producto] ?? ''}"
-                    style="width:88px;padding:10px 6px;border:2px solid ${borderColor};border-radius:8px;font-size:22px;font-weight:700;text-align:center;color:var(--color-primary);background:var(--color-card);-webkit-appearance:none"
-                    oninput="window._levOnQty(${JSON.stringify(p.id_producto)}, ${JSON.stringify(grupo)}, this)">
-                  <span style="font-size:11px;color:var(--color-text-muted)">${p.unidad_medida || ''}</span>
-                </div>
-              </div>`
-          }).join('')}
+          <div class="ic-grupo-body" style="display:none">
+            ${items.map(renderInsumoRow).join('')}
+          </div>
         </div>`
     }).join('')
   }
@@ -619,27 +613,22 @@ function mostrarFormLevantamiento() {
     if (card) card.style.background = captured ? 'var(--color-secondary)' : 'var(--color-card)'
     input.style.borderColor = captured ? '#3A8C3E' : 'var(--color-border)'
     // Actualizar contador del grupo
-    const gKey = grupo.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '')
+    const gKey = levGKey(grupo)
     const items = levInsumos.filter(p => (p.grupo || 'Sin grupo') === grupo)
     const cap   = items.filter(p => esCaptured(p.id_producto)).length
     const gcEl  = document.getElementById('lev-gc-' + gKey)
     if (gcEl) gcEl.textContent = `${cap}/${items.length}`
-    renderGruposNav()
     actualizarProgreso()
   }
 
-  window._levFiltrarGrupo = function(grupo) {
-    guardarValoresDom()
-    levGrupoActivo = grupo
-    const s = document.getElementById('lev-search')
-    if (s) s.value = ''
-    renderGruposNav()
-    renderLista(insumosVisibles())
+  window._levToggleGrupo = function(grupo, el) {
+    const abierto = el.classList.toggle('open')
+    levGruposAbiertos[grupo] = abierto
   }
 
   document.getElementById('lev-search').addEventListener('input', () => {
     guardarValoresDom()
-    renderLista(insumosVisibles())
+    renderLista()
   })
 
   // ── Guardar ──────────────────────────────────────────────────────────────────
