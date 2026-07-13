@@ -92,8 +92,6 @@ function _limpiarCacheGlobal() {
   window._invConteo            = null
   window._invProdMap           = null
   window._nombreProv           = null
-  window._sugeridoPorProveedor = null
-  window._sugeridoItemsRef     = null
   window._cierresData          = null
   window._tenant_id_rec        = null
 }
@@ -216,7 +214,6 @@ async function mostrarApp(rol, email, tenant_id = null) {
     if (view === 'ventas')           await vistaVentas()
     if (view === 'inventario')       await vistaInventarioAnalitico()
     if (view === 'inventarios')      await vistaInventariosConteo()
-    if (view === 'sugerido')         await vistaSugeridoCompra()
     if (view === 'cierres')          await vistaCierres()
     if (view === 'consumo')          await vistaConsumo()
     if (view === 'recepciones')      await vistaRecepciones()
@@ -237,12 +234,12 @@ async function mostrarApp(rol, email, tenant_id = null) {
 
   // Nav agrupado según rol
   const permitidasPorRol = {
-    superadmin: ['inicio','productos','recetas','precios','costeo','pedidos','tesoreria','gastos','mrp','ventas','cierres','consumo','recepciones','incidencias','inventario','inventarios','sugerido'],
-    owner:      ['inicio','productos','recetas','ventas','cierres','consumo','recepciones','incidencias','inventario','inventarios','sugerido'],
-    gerente:    ['inicio','productos','recetas','ventas','cierres','consumo','recepciones','incidencias','inventario','inventarios','sugerido'],
+    superadmin: ['inicio','productos','recetas','precios','costeo','pedidos','tesoreria','gastos','mrp','ventas','cierres','consumo','recepciones','incidencias','inventario','inventarios'],
+    owner:      ['inicio','productos','recetas','ventas','cierres','consumo','recepciones','incidencias','inventario','inventarios'],
+    gerente:    ['inicio','productos','recetas','ventas','cierres','consumo','recepciones','incidencias','inventario','inventarios'],
     caja:       ['productos','recetas','ventas'],
     // legacy
-    admin:      ['inicio','productos','recetas','precios','costeo','pedidos','tesoreria','gastos','mrp','ventas','cierres','consumo','recepciones','incidencias','inventario','inventarios','sugerido'],
+    admin:      ['inicio','productos','recetas','precios','costeo','pedidos','tesoreria','gastos','mrp','ventas','cierres','consumo','recepciones','incidencias','inventario','inventarios'],
     editor:     ['inicio','productos','recetas']
   }
   const visibles = permitidasPorRol[window._rol] || ['inicio','productos','recetas','precios','costeo','pedidos']
@@ -250,7 +247,7 @@ async function mostrarApp(rol, email, tenant_id = null) {
   const navGrupos = [
     { label: 'Menú',        vistas: ['productos','recetas'],                                 roles: ['superadmin','admin','owner','gerente','editor','caja','cocina'] },
     { label: 'Operación',   vistas: ['ventas','cierres','consumo','recepciones','incidencias'], roles: ['superadmin','admin','owner','gerente','editor'] },
-    { label: 'Inventarios', vistas: ['inventario','inventarios','sugerido'], roles: ['superadmin','admin','owner','gerente','editor'] },
+    { label: 'Inventarios', vistas: ['inventario','inventarios'], roles: ['superadmin','admin','owner','gerente','editor'] },
     { label: 'Desarrollo',  vistas: ['inicio','precios','costeo','pedidos','tesoreria','gastos','mrp'],                 roles: ['superadmin','admin'] }
   ]
 
@@ -258,7 +255,7 @@ async function mostrarApp(rol, email, tenant_id = null) {
     inicio: 'Inicio', productos: '🧂 Insumos y Subrecetas', recetas: '📖 Recetas',
     precios: 'Precios', costeo: 'Costeo', pedidos: 'Pedidos', tesoreria: '🏦 Tesorería', gastos: '💸 Gastos', mrp: '📐 MRP',
     ventas: '🧾 Ventas', cierres: '🔒 Cierres', consumo: '🧮 Consumo', recepciones: '📦 Recepciones', incidencias: '⚠️ Incidencias',
-    inventario: '🔍 Diagnóstico', inventarios: '📋 Conteos', sugerido: '🛒 Sugerido de Compra'
+    inventario: '🔍 Diagnóstico', inventarios: '📋 Conteos'
   }
 
   let navHtml = ''
@@ -327,7 +324,6 @@ async function mostrarApp(rol, email, tenant_id = null) {
   else if (vistaInicial === 'ventas')      vistaVentas()
   else if (vistaInicial === 'inventario')  vistaInventarioAnalitico()
   else if (vistaInicial === 'inventarios') vistaInventariosConteo()
-  else if (vistaInicial === 'sugerido')    vistaSugeridoCompra()
   else if (vistaInicial === 'cierres')     vistaCierres()
   else if (vistaInicial === 'consumo')     vistaConsumo()
   else if (vistaInicial === 'recepciones')    vistaRecepciones()
