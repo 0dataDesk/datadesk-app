@@ -9,6 +9,12 @@ async function vistaInventario() {
       <div class="vista-header"><h2>Inventario</h2></div>
       <div class="filtros-bar">
         <input type="text" id="inv-search" placeholder="Buscar insumo..." class="filtro-search" oninput="invRenderizar()" />
+        <select id="inv-clasificacion" class="filtro-select" onchange="invRenderizar()">
+          <option value="todas">Clasificación: Todas</option>
+          <option value="A">A</option>
+          <option value="B">B</option>
+          <option value="C">C</option>
+        </select>
         ${['superadmin','admin','gerente'].includes(window._rol) ? `<button class="btn-accion btn-aprobar" onclick="exportarInventarioExcel()">Exportar Excel</button>` : ''}
         ${['superadmin','admin','gerente'].includes(window._rol) ? `<button class="btn-accion" style="border:1px solid var(--color-border)" onclick="exportarInventarioPDF()">Exportar PDF</button>` : ''}
       </div>
@@ -83,11 +89,14 @@ async function vistaInventario() {
     window.invRenderizar = window.renderInventario = function() {
       const resultado = document.getElementById('inv-resultado')
       const texto = document.getElementById('inv-search')?.value.toLowerCase() || ''
+      const clasificacion = document.getElementById('inv-clasificacion')?.value || 'todas'
+      const pm = window._invProdMap || {}
 
       const filtrados = window._invConteo.filter(c => {
         const enGrupo = window._invGrupoActivo === 'todos' || c.grupo === window._invGrupoActivo
         const enTexto = !texto || c.producto.toLowerCase().includes(texto)
-        return enGrupo && enTexto
+        const enClasificacion = clasificacion === 'todas' || pm[c.id_producto]?.clasificacion_abc === clasificacion
+        return enGrupo && enTexto && enClasificacion
       })
 
       if (!filtrados.length) {
