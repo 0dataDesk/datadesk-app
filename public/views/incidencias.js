@@ -6,6 +6,29 @@
 const INC_MESES_NOMBRES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const INC_MESES_CORTOS  = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
 
+// Metadata de grupo para el acordeón de insumos del paso 2 de Merma (mismo criterio
+// que PR_GRUPO_META en productos.js, copiado en vez de reutilizado — mismo motivo
+// que consumo.js: no acoplar este archivo a los globals de otro view file).
+const INC_GRUPO_META = {
+  'Carnes y Proteínas': { orden: 1, emoji: '🥩', color: '#B85C2A' },
+  'Lácteos y Quesos':   { orden: 2, emoji: '🧀', color: '#6A9BB5' },
+  'Verduras y Frescos': { orden: 3, emoji: '🥬', color: '#4A7A3A' },
+  'Despensa':           { orden: 4, emoji: '🥫', color: '#C8892A' },
+  'Subrecetas':         { orden: 5, emoji: '⚗️', color: '#8A5FB0' },
+  'Bebidas':            { orden: 6, emoji: '🥤', color: '#3D9BA8' },
+  'Desechables':        { orden: 7, emoji: '🗑️', color: '#9B7B6A' }
+}
+const INC_META_DEFAULT = { orden: 99, emoji: '📦', color: '#9B7B6A' }
+
+// Justificaciones clásicas para merma — "Otro" habilita un campo libre obligatorio.
+const INC_MERMA_JUSTIFICACIONES = [
+  'Caducidad/vencimiento',
+  'Error de manejo o manipulación',
+  'Se cayó / se rompió',
+  'Contaminación',
+  'Error de recepción (llegó en mal estado)'
+]
+
 function _getLunesInc(fechaStr) {
   const d = new Date(fechaStr + 'T12:00:00')
   const day = d.getDay() || 7
@@ -477,7 +500,7 @@ async function _incElegirTipo(tipo) {
     if (tipo === 'merma' && !window._incInsumosCache) {
       const { data, error } = await window._db
         .from('productos')
-        .select('id_producto, producto, unidad_medida')
+        .select('id_producto, producto, unidad_medida, grupo')
         .eq('tenant_id', tenant_id)
         .eq('tipo', 'Insumo')
         .eq('activo', true)
@@ -514,32 +537,104 @@ function _incRenderPaso2(body) {
   }
 
   const esProduccion = w.tipo === 'produccion_subreceta'
-  const opciones = esProduccion ? (window._incSubrecetasCache || []) : (window._incInsumosCache || [])
   const buscar = (w.buscar2 || '').toLowerCase()
-  const filtradas = buscar
-    ? opciones.filter(o => (esProduccion ? o.nombre_platillo : o.producto).toLowerCase().includes(buscar))
-    : opciones
-
   const idSel = esProduccion ? w.subrecetaSel?.id : w.insumoSel?.id
+  const nombreSel = esProduccion ? w.subrecetaSel?.nombre : w.insumoSel?.nombre
+
+  // Confirmación fija de selección — antes, al elegir de la lista, el re-render
+  // hacía scroll al inicio y ocultaba la fila elegida (parecía que no pasó nada).
+  // Este bloque queda visible arriba, sin necesidad de scrollear a buscar la fila.
+  const seleccionadoHtml = idSel
+    ? `<div style="padding:10px 12px;border-radius:8px;background:rgba(58,140,62,0.1);border:1px solid rgba(58,140,62,0.3);color:#3A8C3E;font-size:13px;font-weight:600;margin-bottom:10px">
+        ✓ Seleccionado: ${nombreSel}
+      </div>`
+    : ''
+
+  let listaHtml
+  let agrupado = false
+
+  if (esProduccion) {
+    const opciones = window._incSubrecetasCache || []
+    const filtradas = buscar
+      ? opciones.filter(o => o.nombre_platillo.toLowerCase().includes(buscar))
+      : opciones
+    listaHtml = filtradas.length
+      ? filtradas.map(o => _incFilaOpcionHtml(o.id_receta, o.nombre_platillo, idSel)).join('')
+      : `<p style="padding:12px;color:var(--color-text-muted);font-size:13px">Sin resultados.</p>`
+  } else {
+    // MERMA — acordeón por grupo (mismo patrón que productos.js), con buscador
+    // que cruza todos los grupos a la vez en vez de listar insumos sin agrupar.
+    const opciones = window._incInsumosCache || []
+    const filtradas = buscar
+      ? opciones.filter(o => o.producto.toLowerCase().includes(buscar))
+      : opciones
+
+    if (buscar) {
+      listaHtml = filtradas.length
+        ? filtradas.map(o => _incFilaOpcionHtml(o.id_producto, o.producto, idSel)).join('')
+        : `<p style="padding:12px;color:var(--color-text-muted);font-size:13px">Sin resultados.</p>`
+    } else {
+      agrupado = true
+      const porGrupo = {}
+      filtradas.forEach(o => {
+        const g = o.grupo || 'Sin grupo'
+        if (!porGrupo[g]) porGrupo[g] = []
+        porGrupo[g].push(o)
+      })
+      const grupos = Object.keys(porGrupo).sort((a, b) => {
+        const ma = INC_GRUPO_META[a] || INC_META_DEFAULT
+        const mb = INC_GRUPO_META[b] || INC_META_DEFAULT
+        return ma.orden - mb.orden
+      })
+      listaHtml = grupos.length
+        ? grupos.map(g => {
+            const meta  = INC_GRUPO_META[g] || INC_META_DEFAULT
+            const prods = porGrupo[g]
+            const contieneSel = !!idSel && prods.some(o => o.id_producto === idSel)
+            const gid = `inc-grupo-${g.replace(/[^a-zA-Z0-9]/g, '-')}`
+            return `
+              <div style="border:1px solid var(--color-border);border-left:4px solid ${meta.color};border-radius:8px;margin-bottom:6px;overflow:hidden">
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;cursor:pointer;background:var(--color-secondary);user-select:none"
+                  onclick="(function(el){
+                    const b=document.getElementById('${gid}');
+                    const open=b.style.display!=='none';
+                    b.style.display=open?'none':'';
+                    el.querySelector('.inc-grupo-chev').textContent=open?'▶':'▼';
+                  })(this)">
+                  <span style="font-size:13px;font-weight:600">${meta.emoji} ${g}</span>
+                  <span style="display:flex;align-items:center;gap:6px">
+                    <span style="font-size:11px;color:var(--color-text-muted)">${prods.length}</span>
+                    <span class="inc-grupo-chev" style="font-size:11px;color:var(--color-text-muted)">${contieneSel ? '▼' : '▶'}</span>
+                  </span>
+                </div>
+                <div id="${gid}" style="display:${contieneSel ? '' : 'none'}">
+                  ${prods.map(o => _incFilaOpcionHtml(o.id_producto, o.producto, idSel)).join('')}
+                </div>
+              </div>`
+          }).join('')
+        : `<p style="padding:12px;color:var(--color-text-muted);font-size:13px">Sin resultados.</p>`
+    }
+  }
 
   body.innerHTML = `
     <p style="font-size:13px;font-weight:600;margin:0 0 8px">${esProduccion ? '¿Qué subreceta se preparó?' : '¿Qué insumo se perdió?'}</p>
+    ${seleccionadoHtml}
     <input type="text" id="inc-paso2-buscar" class="filtro-search" style="width:100%;box-sizing:border-box"
       placeholder="Buscar..." value="${(w.buscar2 || '').replace(/"/g, '&quot;')}" oninput="_incFiltrarPaso2(this.value)">
-    <div style="max-height:260px;overflow-y:auto;border:1px solid var(--color-border);border-radius:8px;margin-top:8px">
-      ${filtradas.length ? filtradas.map(o => {
-        const id     = esProduccion ? o.id_receta : o.id_producto
-        const nombre = esProduccion ? o.nombre_platillo : o.producto
-        const activo = idSel === id
-        return `<div style="padding:10px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--color-border);${activo ? 'background:var(--color-secondary);font-weight:600' : ''}"
-          onclick="_incSeleccionarOpcion2('${id.replace(/'/g, "\\'")}')">${nombre}</div>`
-      }).join('') : `<p style="padding:12px;color:var(--color-text-muted);font-size:13px">Sin resultados.</p>`}
+    <div style="max-height:320px;overflow-y:auto;margin-top:8px;${agrupado ? '' : 'border:1px solid var(--color-border);border-radius:8px'}">
+      ${listaHtml}
     </div>
     <div style="display:flex;justify-content:space-between;margin-top:16px">
       <button class="btn-accion" style="border:1px solid var(--color-border);background:var(--color-secondary)" onclick="_incIrPaso(1)">← Atrás</button>
       <button class="btn-accion btn-aprobar" ${idSel ? '' : 'disabled'} onclick="_incIrPaso3()">Siguiente →</button>
     </div>
   `
+}
+
+function _incFilaOpcionHtml(id, nombre, idSel) {
+  const activo = idSel === id
+  return `<div style="padding:10px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--color-border);${activo ? 'background:var(--color-secondary);font-weight:600' : ''}"
+    onclick="_incSeleccionarOpcion2('${id.replace(/'/g, "\\'")}')">${nombre}</div>`
 }
 
 function _incFiltrarPaso2(val) {
@@ -632,10 +727,11 @@ function _incRenderPaso3(body) {
     return
   }
 
-  const campoNum = (id, label, requerido) => `
+  const campoNum = (id, label, requerido, ayuda) => `
     <label style="display:flex;flex-direction:column;gap:4px;font-size:13px">
       ${label}${requerido ? ' *' : ' (opcional)'}
       <input type="number" id="${id}" min="0" step="any" class="filtro-search" style="width:100%;box-sizing:border-box">
+      ${ayuda ? `<span style="font-size:11px;font-weight:400;color:var(--color-text-muted)">${ayuda}</span>` : ''}
     </label>`
 
   if (w.tipo === 'produccion_subreceta') {
@@ -648,9 +744,9 @@ function _incRenderPaso3(body) {
           : 'Esta subreceta ya tiene receta fija con rendimiento definido — solo se necesita trazabilidad de cuánto se produjo.'}
       </p>
       <div style="display:flex;flex-direction:column;gap:12px">
-        ${campoNum('inc-cant-producida', 'Cantidad producida', true)}
-        ${esUnico ? campoNum('inc-cant-insumo', `Cantidad de insumo consumido (${w.insumoUnico.producto}${w.insumoUnicoUnidad ? ' — ' + w.insumoUnicoUnidad : ''})`, true) : ''}
-        ${campoNum('inc-merma-adicional', 'Merma adicional', false)}
+        ${campoNum('inc-cant-producida', 'Cantidad producida', true, 'Lo que realmente quedó disponible para usar, ya neto de cualquier accidente.')}
+        ${esUnico ? campoNum('inc-cant-insumo', `Cantidad de insumo consumido (${w.insumoUnico.producto}${w.insumoUnicoUnidad ? ' — ' + w.insumoUnicoUnidad : ''})`, true, 'Sirve para ir afinando con el tiempo el rendimiento real de esta subreceta.') : ''}
+        ${campoNum('inc-merma-adicional', 'Merma adicional', false, 'Solo para accidentes (se quemó, se tiró, se contaminó) aparte de la merma normal del proceso. No afecta el consumo de insumos — es solo registro.')}
       </div>
       <div id="inc-guardar-error" style="color:var(--color-highlight);font-size:13px;margin-top:10px"></div>
       <div style="display:flex;justify-content:space-between;margin-top:16px">
@@ -665,8 +761,16 @@ function _incRenderPaso3(body) {
       <div style="display:flex;flex-direction:column;gap:12px">
         ${campoNum('inc-cant-perdida', `Cantidad perdida${w.insumoSel.unidad ? ' (' + w.insumoSel.unidad + ')' : ''}`, true)}
         <label style="display:flex;flex-direction:column;gap:4px;font-size:13px">
-          Descripción (opcional)
-          <textarea id="inc-descripcion" rows="2" class="filtro-search" style="width:100%;box-sizing:border-box;resize:vertical"></textarea>
+          Justificación *
+          <select id="inc-justificacion" class="filtro-select" style="width:100%;box-sizing:border-box" onchange="_incToggleJustifOtro(this.value)">
+            <option value="">— Selecciona una —</option>
+            ${INC_MERMA_JUSTIFICACIONES.map(j => `<option value="${j}">${j}</option>`).join('')}
+            <option value="OTRO">Otro (especificar)</option>
+          </select>
+        </label>
+        <label id="inc-justif-otro-wrap" style="display:none;flex-direction:column;gap:4px;font-size:13px">
+          Especifica la justificación *
+          <input type="text" id="inc-justificacion-otro" class="filtro-search" style="width:100%;box-sizing:border-box" placeholder="Describe qué pasó">
         </label>
       </div>
       <div id="inc-guardar-error" style="color:var(--color-highlight);font-size:13px;margin-top:10px"></div>
@@ -676,6 +780,12 @@ function _incRenderPaso3(body) {
       </div>
     `
   }
+}
+
+function _incToggleJustifOtro(val) {
+  const wrap = document.getElementById('inc-justif-otro-wrap')
+  if (!wrap) return
+  wrap.style.display = val === 'OTRO' ? 'flex' : 'none'
 }
 
 // ── Guardar ───────────────────────────────────────────────────────────────────
@@ -723,7 +833,22 @@ async function guardarIncidencia() {
       if (errEl) errEl.textContent = 'Captura la cantidad perdida.'
       return
     }
-    const descripcion = document.getElementById('inc-descripcion')?.value.trim() || null
+
+    const justificacion = document.getElementById('inc-justificacion')?.value
+    if (!justificacion) {
+      if (errEl) errEl.textContent = 'Selecciona una justificación.'
+      return
+    }
+    let descripcion
+    if (justificacion === 'OTRO') {
+      descripcion = document.getElementById('inc-justificacion-otro')?.value.trim()
+      if (!descripcion) {
+        if (errEl) errEl.textContent = 'Escribe la justificación.'
+        return
+      }
+    } else {
+      descripcion = justificacion
+    }
 
     payload = {
       tipo: 'merma',
