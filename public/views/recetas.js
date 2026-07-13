@@ -293,7 +293,10 @@ function renderRecPlatillos(wrap) {
         }
         return `
           <button class="rec-tile" style="border-left:4px solid ${meta.color};position:relative" onclick="recIrDetalle('${r.id_receta}')">
-            ${r.destacado ? '<span style="position:absolute;top:6px;right:8px;font-size:14px">⭐</span>' : ''}
+            <div class="rec-tile-badges">
+              ${r.destacado ? '<span class="rec-badge-destacado">⭐</span>' : ''}
+              ${r.colaboracion ? '<span class="rec-badge-colab">🤝</span>' : ''}
+            </div>
             <div class="rec-tile-titulo">${r.nombre_platillo}</div>
           </button>`
       }).join('')}
@@ -667,7 +670,7 @@ async function cargarDetalleReceta(receta) {
       <div class="receta-detalle-card">
         <div class="detalle-header">
           <div>
-            <h3>${receta.nombre_platillo}${receta.destacado ? ' ⭐' : ''}</h3>
+            <h3>${receta.nombre_platillo}${receta.destacado ? ' ⭐' : ''}${receta.colaboracion ? ' <span class="rec-badge-colab-inline">🤝 Colab</span>' : ''}</h3>
             <p class="detalle-categoria">${_recCatLabel(window._recTenantActual, receta.categoria || '')}${receta.subcategoria ? ' · ' + receta.subcategoria : ''}</p>
           </div>
         </div>

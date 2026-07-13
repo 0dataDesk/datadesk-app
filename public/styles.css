@@ -745,6 +745,28 @@ body {
 .rec-tile .rec-tile-titulo { font-weight: 600; font-size: 14px; color: var(--color-text); margin-bottom: 4px; }
 .rec-tile .rec-tile-sub { font-size: 12px; color: var(--color-text-muted); }
 
+.rec-tile-badges { position: absolute; top: 6px; right: 8px; display: flex; align-items: center; gap: 4px; }
+.rec-badge-destacado { font-size: 14px; }
+.rec-badge-colab {
+  font-size: 11px;
+  line-height: 1;
+  background: #3D9BA8;
+  color: #FFFFFF;
+  border-radius: 8px;
+  padding: 3px 5px;
+}
+.rec-badge-colab-inline {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  background: #3D9BA8;
+  color: #FFFFFF;
+  border-radius: 10px;
+  padding: 2px 8px;
+  vertical-align: middle;
+  margin-left: 4px;
+}
+
 .rec-volver-btn {
   background: var(--color-secondary);
   border: 1px solid var(--color-border);
