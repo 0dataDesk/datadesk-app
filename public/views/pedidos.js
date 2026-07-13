@@ -6,7 +6,7 @@ async function vistaPedidos() {
 
   const { data: pedidos, error } = await window._db
     .from('pedidos')
-    .select('id_pedido, id_proveedor, fecha_pedido, fecha_entrega_esperada, status, notas')
+    .select('id_pedido, id_proveedor, fecha_pedido, fecha_entrega_esperada, status, notas, id_corrida_mrp')
     .eq('tenant_id', tenant_id)
     .order('created_at', { ascending: false })
 
@@ -61,7 +61,7 @@ async function vistaPedidos() {
     const badge = badgeStatus[p.status] || ''
     html += `
       <tr style="cursor:pointer" onclick="vistaPedidoDetalle('${p.id_pedido}')">
-        <td><strong>${p.id_pedido}</strong></td>
+        <td><strong>${p.id_pedido}</strong>${p.id_corrida_mrp ? '<br><span style="display:inline-block;margin-top:3px;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;background:rgba(138,95,176,0.12);color:#8A5FB0;border:1px solid rgba(138,95,176,0.3)">🤖 Generado por MRP</span>' : ''}</td>
         <td>${nombreProv[p.id_proveedor] || p.id_proveedor}</td>
         <td>${p.fecha_pedido || '—'}</td>
         <td>${p.fecha_entrega_esperada || '—'}</td>

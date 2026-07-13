@@ -73,7 +73,7 @@ async function vistaPedidoDetalle(id_pedido) {
 
   content.innerHTML = `
     <div class="vista-header">
-      <h2>${id_pedido}</h2>
+      <h2>${id_pedido}${pedido.id_corrida_mrp ? ' <span style="display:inline-block;vertical-align:middle;margin-left:6px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;background:rgba(138,95,176,0.12);color:#8A5FB0;border:1px solid rgba(138,95,176,0.3)">🤖 Generado por MRP</span>' : ''}</h2>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <select class="filtro-select" style="font-size:12px"
           onchange="cambiarStatusPedido('${id_pedido}', this.value)">${statusOpciones}</select>
