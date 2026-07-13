@@ -68,6 +68,12 @@ async function vistaProductos() {
 
       <div class="filtros-bar">
         <input type="text" id="insumos-search" placeholder="Buscar insumo..." class="filtro-search" />
+        <select id="insumos-clasificacion" class="filtro-select">
+          <option value="todas">Clasificación: Todas</option>
+          <option value="A">A</option>
+          <option value="B">B</option>
+          <option value="C">C</option>
+        </select>
       </div>
       <div id="insumos-lista-wrap"></div>
     `
@@ -227,12 +233,15 @@ async function vistaProductos() {
 
     const aplicarFiltros = () => {
       const texto = document.getElementById('insumos-search')?.value.toLowerCase().trim() || ''
-      if (!texto) return { lista: window._productos, buscando: false, termino: '' }
-      return {
-        lista: window._productos.filter(p => p.producto?.toLowerCase().includes(texto)),
-        buscando: true,
-        termino: texto
-      }
+      const clasificacion = document.getElementById('insumos-clasificacion')?.value || 'todas'
+
+      const lista = window._productos.filter(p => {
+        const enTexto = !texto || p.producto?.toLowerCase().includes(texto)
+        const enClasificacion = clasificacion === 'todas' || p.clasificacion_abc === clasificacion
+        return enTexto && enClasificacion
+      })
+
+      return { lista, buscando: !!texto, termino: texto }
     }
 
     // Cargar proveedores para el panel de inventario
@@ -242,13 +251,15 @@ async function vistaProductos() {
       window._proveedoresCache = provs || []
     }
 
-    document.getElementById('insumos-search').addEventListener('input', () => {
+    const actualizarListaInsumos = () => {
       const { lista, buscando, termino } = aplicarFiltros()
       renderTabla(lista, buscando, termino)
-    })
+    }
 
-    const inicial = aplicarFiltros()
-    renderTabla(inicial.lista, inicial.buscando, inicial.termino)
+    document.getElementById('insumos-search').addEventListener('input', actualizarListaInsumos)
+    document.getElementById('insumos-clasificacion').addEventListener('change', actualizarListaInsumos)
+
+    actualizarListaInsumos()
 
   } catch (err) {
     content.innerHTML = `<p style="color:var(--color-highlight)">Error: ${err.message}</p>`
