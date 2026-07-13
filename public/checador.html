@@ -75,11 +75,19 @@
       document.getElementById('card').innerHTML = html
     }
 
-    function pantallaSinRegistro() {
+    // motivo: 'sin_token' (nunca se guardó un token en este navegador) vs
+    // 'no_reconocido' (había token guardado, pero el servidor lo rechazó dos
+    // veces seguidas) — mismo mensaje principal para el empleado, pero con una
+    // línea técnica chica para que un reporte futuro ya distinga cuál fue.
+    function pantallaSinRegistro(motivo) {
+      const tecnico = motivo === 'no_reconocido'
+        ? 'Había un token guardado en este teléfono, pero el servidor no lo reconoció (2 intentos).'
+        : 'No hay ningún token guardado en este navegador.'
       render(`
         <div class="icono">📵</div>
         <h1>Este teléfono no está registrado</h1>
         <p>Pide que te den de alta.</p>
+        <p style="font-size:11px;color:#b0a599;margin-top:14px">${tecnico}</p>
       `)
     }
 
@@ -131,6 +139,46 @@
       `)
     }
 
+    // Llama fn_checar_asistencia con las coordenadas ya obtenidas. Si el servidor
+    // responde dispositivo_no_reconocido, reintenta UNA vez antes de asumir que
+    // el dispositivo de verdad no está dado de alta — un error transitorio (red
+    // intermitente, RPC lenta) no debe borrar un token que sigue siendo válido.
+    async function llamarChecarAsistencia(lat, lng, esReintento) {
+      try {
+        const { data, error } = await window._db.rpc('fn_checar_asistencia', {
+          p_token: TOKEN,
+          p_lat: lat,
+          p_lng: lng
+        })
+
+        if (error) throw error
+
+        if (data && data.error === 'dispositivo_no_reconocido') {
+          if (!esReintento) {
+            await llamarChecarAsistencia(lat, lng, true)
+            return
+          }
+          localStorage.removeItem(`${TENANT}_dispositivo_token`)
+          pantallaSinRegistro('no_reconocido')
+          return
+        }
+
+        if (data && data.error === 'geocerca_no_configurada') {
+          pantallaErrorGenerico('Este negocio todavía no tiene su ubicación configurada. Avisa a tu administrador.')
+          return
+        }
+
+        if (data && data.id_registro) {
+          pantallaExito(data)
+          return
+        }
+
+        pantallaErrorGenerico('Intenta de nuevo en unos segundos.')
+      } catch (err) {
+        pantallaErrorGenerico('Intenta de nuevo en unos segundos.')
+      }
+    }
+
     async function solicitarUbicacion() {
       pantallaPidiendoUbicacion()
 
@@ -140,37 +188,7 @@
       }
 
       navigator.geolocation.getCurrentPosition(
-        async (pos) => {
-          try {
-            const { data, error } = await window._db.rpc('fn_checar_asistencia', {
-              p_token: TOKEN,
-              p_lat: pos.coords.latitude,
-              p_lng: pos.coords.longitude
-            })
-
-            if (error) throw error
-
-            if (data && data.error === 'dispositivo_no_reconocido') {
-              localStorage.removeItem(`${TENANT}_dispositivo_token`)
-              pantallaSinRegistro()
-              return
-            }
-
-            if (data && data.error === 'geocerca_no_configurada') {
-              pantallaErrorGenerico('Este negocio todavía no tiene su ubicación configurada. Avisa a tu administrador.')
-              return
-            }
-
-            if (data && data.id_registro) {
-              pantallaExito(data)
-              return
-            }
-
-            pantallaErrorGenerico('Intenta de nuevo en unos segundos.')
-          } catch (err) {
-            pantallaErrorGenerico('Intenta de nuevo en unos segundos.')
-          }
-        },
+        (pos) => llamarChecarAsistencia(pos.coords.latitude, pos.coords.longitude, false),
         (err) => {
           if (err.code === err.PERMISSION_DENIED) {
             pantallaPermisoRechazado()
@@ -197,7 +215,7 @@
 
       TOKEN = localStorage.getItem(`${TENANT}_dispositivo_token`)
       if (!TOKEN) {
-        pantallaSinRegistro()
+        pantallaSinRegistro('sin_token')
         return
       }
 

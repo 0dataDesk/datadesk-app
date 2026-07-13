@@ -137,12 +137,19 @@ async function renderPersonalEmpleados() {
   const cont = document.getElementById('personal-tab-content')
   const tenant_id = window._personalTenant
 
-  const { data: empleados, error } = await window._db
-    .from('empleados')
-    .select('id, nombre, puesto, activo')
-    .eq('tenant_id', tenant_id)
-    .order('activo', { ascending: false })
-    .order('nombre')
+  const [{ data: empleados, error }, { data: dispositivos }] = await Promise.all([
+    window._db
+      .from('empleados')
+      .select('id, nombre, puesto, activo')
+      .eq('tenant_id', tenant_id)
+      .order('activo', { ascending: false })
+      .order('nombre'),
+    window._db
+      .from('dispositivos_empleado')
+      .select('id_empleado')
+      .eq('tenant_id', tenant_id)
+      .eq('activo', true)
+  ])
 
   if (error) {
     cont.innerHTML = `<p style="color:var(--color-highlight)">Error: ${error.message}</p>`
@@ -150,6 +157,9 @@ async function renderPersonalEmpleados() {
   }
 
   window._personalEmpleados = empleados || []
+  // No importa si un empleado tiene más de un dispositivo activo (puede pasar,
+  // ej. re-escaneó el link de alta) — no es error, el indicador es el mismo.
+  const conDispositivo = new Set((dispositivos || []).map(d => d.id_empleado))
 
   cont.innerHTML = `
     <div class="vista-header" style="margin-bottom:16px">
@@ -173,7 +183,10 @@ async function renderPersonalEmpleados() {
             ? `<tr><td colspan="4" style="text-align:center;color:var(--color-text-muted)">Sin empleados registrados.</td></tr>`
             : empleados.map(e => `
               <tr>
-                <td style="font-weight:600">${e.nombre}</td>
+                <td style="font-weight:600">
+                  ${e.nombre}
+                  ${conDispositivo.has(e.id) ? `<span style="margin-left:8px;font-size:11px;font-weight:600;color:#3A8C3E;white-space:nowrap">📱 Dispositivo registrado</span>` : ''}
+                </td>
                 <td>${e.puesto}</td>
                 <td>
                   <span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;${e.activo ? 'background:rgba(76,153,80,0.12);color:#3A8C3E' : 'background:rgba(184,92,42,0.1);color:var(--color-highlight)'}">
@@ -297,27 +310,43 @@ function _personalCopiarLink(url, btn) {
 // ── TAB: HORARIOS ────────────────────────────────────────────────────────────
 // ══════════════════════════════════════════════════════════════════════════
 
-// La semana que se edita es siempre la próxima (lunes a domingo entrante),
-// pensado para cargarse los viernes de la semana en curso.
+// Default al abrir la vista: la próxima semana (lunes a domingo entrante),
+// pensado para cargarse los viernes de la semana en curso. La navegación
+// manual (‹ Semana anterior / Siguiente semana ›) parte de acá pero puede
+// moverse a cualquier otra semana, incluida la actual.
 function _personalProximaSemana() {
   const hoy = new Date()
   const day = hoy.getDay() || 7 // Lunes=1 ... Domingo=7
   const diasHastaProximoLunes = 8 - day
   const proximoLunes = new Date(hoy)
   proximoLunes.setDate(hoy.getDate() + diasHastaProximoLunes)
+  return _personalFechasDesdeLunes(proximoLunes.toISOString().split('T')[0])
+}
+
+// Construye las 7 fechas (lunes a domingo) a partir de un lunes dado.
+function _personalFechasDesdeLunes(lunesStr) {
+  const lunes = new Date(lunesStr + 'T12:00:00')
   const fechas = []
   for (let i = 0; i < 7; i++) {
-    const d = new Date(proximoLunes)
-    d.setDate(proximoLunes.getDate() + i)
+    const d = new Date(lunes)
+    d.setDate(lunes.getDate() + i)
     fechas.push(d.toISOString().split('T')[0])
   }
   return fechas
 }
 
-async function renderPersonalHorarios() {
+// Mueve la semana mostrada 7 días atrás/adelante desde la que está en pantalla.
+async function _personalCambiarSemanaHorarios(deltaDias) {
+  const actual = window._personalHorariosFechas || _personalProximaSemana()
+  const lunesActual = new Date(actual[0] + 'T12:00:00')
+  lunesActual.setDate(lunesActual.getDate() + deltaDias)
+  await renderPersonalHorarios(_personalFechasDesdeLunes(lunesActual.toISOString().split('T')[0]))
+}
+
+async function renderPersonalHorarios(fechasOverride) {
   const cont = document.getElementById('personal-tab-content')
   const tenant_id = window._personalTenant
-  const fechas = _personalProximaSemana()
+  const fechas = fechasOverride || _personalProximaSemana()
   window._personalHorariosFechas = fechas
 
   const [{ data: empleados, error: errE }, { data: horarios, error: errH }] = await Promise.all([
@@ -344,8 +373,12 @@ async function renderPersonalHorarios() {
   const domLabel = new Date(domingo + 'T12:00:00')
 
   cont.innerHTML = `
-    <div class="vista-header" style="margin-bottom:16px">
-      <h3 style="font-family:var(--font-brand);font-size:18px">Semana del ${lunLabel.getDate()} al ${domLabel.getDate()} de ${PERSASIS_MESES_NOMBRES[domLabel.getMonth()]}</h3>
+    <div class="vista-header" style="margin-bottom:16px;flex-wrap:wrap;gap:12px">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <button class="btn-accion" style="border:1px solid var(--color-border)" onclick="_personalCambiarSemanaHorarios(-7)">‹ Semana anterior</button>
+        <h3 style="font-family:var(--font-brand);font-size:18px;margin:0">Semana del ${lunLabel.getDate()} al ${domLabel.getDate()} de ${PERSASIS_MESES_NOMBRES[domLabel.getMonth()]} ${domLabel.getFullYear()}</h3>
+        <button class="btn-accion" style="border:1px solid var(--color-border)" onclick="_personalCambiarSemanaHorarios(7)">Siguiente semana ›</button>
+      </div>
       <button class="btn-accion btn-aprobar" onclick="guardarPersonalHorarios()">Guardar horarios</button>
     </div>
     <div id="personal-horarios-avisos"></div>
@@ -459,7 +492,7 @@ async function guardarPersonalHorarios() {
     }
 
     alert('Horarios guardados.')
-    await renderPersonalHorarios()
+    await renderPersonalHorarios(fechas)
   } catch (err) {
     alert(`Error al guardar: ${err.message}`)
   }
