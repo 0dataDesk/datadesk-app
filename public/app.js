@@ -221,6 +221,7 @@ async function mostrarApp(rol, email, tenant_id = null) {
     if (view === 'tesoreria')        await vistaTesoreria()
     if (view === 'gastos')           await vistaGastos()
     if (view === 'mrp')              await vistaMRP()
+    if (view === 'personal')         await vistaPersonal()
   })
 
   // Cerrar dropdowns al hacer click fuera del nav
@@ -234,12 +235,12 @@ async function mostrarApp(rol, email, tenant_id = null) {
 
   // Nav agrupado según rol
   const permitidasPorRol = {
-    superadmin: ['inicio','productos','recetas','precios','costeo','pedidos','tesoreria','gastos','mrp','ventas','cierres','consumo','recepciones','incidencias','inventario','inventarios'],
-    owner:      ['inicio','productos','recetas','ventas','cierres','consumo','recepciones','incidencias','inventario','inventarios'],
-    gerente:    ['inicio','productos','recetas','ventas','cierres','consumo','recepciones','incidencias','inventario','inventarios'],
+    superadmin: ['inicio','productos','recetas','precios','costeo','pedidos','tesoreria','gastos','mrp','ventas','cierres','consumo','recepciones','incidencias','inventario','inventarios','personal'],
+    owner:      ['inicio','productos','recetas','ventas','cierres','consumo','recepciones','incidencias','inventario','inventarios','personal'],
+    gerente:    ['inicio','productos','recetas','ventas','cierres','consumo','recepciones','incidencias','inventario','inventarios','personal'],
     caja:       ['productos','recetas','ventas'],
     // legacy
-    admin:      ['inicio','productos','recetas','precios','costeo','pedidos','tesoreria','gastos','mrp','ventas','cierres','consumo','recepciones','incidencias','inventario','inventarios'],
+    admin:      ['inicio','productos','recetas','precios','costeo','pedidos','tesoreria','gastos','mrp','ventas','cierres','consumo','recepciones','incidencias','inventario','inventarios','personal'],
     editor:     ['inicio','productos','recetas']
   }
   const visibles = permitidasPorRol[window._rol] || ['inicio','productos','recetas','precios','costeo','pedidos']
@@ -248,6 +249,7 @@ async function mostrarApp(rol, email, tenant_id = null) {
     { label: 'Menú',        vistas: ['productos','recetas'],                                 roles: ['superadmin','admin','owner','gerente','editor','caja','cocina'] },
     { label: 'Operación',   vistas: ['ventas','cierres','consumo','recepciones','incidencias'], roles: ['superadmin','admin','owner','gerente','editor'] },
     { label: 'Inventarios', vistas: ['inventario','inventarios'], roles: ['superadmin','admin','owner','gerente','editor'] },
+    { label: 'Personal',    vistas: ['personal'],                roles: ['superadmin','admin','owner','gerente'] },
     { label: 'Desarrollo',  vistas: ['inicio','precios','costeo','pedidos','tesoreria','gastos','mrp'],                 roles: ['superadmin','admin'] }
   ]
 
@@ -255,7 +257,7 @@ async function mostrarApp(rol, email, tenant_id = null) {
     inicio: 'Inicio', productos: '🧂 Insumos y Subrecetas', recetas: '📖 Recetas',
     precios: 'Precios', costeo: 'Costeo', pedidos: 'Pedidos', tesoreria: '🏦 Tesorería', gastos: '💸 Gastos', mrp: '📐 MRP',
     ventas: '🧾 Ventas', cierres: '🔒 Cierres', consumo: '🧮 Consumo', recepciones: '📦 Recepciones', incidencias: '⚠️ Incidencias',
-    inventario: '🔍 Diagnóstico', inventarios: '📋 Conteos'
+    inventario: '🔍 Diagnóstico', inventarios: '📋 Conteos', personal: '👥 Personal'
   }
 
   let navHtml = ''
@@ -331,6 +333,7 @@ async function mostrarApp(rol, email, tenant_id = null) {
   else if (vistaInicial === 'tesoreria')      vistaTesoreria()
   else if (vistaInicial === 'gastos')         vistaGastos()
   else if (vistaInicial === 'mrp')            vistaMRP()
+  else if (vistaInicial === 'personal')       vistaPersonal()
   else                                     mostrarBienvenida()
 }
 
