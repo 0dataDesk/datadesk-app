@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>Alta de dispositivo</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="src/supabase.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #faf8f5;
+      color: #2B1A0F;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      width: 100%;
+      max-width: 420px;
+      background: #fff;
+      border-radius: 20px;
+      box-shadow: 0 2px 20px rgba(0,0,0,0.08);
+      padding: 40px 28px;
+      text-align: center;
+    }
+    .icono { font-size: 56px; margin-bottom: 20px; line-height: 1; }
+    h1 { font-size: 22px; font-weight: 700; margin-bottom: 12px; line-height: 1.3; }
+    p { font-size: 16px; color: #6b5648; line-height: 1.5; }
+    .spinner {
+      width: 40px; height: 40px; margin: 0 auto 20px;
+      border: 4px solid #e8ddd5; border-top-color: #C8892A;
+      border-radius: 50%;
+      animation: girar 0.8s linear infinite;
+    }
+    @keyframes girar { to { transform: rotate(360deg); } }
+    .error .icono { color: #B85C2A; }
+    .ok .icono { color: #3A8C3E; }
+  </style>
+</head>
+<body>
+  <div class="card" id="card">
+    <div class="spinner"></div>
+    <h1>Registrando este teléfono...</h1>
+  </div>
+
+  <script>
+    function mostrarError(mensaje) {
+      document.getElementById('card').innerHTML = `
+        <div class="icono">⚠️</div>
+        <h1>Este enlace no es válido</h1>
+        <p>${mensaje}</p>
+      `
+      document.getElementById('card').classList.add('error')
+    }
+
+    function mostrarExito(nombre) {
+      document.getElementById('card').innerHTML = `
+        <div class="icono">✅</div>
+        <h1>Listo, ${nombre}.</h1>
+        <p>Este teléfono ya quedó registrado.</p>
+      `
+      document.getElementById('card').classList.add('ok')
+    }
+
+    async function iniciar() {
+      const params = new URLSearchParams(window.location.search)
+      const id     = params.get('id')
+      const tenant = params.get('tenant')
+
+      if (!id || !tenant) {
+        mostrarError('Falta información en el enlace. Pide que te compartan uno nuevo.')
+        return
+      }
+
+      try {
+        const { data, error } = await window._db.rpc('fn_alta_dispositivo', {
+          p_id_empleado: id,
+          p_tenant_id: tenant
+        })
+
+        if (error) throw error
+
+        if (data && data.error === 'empleado_no_encontrado') {
+          mostrarError('No encontramos a este empleado. Pide que te compartan un enlace nuevo.')
+          return
+        }
+
+        if (data && data.token) {
+          localStorage.setItem(`${tenant}_dispositivo_token`, data.token)
+          mostrarExito(data.nombre || '')
+          return
+        }
+
+        mostrarError('No se pudo completar el registro. Pide que te compartan un enlace nuevo.')
+      } catch (err) {
+        mostrarError('No se pudo completar el registro. Intenta de nuevo o pide un enlace nuevo.')
+      }
+    }
+
+    iniciar()
+  </script>
+</body>
+</html>

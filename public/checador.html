@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>Checador de asistencia</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="src/supabase.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #faf8f5;
+      color: #2B1A0F;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      width: 100%;
+      max-width: 420px;
+      background: #fff;
+      border-radius: 20px;
+      box-shadow: 0 2px 20px rgba(0,0,0,0.08);
+      padding: 40px 28px;
+      text-align: center;
+    }
+    .icono { font-size: 56px; margin-bottom: 20px; line-height: 1; }
+    h1 { font-size: 22px; font-weight: 700; margin-bottom: 12px; line-height: 1.3; }
+    p { font-size: 16px; color: #6b5648; line-height: 1.5; }
+    .spinner {
+      width: 40px; height: 40px; margin: 0 auto 20px;
+      border: 4px solid #e8ddd5; border-top-color: #C8892A;
+      border-radius: 50%;
+      animation: girar 0.8s linear infinite;
+    }
+    @keyframes girar { to { transform: rotate(360deg); } }
+    .aviso-geocerca {
+      margin-top: 16px;
+      padding: 10px 14px;
+      background: rgba(200,137,42,0.12);
+      color: #a06a1f;
+      border-radius: 10px;
+      font-size: 14px;
+    }
+    .btn-reintentar {
+      margin-top: 24px;
+      width: 100%;
+      padding: 16px;
+      background: #1e3a5f;
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      font-size: 17px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn-reintentar:active { opacity: 0.85; }
+  </style>
+</head>
+<body>
+  <div class="card" id="card">
+    <div class="spinner"></div>
+    <h1>Cargando...</h1>
+  </div>
+
+  <script>
+    let TENANT = null
+    let TOKEN  = null
+
+    function render(html) {
+      document.getElementById('card').innerHTML = html
+    }
+
+    function pantallaSinRegistro() {
+      render(`
+        <div class="icono">📵</div>
+        <h1>Este teléfono no está registrado</h1>
+        <p>Pide que te den de alta.</p>
+      `)
+    }
+
+    function pantallaPidiendoUbicacion() {
+      render(`
+        <div class="spinner"></div>
+        <h1>Registrando tu asistencia...</h1>
+        <p>Acepta el permiso de ubicación para continuar.</p>
+      `)
+    }
+
+    function pantallaPermisoRechazado() {
+      render(`
+        <div class="icono">📍</div>
+        <h1>Necesitamos tu ubicación</h1>
+        <p>Para registrar tu asistencia, acepta el permiso de ubicación del navegador.</p>
+        <button class="btn-reintentar" onclick="solicitarUbicacion()">Reintentar</button>
+      `)
+    }
+
+    function pantallaErrorUbicacion() {
+      render(`
+        <div class="icono">📍</div>
+        <h1>No pudimos obtener tu ubicación</h1>
+        <p>Verifica que el GPS esté activado e intenta de nuevo.</p>
+        <button class="btn-reintentar" onclick="solicitarUbicacion()">Reintentar</button>
+      `)
+    }
+
+    function pantallaErrorGenerico(mensaje) {
+      render(`
+        <div class="icono">⚠️</div>
+        <h1>No se pudo registrar</h1>
+        <p>${mensaje}</p>
+        <button class="btn-reintentar" onclick="solicitarUbicacion()">Reintentar</button>
+      `)
+    }
+
+    function pantallaExito(data) {
+      const tipoLabel = data.tipo ? data.tipo.charAt(0).toUpperCase() + data.tipo.slice(1) : 'Asistencia'
+      const avisoGeocerca = data.dentro_geocerca === false
+        ? `<div class="aviso-geocerca">⚠ Parece que no estás en el negocio, pero tu registro ya se guardó.</div>`
+        : ''
+      render(`
+        <div class="icono">✓</div>
+        <h1>${tipoLabel} registrada</h1>
+        <p>${data.nombre || ''}</p>
+        ${avisoGeocerca}
+      `)
+    }
+
+    async function solicitarUbicacion() {
+      pantallaPidiendoUbicacion()
+
+      if (!navigator.geolocation) {
+        pantallaErrorGenerico('Este navegador no soporta ubicación. Prueba con otro navegador.')
+        return
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          try {
+            const { data, error } = await window._db.rpc('fn_checar_asistencia', {
+              p_token: TOKEN,
+              p_lat: pos.coords.latitude,
+              p_lng: pos.coords.longitude
+            })
+
+            if (error) throw error
+
+            if (data && data.error === 'dispositivo_no_reconocido') {
+              localStorage.removeItem(`${TENANT}_dispositivo_token`)
+              pantallaSinRegistro()
+              return
+            }
+
+            if (data && data.error === 'geocerca_no_configurada') {
+              pantallaErrorGenerico('Este negocio todavía no tiene su ubicación configurada. Avisa a tu administrador.')
+              return
+            }
+
+            if (data && data.id_registro) {
+              pantallaExito(data)
+              return
+            }
+
+            pantallaErrorGenerico('Intenta de nuevo en unos segundos.')
+          } catch (err) {
+            pantallaErrorGenerico('Intenta de nuevo en unos segundos.')
+          }
+        },
+        (err) => {
+          if (err.code === err.PERMISSION_DENIED) {
+            pantallaPermisoRechazado()
+          } else {
+            pantallaErrorUbicacion()
+          }
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      )
+    }
+
+    function iniciar() {
+      const params = new URLSearchParams(window.location.search)
+      TENANT = params.get('tenant')
+
+      if (!TENANT) {
+        render(`
+          <div class="icono">⚠️</div>
+          <h1>Enlace no válido</h1>
+          <p>Falta información en el enlace. Pide el código QR correcto.</p>
+        `)
+        return
+      }
+
+      TOKEN = localStorage.getItem(`${TENANT}_dispositivo_token`)
+      if (!TOKEN) {
+        pantallaSinRegistro()
+        return
+      }
+
+      solicitarUbicacion()
+    }
+
+    iniciar()
+  </script>
+</body>
+</html>
