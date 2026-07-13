@@ -615,7 +615,7 @@ async function cargarDetalleReceta(receta) {
     if (esReventa) {
       const filtrosPorReceta = {
         'RBE-004': () => window._db.from('productos').select('producto')
-          .eq('tenant_id', tenant_id).eq('activo', true).eq('grupo', 'Bebidas').eq('fuente', 'menu_charly')
+          .eq('tenant_id', tenant_id).eq('activo', true).eq('grupo', 'Productos Coca Cola').eq('fuente', 'menu_charly')
           .not('id_producto', 'in', '(BEB-001,BEB-025,BEB-026,BEB-031,BEB-037)')
           .order('producto'),
         'RBE-005': () => window._db.from('productos').select('producto')

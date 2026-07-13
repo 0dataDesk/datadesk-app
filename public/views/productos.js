@@ -1,14 +1,16 @@
 const PR_GRUPO_META = {
-  'Carnes y Proteínas': { orden: 1, emoji: '🥩', color: '#B85C2A' },
-  'Lácteos y Quesos':   { orden: 2, emoji: '🧀', color: '#6A9BB5' },
-  'Verduras y Frescos': { orden: 3, emoji: '🥬', color: '#4A7A3A' },
-  'Despensa':           { orden: 4, emoji: '🥫', color: '#C8892A' },
-  'Subrecetas':         { orden: 5, emoji: '⚗️', color: '#8A5FB0' },
-  'Bebidas':            { orden: 6, emoji: '🥤', color: '#3D9BA8' },
-  'Desechables':        { orden: 7, emoji: '🗑️', color: '#9B7B6A' }
+  'Proteínas':           { orden: 1, emoji: '🥩', color: '#B85C2A' },
+  'Lácteos':             { orden: 2, emoji: '🧀', color: '#6A9BB5' },
+  'Frutas y Verduras':   { orden: 3, emoji: '🥬', color: '#4A7A3A' },
+  'Congelados':          { orden: 4, emoji: '🧊', color: '#5B8DB8' },
+  'Abarrotes':           { orden: 5, emoji: '🥫', color: '#C8892A' },
+  'Subrecetas':          { orden: 6, emoji: '⚗️', color: '#8A5FB0' },
+  'Aderezos de la Casa': { orden: 7, emoji: '🧂', color: '#B08A3E' },
+  'Productos Coca Cola': { orden: 8, emoji: '🥤', color: '#3D9BA8' },
+  'Empaques':            { orden: 9, emoji: '🗑️', color: '#9B7B6A' }
 }
 const PR_META_DEFAULT = { orden: 99, emoji: '📦', color: '#9B7B6A' }
-const PR_SECCION_2_GRUPOS = ['Subrecetas', 'Bebidas', 'Desechables', 'Empaque y Desechables']
+const PR_SECCION_2_GRUPOS = ['Subrecetas', 'Aderezos de la Casa', 'Productos Coca Cola', 'Empaques', 'Empaque y Desechables']
 
 function _prHighlight(texto, termino) {
   if (!termino) return texto

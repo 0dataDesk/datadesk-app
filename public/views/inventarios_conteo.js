@@ -200,13 +200,15 @@ async function verDetalleInventario(idInventario) {
     })
 
     const GRUPO_META = {
-      'Carnes y Proteínas': { orden: 1, emoji: '🥩', color: '#B85C2A' },
-      'Lácteos y Quesos':   { orden: 2, emoji: '🧀', color: '#6A9BB5' },
-      'Verduras y Frescos': { orden: 3, emoji: '🥬', color: '#4A7A3A' },
-      'Despensa':           { orden: 4, emoji: '🥫', color: '#C8892A' },
-      'Subrecetas':         { orden: 5, emoji: '⚗️', color: '#8A5FB0' },
-      'Bebidas':            { orden: 6, emoji: '🥤', color: '#3D9BA8' },
-      'Desechables':        { orden: 7, emoji: '🗑️', color: '#9B7B6A' }
+      'Proteínas':           { orden: 1, emoji: '🥩', color: '#B85C2A' },
+      'Lácteos':             { orden: 2, emoji: '🧀', color: '#6A9BB5' },
+      'Frutas y Verduras':   { orden: 3, emoji: '🥬', color: '#4A7A3A' },
+      'Congelados':          { orden: 4, emoji: '🧊', color: '#5B8DB8' },
+      'Abarrotes':           { orden: 5, emoji: '🥫', color: '#C8892A' },
+      'Subrecetas':          { orden: 6, emoji: '⚗️', color: '#8A5FB0' },
+      'Aderezos de la Casa': { orden: 7, emoji: '🧂', color: '#B08A3E' },
+      'Productos Coca Cola': { orden: 8, emoji: '🥤', color: '#3D9BA8' },
+      'Empaques':            { orden: 9, emoji: '🗑️', color: '#9B7B6A' }
     }
     const metaDefault = { orden: 99, emoji: '📦', color: '#9B7B6A' }
 
@@ -217,7 +219,7 @@ async function verDetalleInventario(idInventario) {
       return ma.orden - mb.orden
     })
 
-    const SECCION_2_GRUPOS = ['Subrecetas', 'Bebidas', 'Desechables']
+    const SECCION_2_GRUPOS = ['Subrecetas', 'Aderezos de la Casa', 'Productos Coca Cola', 'Empaques']
     const seccion1 = grupoNames.filter(g => !SECCION_2_GRUPOS.includes(g))
     const seccion2 = grupoNames.filter(g => SECCION_2_GRUPOS.includes(g))
 
