@@ -59,15 +59,25 @@ function _persAsisMesLabelDe(mes, soloUnAño) {
 }
 
 // ── Carga diferida de librería QR (solo cuando se necesita, no en cada carga de la app) ──
+// Vendorizada en public/vendor/qrcode.min.js — el checador tiene que funcionar sí o sí en
+// producción, no puede depender de que un CDN externo esté disponible en ese momento.
 function _personalCargarQRLib() {
   return new Promise((resolve, reject) => {
-    if (window.QRCode) { resolve(); return }
+    if (window.qrcode) { resolve(); return }
     const s = document.createElement('script')
-    s.src = 'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js'
+    s.src = 'vendor/qrcode.min.js'
     s.onload = () => resolve()
     s.onerror = () => reject(new Error('No se pudo cargar la librería de QR'))
     document.head.appendChild(s)
   })
+}
+
+// Genera el HTML de un <img> con el QR de `texto` (usa la API de qrcode-generator).
+function _personalRenderQR(texto, cellSize) {
+  const qr = qrcode(0, 'M')
+  qr.addData(texto)
+  qr.make()
+  return qr.createImgTag(cellSize || 4)
 }
 
 // ── Entrada de la vista ──────────────────────────────────────────────────────
@@ -268,13 +278,10 @@ async function mostrarLinkAlta(id, nombre) {
     await _personalCargarQRLib()
     const canvasWrap = document.getElementById('personal-qr-canvas-wrap')
     if (!canvasWrap) return
-    canvasWrap.innerHTML = `<canvas id="personal-qr-canvas"></canvas>`
-    QRCode.toCanvas(document.getElementById('personal-qr-canvas'), url, { width: 220, margin: 1 }, (err) => {
-      if (err) canvasWrap.innerHTML = `<p style="color:var(--color-highlight);font-size:13px">No se pudo generar el QR.</p>`
-    })
+    canvasWrap.innerHTML = _personalRenderQR(url, 5)
   } catch (e) {
     const canvasWrap = document.getElementById('personal-qr-canvas-wrap')
-    if (canvasWrap) canvasWrap.innerHTML = `<p style="color:var(--color-highlight);font-size:13px">No se pudo cargar la librería de QR.</p>`
+    if (canvasWrap) canvasWrap.innerHTML = `<p style="color:var(--color-highlight);font-size:13px">No se pudo generar el QR.</p>`
   }
 }
 
@@ -514,13 +521,10 @@ async function renderPersonalRegistros() {
     await _personalCargarQRLib()
     const qrWrap = document.getElementById('personal-checador-qr')
     if (!qrWrap) return
-    qrWrap.innerHTML = `<canvas id="personal-checador-qr-canvas"></canvas>`
-    QRCode.toCanvas(document.getElementById('personal-checador-qr-canvas'), checadorUrl, { width: 160, margin: 1 }, (err) => {
-      if (err) qrWrap.innerHTML = `<p style="color:var(--color-highlight);font-size:13px">No se pudo generar el QR.</p>`
-    })
+    qrWrap.innerHTML = _personalRenderQR(checadorUrl, 4)
   } catch (e) {
     const qrWrap = document.getElementById('personal-checador-qr')
-    if (qrWrap) qrWrap.innerHTML = `<p style="color:var(--color-highlight);font-size:13px">No se pudo cargar la librería de QR.</p>`
+    if (qrWrap) qrWrap.innerHTML = `<p style="color:var(--color-highlight);font-size:13px">No se pudo generar el QR.</p>`
   }
 }
 
