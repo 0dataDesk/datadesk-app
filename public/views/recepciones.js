@@ -505,20 +505,48 @@ function _actualizarTotalRecepcion() {
   const filas = document.querySelectorAll('[id^="rec-item-"]')
   let total = 0
   filas.forEach(fila => {
-    const idx      = fila.id.replace('rec-item-', '')
-    const piezas   = parseFloat(document.getElementById(`rec-piezas-${idx}`)?.value) || 0
-    const contenido = parseFloat(document.getElementById(`rec-contenido-${idx}`)?.value)
-    const cantidad  = (piezas > 0 && !isNaN(contenido) && contenido > 0) ? piezas * contenido : piezas
-    const costo     = parseFloat(document.getElementById(`rec-costo-${idx}`)?.value) || 0
-    const item_total = piezas * costo
+    const idx  = fila.id.replace('rec-item-', '')
+    const modo = (window._recModoFila && window._recModoFila[idx]) || 'directo'
+    const unidad = (window._recUnidadFila && window._recUnidadFila[idx]) || ''
+
+    let cantidad = 0, costo_unitario = 0, item_total = 0
+
+    if (modo === 'directo') {
+      const cantidadCap = parseFloat(document.getElementById(`rec-cantidad-directa-${idx}`)?.value)
+      const costoTotal  = parseFloat(document.getElementById(`rec-costo-total-${idx}`)?.value)
+      cantidad   = (!isNaN(cantidadCap) && cantidadCap > 0) ? cantidadCap : 0
+      item_total = (!isNaN(costoTotal) && costoTotal > 0) ? costoTotal : 0
+      costo_unitario = cantidad > 0 ? item_total / cantidad : 0
+
+      const refEl = document.getElementById(`rec-ref-costo-${idx}`)
+      if (refEl) refEl.textContent = (cantidad > 0 && item_total > 0)
+        ? `= $${formatNum(costo_unitario)}/${unidad || 'unidad'}`
+        : ''
+    } else {
+      const piezas    = parseFloat(document.getElementById(`rec-piezas-${idx}`)?.value) || 0
+      const contenido = parseFloat(document.getElementById(`rec-contenido-${idx}`)?.value)
+      const costoPieza = parseFloat(document.getElementById(`rec-costo-${idx}`)?.value) || 0
+      cantidad = (piezas > 0 && !isNaN(contenido) && contenido > 0) ? piezas * contenido : piezas
+      costo_unitario = (!isNaN(contenido) && contenido > 0) ? costoPieza / contenido : costoPieza
+      item_total = piezas * costoPieza
+
+      const totalTextoEl = document.getElementById(`rec-total-texto-${idx}`)
+      if (totalTextoEl) totalTextoEl.textContent = (piezas > 0 && !isNaN(contenido) && contenido > 0)
+        ? `= ${formatInt(cantidad)} ${unidad} en total`
+        : ''
+
+      const td = document.getElementById(`rec-total-item-${idx}`)
+      if (td) td.textContent = `$${formatNum(item_total)}`
+    }
 
     total += item_total
 
-    const cantEl = document.getElementById(`rec-cant-${idx}`)
-    if (cantEl) cantEl.value = cantidad > 0 ? cantidad : ''
-
-    const td = document.getElementById(`rec-total-item-${idx}`)
-    if (td) td.textContent = `$${formatNum(item_total)}`
+    const cantFinalEl = document.getElementById(`rec-cant-final-${idx}`)
+    if (cantFinalEl) cantFinalEl.value = cantidad > 0 ? cantidad : ''
+    const costoFinalEl = document.getElementById(`rec-costo-final-${idx}`)
+    if (costoFinalEl) costoFinalEl.value = costo_unitario > 0 ? costo_unitario : ''
+    const itemTotalFinalEl = document.getElementById(`rec-itemtotal-final-${idx}`)
+    if (itemTotalFinalEl) itemTotalFinalEl.value = item_total > 0 ? item_total : ''
   })
   const fmt = (n) => '$' + formatNum(n)
 
@@ -551,6 +579,10 @@ function _recGlobalDrop() {
 
 function agregarFilaRecepcion() {
   const i = window._recItemCount++
+  window._recModoFila   = window._recModoFila   || {}
+  window._recUnidadFila = window._recUnidadFila || {}
+  window._recModoFila[i] = 'directo'
+
   const body = document.getElementById('rec-items-body')
   const card = document.createElement('div')
   card.className = 'rec-item-card'
@@ -562,36 +594,22 @@ function agregarFilaRecepcion() {
       <input type="hidden" id="rec-prod-${i}">
     </div>
 
-    <div class="rec-item-row">
-      <div class="rec-item-field">
-        <label class="rec-item-label">Piezas</label>
-        <input type="number" class="edit-input edit-num" id="rec-piezas-${i}" min="0" step="any" value="1">
-      </div>
-      <span class="rec-item-op">×</span>
-      <div class="rec-item-field">
-        <label class="rec-item-label">Contenido/pieza</label>
-        <input type="number" class="edit-input edit-num" id="rec-contenido-${i}" min="0" step="any" placeholder="—">
-        <span id="rec-unidad-${i}" class="rec-item-unidad"></span>
-      </div>
-      <span class="rec-item-op">=</span>
-      <div class="rec-item-field rec-item-field-resultado">
-        <label class="rec-item-label">Cantidad total</label>
-        <input type="text" class="edit-input" id="rec-cant-${i}" readonly placeholder="—">
-      </div>
-    </div>
-
-    <div class="rec-item-row">
-      <div class="rec-item-field">
-        <label class="rec-item-label">Costo/pieza</label>
-        <input type="number" class="edit-input edit-num" id="rec-costo-${i}" min="0" step="any" placeholder="$0.00">
-      </div>
-      <div class="rec-item-field rec-item-field-resultado">
-        <label class="rec-item-label">Total</label>
-        <div id="rec-total-item-${i}" class="rec-item-total-valor">$0.00</div>
+    <div class="rec-item-modo-row">
+      <div class="cierres-segmented cierres-segmented-sub" id="rec-modo-btns-${i}">
+        <button type="button" class="btn-periodo active" data-modo="directo"
+          onclick="_setModoRecepcionFila('${i}','directo')">Directo</button>
+        <button type="button" class="btn-periodo" data-modo="caja"
+          onclick="_setModoRecepcionFila('${i}','caja')">Por caja o paquete</button>
       </div>
       ${i > 0 ? `<button type="button" class="btn-fila btn-inactivar-ing rec-item-borrar" title="Eliminar insumo"
         onclick="this.closest('.rec-item-card').remove();_actualizarTotalRecepcion()">×</button>` : ''}
     </div>
+
+    <div id="rec-campos-${i}"></div>
+
+    <input type="hidden" id="rec-cant-final-${i}">
+    <input type="hidden" id="rec-costo-final-${i}">
+    <input type="hidden" id="rec-itemtotal-final-${i}">
   `
   body.appendChild(card)
 
@@ -601,9 +619,78 @@ function agregarFilaRecepcion() {
   inputEl.addEventListener('blur',   () => _cerrarDropdown(i))
   inputEl.addEventListener('keydown', (e) => { if (e.key === 'Escape') _cerrarDropdown(i) })
 
-  document.getElementById(`rec-piezas-${i}`).addEventListener('input', _actualizarTotalRecepcion)
-  document.getElementById(`rec-contenido-${i}`).addEventListener('input', _actualizarTotalRecepcion)
-  document.getElementById(`rec-costo-${i}`).addEventListener('input', _actualizarTotalRecepcion)
+  _renderCamposRecepcionFila(i, 'directo')
+}
+
+function _renderCamposRecepcionFila(idx, modo) {
+  const cont = document.getElementById(`rec-campos-${idx}`)
+  if (!cont) return
+  const unidad = (window._recUnidadFila && window._recUnidadFila[idx]) || ''
+
+  if (modo === 'directo') {
+    cont.innerHTML = `
+      <div class="rec-item-row">
+        <div class="rec-item-field">
+          <label class="rec-item-label">Cantidad recibida</label>
+          <input type="number" class="edit-input edit-num" id="rec-cantidad-directa-${idx}" min="0" step="any" placeholder="0">
+          <span id="rec-unidad-directo-${idx}" class="rec-item-unidad">${unidad}</span>
+        </div>
+        <div class="rec-item-field">
+          <label class="rec-item-label">Costo total de esta línea</label>
+          <input type="number" class="edit-input edit-num" id="rec-costo-total-${idx}" min="0" step="any" placeholder="$0.00">
+          <span id="rec-ref-costo-${idx}" class="rec-item-unidad">&nbsp;</span>
+        </div>
+      </div>
+    `
+    document.getElementById(`rec-cantidad-directa-${idx}`).addEventListener('input', _actualizarTotalRecepcion)
+    document.getElementById(`rec-costo-total-${idx}`).addEventListener('input', _actualizarTotalRecepcion)
+  } else {
+    cont.innerHTML = `
+      <div class="rec-item-row">
+        <div class="rec-item-field">
+          <label class="rec-item-label">¿Cuántas piezas/cajas?</label>
+          <input type="number" class="edit-input edit-num" id="rec-piezas-${idx}" min="0" step="any" value="1">
+        </div>
+        <span class="rec-item-op">×</span>
+        <div class="rec-item-field">
+          <label class="rec-item-label">¿Cuánto trae cada una?</label>
+          <input type="number" class="edit-input edit-num" id="rec-contenido-${idx}" min="0" step="any" placeholder="—">
+          <span id="rec-unidad-${idx}" class="rec-item-unidad">${unidad}</span>
+        </div>
+      </div>
+      <div id="rec-total-texto-${idx}" class="rec-item-unidad">&nbsp;</div>
+      <div class="rec-item-row">
+        <div class="rec-item-field">
+          <label class="rec-item-label">Costo por caja/pieza</label>
+          <input type="number" class="edit-input edit-num" id="rec-costo-${idx}" min="0" step="any" placeholder="$0.00">
+        </div>
+        <div class="rec-item-field rec-item-field-resultado">
+          <label class="rec-item-label">Total</label>
+          <div id="rec-total-item-${idx}" class="rec-item-total-valor">$0.00</div>
+        </div>
+      </div>
+    `
+    document.getElementById(`rec-piezas-${idx}`).addEventListener('input', _actualizarTotalRecepcion)
+    document.getElementById(`rec-contenido-${idx}`).addEventListener('input', _actualizarTotalRecepcion)
+    document.getElementById(`rec-costo-${idx}`).addEventListener('input', _actualizarTotalRecepcion)
+  }
+
+  _actualizarTotalRecepcion()
+}
+
+function _setModoRecepcionFila(idx, modo) {
+  window._recModoFila = window._recModoFila || {}
+  if (window._recModoFila[idx] === modo) return
+  window._recModoFila[idx] = modo
+
+  const btnsWrap = document.getElementById(`rec-modo-btns-${idx}`)
+  if (btnsWrap) {
+    btnsWrap.querySelectorAll('.btn-periodo').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.modo === modo)
+    })
+  }
+
+  _renderCamposRecepcionFila(idx, modo)
 }
 
 function _filtrarInsumo(idx) {
@@ -649,14 +736,22 @@ function _filtrarInsumo(idx) {
 }
 
 function _seleccionarInsumo(idx, id_producto, nombre, unidad) {
-  const input    = document.getElementById(`rec-buscar-${idx}`)
-  const hidden   = document.getElementById(`rec-prod-${idx}`)
-  const drop     = document.getElementById('rec-global-drop')
-  const unidadEl = document.getElementById(`rec-unidad-${idx}`)
-  if (input)    input.value  = nombre
-  if (hidden)   hidden.value = id_producto
-  if (drop)     drop.style.display = 'none'
-  if (unidadEl) unidadEl.textContent = unidad || ''
+  const input  = document.getElementById(`rec-buscar-${idx}`)
+  const hidden = document.getElementById(`rec-prod-${idx}`)
+  const drop   = document.getElementById('rec-global-drop')
+  if (input)  input.value  = nombre
+  if (hidden) hidden.value = id_producto
+  if (drop)   drop.style.display = 'none'
+
+  window._recUnidadFila = window._recUnidadFila || {}
+  window._recUnidadFila[idx] = unidad || ''
+
+  const unidadDirectoEl = document.getElementById(`rec-unidad-directo-${idx}`)
+  if (unidadDirectoEl) unidadDirectoEl.textContent = unidad || ''
+  const unidadCajaEl = document.getElementById(`rec-unidad-${idx}`)
+  if (unidadCajaEl) unidadCajaEl.textContent = unidad || ''
+
+  _actualizarTotalRecepcion()
 }
 
 function _cerrarDropdown(idx) {
@@ -682,18 +777,12 @@ async function guardarRecepcion() {
   const items = []
 
   for (const fila of filas) {
-    const idx        = fila.id.replace('rec-item-', '')
-    const id_producto = document.getElementById(`rec-prod-${idx}`)?.value
-    const piezas     = parseFloat(document.getElementById(`rec-piezas-${idx}`)?.value)
-    const contenido  = parseFloat(document.getElementById(`rec-contenido-${idx}`)?.value)
-    const costo      = parseFloat(document.getElementById(`rec-costo-${idx}`)?.value)
-    if (!id_producto || isNaN(piezas) || piezas <= 0) continue
-    const cantidad_recibida = (!isNaN(contenido) && contenido > 0) ? piezas * contenido : piezas
-    // costo por unidad base: si hay contenido, dividir costo/pieza entre unidades/pieza
-    const costo_unitario = isNaN(costo) ? 0
-      : (!isNaN(contenido) && contenido > 0) ? costo / contenido
-      : costo
-    items.push({ id_producto, cantidad_recibida, costo_unitario })
+    const idx         = fila.id.replace('rec-item-', '')
+    const id_producto  = document.getElementById(`rec-prod-${idx}`)?.value
+    const cantidad_recibida = parseFloat(document.getElementById(`rec-cant-final-${idx}`)?.value)
+    const costo_unitario    = parseFloat(document.getElementById(`rec-costo-final-${idx}`)?.value)
+    if (!id_producto || isNaN(cantidad_recibida) || cantidad_recibida <= 0) continue
+    items.push({ id_producto, cantidad_recibida, costo_unitario: isNaN(costo_unitario) ? 0 : costo_unitario })
   }
 
   if (!items.length) { alert('Agrega al menos un insumo'); return }
@@ -717,13 +806,11 @@ async function guardarRecepcion() {
     }
   }
 
-  // Calcular subtotal = suma(piezas × costo/pieza) para guardar en BD
+  // Calcular subtotal = suma de los totales por línea (ya calculados por fila, sin importar el modo)
   let _subtotalFinal = 0
   document.querySelectorAll('[id^="rec-item-"]').forEach(fila => {
-    const idx    = fila.id.replace('rec-item-', '')
-    const piezas = parseFloat(document.getElementById(`rec-piezas-${idx}`)?.value) || 0
-    const costo  = parseFloat(document.getElementById(`rec-costo-${idx}`)?.value)  || 0
-    _subtotalFinal += piezas * costo
+    const idx = fila.id.replace('rec-item-', '')
+    _subtotalFinal += parseFloat(document.getElementById(`rec-itemtotal-final-${idx}`)?.value) || 0
   })
   const _iepsMonto  = parseFloat(document.getElementById('rec-ieps-monto')?.value) || null
   const _ivaMonto   = parseFloat(document.getElementById('rec-iva-monto')?.value)  || null
