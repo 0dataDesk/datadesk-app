@@ -649,6 +649,8 @@ function _renderCamposRecepcionFila(idx, modo) {
     `
     document.getElementById(`rec-cantidad-directa-${idx}`).addEventListener('input', _actualizarTotalRecepcion)
     document.getElementById(`rec-costo-total-${idx}`).addEventListener('input', _actualizarTotalRecepcion)
+    _recCentrarAlEnfocar(document.getElementById(`rec-cantidad-directa-${idx}`))
+    _recCentrarAlEnfocar(document.getElementById(`rec-costo-total-${idx}`))
   } else {
     cont.innerHTML = `
       <div class="rec-item-row">
@@ -680,9 +682,21 @@ function _renderCamposRecepcionFila(idx, modo) {
     document.getElementById(`rec-piezas-${idx}`).addEventListener('input', _actualizarTotalRecepcion)
     document.getElementById(`rec-contenido-${idx}`).addEventListener('input', _actualizarTotalRecepcion)
     document.getElementById(`rec-costo-${idx}`).addEventListener('input', _actualizarTotalRecepcion)
+    _recCentrarAlEnfocar(document.getElementById(`rec-piezas-${idx}`))
+    _recCentrarAlEnfocar(document.getElementById(`rec-contenido-${idx}`))
+    _recCentrarAlEnfocar(document.getElementById(`rec-costo-${idx}`))
   }
 
   _actualizarTotalRecepcion()
+}
+
+// El teclado numérico del celular tapa el campo enfocado y el navegador no siempre
+// reacomoda el scroll solo — forzamos que el campo quede centrado al enfocarlo.
+function _recCentrarAlEnfocar(el) {
+  if (!el) return
+  el.addEventListener('focus', () => {
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  })
 }
 
 function _setModoRecepcionFila(idx, modo) {
