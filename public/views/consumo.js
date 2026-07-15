@@ -321,7 +321,7 @@ function renderConsumoVista() {
       semanasHtml += `
         <div style="margin-left:16px">
           <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;
-              font-size:13px;border-bottom:1px solid var(--color-border)"
+              font-size:13px;border-bottom:1px solid var(--color-border);background:var(--color-bg-alt)"
             onclick="(function(el){
               const b=document.getElementById('${semId}');
               const open=b.style.display!=='none';
