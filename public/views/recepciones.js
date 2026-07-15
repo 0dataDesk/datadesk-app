@@ -531,9 +531,11 @@ function _actualizarTotalRecepcion() {
       item_total = piezas * costoPieza
 
       const totalTextoEl = document.getElementById(`rec-total-texto-${idx}`)
-      if (totalTextoEl) totalTextoEl.textContent = (piezas > 0 && !isNaN(contenido) && contenido > 0)
-        ? `= ${formatInt(cantidad)} ${unidad} en total`
-        : ''
+      if (totalTextoEl) {
+        const hayTotal = piezas > 0 && !isNaN(contenido) && contenido > 0
+        totalTextoEl.textContent = hayTotal ? `= ${formatInt(cantidad)} ${unidad} en total` : '—'
+        totalTextoEl.classList.toggle('rec-total-vivo-activo', hayTotal)
+      }
 
       const td = document.getElementById(`rec-total-item-${idx}`)
       if (td) td.textContent = `$${formatNum(item_total)}`
@@ -625,6 +627,7 @@ function agregarFilaRecepcion() {
 function _renderCamposRecepcionFila(idx, modo) {
   const cont = document.getElementById(`rec-campos-${idx}`)
   if (!cont) return
+  cont.className = 'rec-campos-fila'
   const unidad = (window._recUnidadFila && window._recUnidadFila[idx]) || ''
 
   if (modo === 'directo') {
@@ -632,13 +635,15 @@ function _renderCamposRecepcionFila(idx, modo) {
       <div class="rec-item-row">
         <div class="rec-item-field">
           <label class="rec-item-label">Cantidad recibida</label>
-          <input type="number" class="edit-input edit-num" id="rec-cantidad-directa-${idx}" min="0" step="any" placeholder="0">
-          <span id="rec-unidad-directo-${idx}" class="rec-item-unidad">${unidad}</span>
+          <div class="rec-item-input-group">
+            <input type="number" class="edit-input edit-num" id="rec-cantidad-directa-${idx}" min="0" step="any" placeholder="0">
+            <span id="rec-unidad-directo-${idx}" class="rec-item-unidad-inline">${unidad}</span>
+          </div>
         </div>
         <div class="rec-item-field">
           <label class="rec-item-label">Costo total de esta línea</label>
           <input type="number" class="edit-input edit-num" id="rec-costo-total-${idx}" min="0" step="any" placeholder="$0.00">
-          <span id="rec-ref-costo-${idx}" class="rec-item-unidad">&nbsp;</span>
+          <span id="rec-ref-costo-${idx}" class="rec-item-referencia">&nbsp;</span>
         </div>
       </div>
     `
@@ -648,17 +653,19 @@ function _renderCamposRecepcionFila(idx, modo) {
     cont.innerHTML = `
       <div class="rec-item-row">
         <div class="rec-item-field">
-          <label class="rec-item-label">¿Cuántas piezas/cajas?</label>
+          <label class="rec-item-label">Piezas/cajas</label>
           <input type="number" class="edit-input edit-num" id="rec-piezas-${idx}" min="0" step="any" value="1">
         </div>
         <span class="rec-item-op">×</span>
         <div class="rec-item-field">
-          <label class="rec-item-label">¿Cuánto trae cada una?</label>
-          <input type="number" class="edit-input edit-num" id="rec-contenido-${idx}" min="0" step="any" placeholder="—">
-          <span id="rec-unidad-${idx}" class="rec-item-unidad">${unidad}</span>
+          <label class="rec-item-label">Contenido c/u</label>
+          <div class="rec-item-input-group">
+            <input type="number" class="edit-input edit-num" id="rec-contenido-${idx}" min="0" step="any" placeholder="—">
+            <span id="rec-unidad-${idx}" class="rec-item-unidad-inline">${unidad}</span>
+          </div>
         </div>
       </div>
-      <div id="rec-total-texto-${idx}" class="rec-item-unidad">&nbsp;</div>
+      <div id="rec-total-texto-${idx}" class="rec-total-vivo">&nbsp;</div>
       <div class="rec-item-row">
         <div class="rec-item-field">
           <label class="rec-item-label">Costo por caja/pieza</label>
