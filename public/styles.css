@@ -768,6 +768,92 @@ body {
   margin-left: 4px;
 }
 
+/* ── RECEPCIÓN — CAPTURA DE INSUMOS (tarjeta mobile-first) ── */
+.rec-items-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.rec-item-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  background: var(--color-card);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rec-item-buscar input { font-size: 15px; padding: 10px 12px; }
+
+.rec-item-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.rec-item-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 90px;
+  flex: 1;
+}
+.rec-item-field input { width: 100%; }
+
+.rec-item-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.rec-item-op {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  padding-bottom: 7px;
+  flex-shrink: 0;
+}
+
+.rec-item-field-resultado input,
+.rec-item-total-valor {
+  background: rgba(0,0,0,0.03);
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.rec-item-total-valor {
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 13px;
+  min-height: 31px;
+  display: flex;
+  align-items: center;
+}
+
+.rec-item-unidad {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+.rec-item-borrar {
+  margin-left: auto;
+  align-self: center;
+}
+
+@media (max-width: 699px) {
+  .rec-item-field { min-width: 74px; }
+  .rec-item-row { gap: 8px 10px; }
+}
+
 .rec-volver-btn {
   background: var(--color-secondary);
   border: 1px solid var(--color-border);

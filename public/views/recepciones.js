@@ -105,22 +105,23 @@ async function vistaRecepciones() {
     content.innerHTML = `
       <div class="vista-header">
         <h2>📦 Recepciones</h2>
-        <button class="btn-accion btn-aprobar" onclick="mostrarFormRecepcion()">+ Nueva recepción</button>
+        <button class="btn-accion btn-aprobar" onclick="vistaRecepcionCaptura()">+ Nueva recepción</button>
       </div>
 
       <div id="form-recepcion-wrap"></div>
 
       <div id="recepciones-controles">
-        <div class="filtros-bar">
+        <div id="recepciones-filtro-periodo" style="margin-bottom:16px"></div>
+
+        <div id="recepciones-cabecero"></div>
+
+        <div class="filtros-bar" style="margin-bottom:16px">
           <select id="filtro-rec-prov" class="filtro-select" onchange="filtrarRecepciones()">
             <option value="">Todos los proveedores</option>
             ${(proveedores || []).map(p => `<option value="${p.id_proveedor}">${p.nombre_corto || p.nombre}</option>`).join('')}
           </select>
         </div>
 
-        <div id="recepciones-filtro-periodo" style="margin-bottom:16px"></div>
-
-        <div id="recepciones-cabecero"></div>
         <div id="recepciones-lista"></div>
       </div>
     `
@@ -354,7 +355,7 @@ function renderListaRecepciones(lista) {
       semanasHtml += `
         <div style="margin-left:16px">
           <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;
-              font-size:13px;border-bottom:1px solid var(--color-border)"
+              font-size:13px;border-bottom:1px solid var(--color-border);background:var(--color-bg-alt)"
             onclick="(function(el){
               const b=document.getElementById('${semId}');
               const open=b.style.display!=='none';
@@ -398,7 +399,10 @@ function renderListaRecepciones(lista) {
   wrap.innerHTML = html
 }
 
-async function mostrarFormRecepcion() {
+async function vistaRecepcionCaptura() {
+  const content = document.getElementById('content')
+  content.innerHTML = `<p style="color:var(--color-text-muted)">Cargando...</p>`
+
   const tenant_id = await getTenantId()
   const hoy = new Date().toISOString().split('T')[0]
 
@@ -412,17 +416,20 @@ async function mostrarFormRecepcion() {
     window._db.from('productos').select('id_producto, producto, unidad_medida, grupo').eq('tenant_id', tenant_id).eq('activo', true).eq('tipo', 'Insumo').in('fuente', _fuentes).order('producto')
   ])
 
-  if (errProd) { alert(`Error al cargar insumos: ${errProd.message}`); return }
-  if (errProv) { alert(`Error al cargar proveedores: ${errProv.message}`); return }
+  if (errProd) { alert(`Error al cargar insumos: ${errProd.message}`); await vistaRecepciones(); return }
+  if (errProv) { alert(`Error al cargar proveedores: ${errProv.message}`); await vistaRecepciones(); return }
 
   window._productos_rec = productos || []
   window._tenant_id_rec = tenant_id
 
-  const wrap = document.getElementById('form-recepcion-wrap')
-  wrap.innerHTML = `
-    <div class="card-surface" style="padding:24px;margin-bottom:24px">
-      <h3 style="margin-bottom:20px">Nueva recepción</h3>
+  content.innerHTML = `
+    <div class="vista-header">
+      <h2>📦 Nueva recepción</h2>
+      <button class="btn-accion" style="border:1px solid var(--color-border);background:var(--color-secondary)"
+        onclick="vistaRecepciones()">← Volver</button>
+    </div>
 
+    <div class="card-surface" style="padding:24px">
       <div class="filtros-cascada">
         <div class="filtro-cascada-item">
           <label class="filtro-label">Fecha</label>
@@ -451,22 +458,8 @@ async function mostrarFormRecepcion() {
       </h4>
 
       <div id="rec-items-wrap">
-        <table class="tabla" id="rec-items-tabla">
-          <thead>
-            <tr>
-              <th>Insumo</th>
-              <th style="width:80px">Piezas</th>
-              <th style="width:130px">Contenido/pieza</th>
-              <th style="width:100px">Cantidad total</th>
-              <th style="width:110px">Costo/pieza</th>
-              <th style="width:100px">Total</th>
-              <th style="width:40px"></th>
-            </tr>
-          </thead>
-          <tbody id="rec-items-body">
-          </tbody>
-        </table>
-        <button class="btn-accion" style="margin-top:8px;font-size:12px;border:1px solid var(--color-border)"
+        <div id="rec-items-body" class="rec-items-body"></div>
+        <button class="btn-accion" style="margin-top:12px;font-size:12px;border:1px solid var(--color-border)"
           onclick="agregarFilaRecepcion()">+ Agregar insumo</button>
       </div>
 
@@ -496,7 +489,7 @@ async function mostrarFormRecepcion() {
       <div style="display:flex;gap:10px;margin-top:20px">
         <button class="btn-accion btn-aprobar" onclick="guardarRecepcion()">Guardar recepción</button>
         <button class="btn-accion" style="border:1px solid var(--color-border);background:var(--color-secondary)"
-          onclick="document.getElementById('form-recepcion-wrap').innerHTML=''">Cancelar</button>
+          onclick="vistaRecepciones()">Cancelar</button>
       </div>
     </div>
   `
@@ -559,37 +552,48 @@ function _recGlobalDrop() {
 function agregarFilaRecepcion() {
   const i = window._recItemCount++
   const body = document.getElementById('rec-items-body')
-  const tr = document.createElement('tr')
-  tr.id = `rec-item-${i}`
-  tr.innerHTML = `
-    <td>
+  const card = document.createElement('div')
+  card.className = 'rec-item-card'
+  card.id = `rec-item-${i}`
+  card.innerHTML = `
+    <div class="rec-item-buscar">
       <input type="text" class="edit-select" id="rec-buscar-${i}" placeholder="Buscar insumo..."
         style="width:100%" autocomplete="off">
       <input type="hidden" id="rec-prod-${i}">
-    </td>
-    <td>
-      <input type="number" class="edit-input edit-num" id="rec-piezas-${i}" min="0" step="any"
-        value="1" style="width:64px">
-    </td>
-    <td style="white-space:nowrap">
-      <input type="number" class="edit-input edit-num" id="rec-contenido-${i}" min="0" step="any"
-        placeholder="—" style="width:70px">
-      <span id="rec-unidad-${i}" style="font-size:11px;color:var(--color-text-muted);margin-left:4px"></span>
-    </td>
-    <td>
-      <input type="text" class="edit-input" id="rec-cant-${i}" readonly
-        style="width:80px;text-align:right;background:rgba(0,0,0,0.03);color:var(--color-text-muted)" placeholder="—">
-    </td>
-    <td>
-      <input type="number" class="edit-input edit-num" id="rec-costo-${i}" min="0" step="any" placeholder="$0.00">
-    </td>
-    <td id="rec-total-item-${i}" style="text-align:right;font-size:13px;color:var(--color-text-muted)">$0.00</td>
-    <td>
-      ${i > 0 ? `<button class="btn-fila btn-inactivar-ing" style="font-size:16px"
-        onclick="this.closest('tr').remove();_actualizarTotalRecepcion()">×</button>` : ''}
-    </td>
+    </div>
+
+    <div class="rec-item-row">
+      <div class="rec-item-field">
+        <label class="rec-item-label">Piezas</label>
+        <input type="number" class="edit-input edit-num" id="rec-piezas-${i}" min="0" step="any" value="1">
+      </div>
+      <span class="rec-item-op">×</span>
+      <div class="rec-item-field">
+        <label class="rec-item-label">Contenido/pieza</label>
+        <input type="number" class="edit-input edit-num" id="rec-contenido-${i}" min="0" step="any" placeholder="—">
+        <span id="rec-unidad-${i}" class="rec-item-unidad"></span>
+      </div>
+      <span class="rec-item-op">=</span>
+      <div class="rec-item-field rec-item-field-resultado">
+        <label class="rec-item-label">Cantidad total</label>
+        <input type="text" class="edit-input" id="rec-cant-${i}" readonly placeholder="—">
+      </div>
+    </div>
+
+    <div class="rec-item-row">
+      <div class="rec-item-field">
+        <label class="rec-item-label">Costo/pieza</label>
+        <input type="number" class="edit-input edit-num" id="rec-costo-${i}" min="0" step="any" placeholder="$0.00">
+      </div>
+      <div class="rec-item-field rec-item-field-resultado">
+        <label class="rec-item-label">Total</label>
+        <div id="rec-total-item-${i}" class="rec-item-total-valor">$0.00</div>
+      </div>
+      ${i > 0 ? `<button type="button" class="btn-fila btn-inactivar-ing rec-item-borrar" title="Eliminar insumo"
+        onclick="this.closest('.rec-item-card').remove();_actualizarTotalRecepcion()">×</button>` : ''}
+    </div>
   `
-  body.appendChild(tr)
+  body.appendChild(card)
 
   const inputEl = document.getElementById(`rec-buscar-${i}`)
   inputEl.addEventListener('input',  () => _filtrarInsumo(i))
@@ -748,7 +752,6 @@ async function guardarRecepcion() {
   const { error: errI } = await window._db.from('recepcion_items').insert(rows)
   if (errI) { alert(`Error al guardar items: ${errI.message}`); return }
 
-  document.getElementById('form-recepcion-wrap').innerHTML = ''
   await vistaRecepciones()
 }
 
