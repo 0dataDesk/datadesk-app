@@ -44,6 +44,7 @@ async function handleGet(req, res) {
     .single()
 
   if (challengeError || !challengeRow) {
+    console.error('webauthn/checado GET insert challenge failed:', challengeError)
     return res.status(500).json({ error: 'no_se_pudo_iniciar_checado' })
   }
 
