@@ -8,6 +8,10 @@
     "dev": "node --watch src/index.js",
     "build": "node scripts/inject-env.js"
   },
+  "dependencies": {
+    "@simplewebauthn/server": "^10.0.1",
+    "@supabase/supabase-js": "^2.45.0"
+  },
   "devDependencies": {
     "@supabase/supabase-js": "^2.45.0",
     "express": "^4.19.0",

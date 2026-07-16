@@ -4,6 +4,7 @@
   "outputDirectory": "public",
   "routes": [
     { "src": "/inventario-captura", "dest": "/inventario-captura.html" },
+    { "src": "/api/webauthn/(.*)", "dest": "/api/webauthn/$1" },
     { "src": "/(.*)", "dest": "/$1" }
   ]
 }

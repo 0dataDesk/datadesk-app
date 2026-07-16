@@ -91,6 +91,14 @@
       `)
     }
 
+    function pantallaSinHuella() {
+      render(`
+        <div class="icono">🔒</div>
+        <h1>Activa tu huella primero</h1>
+        <p>Pide que te compartan el enlace de alta para activar tu huella en este teléfono.</p>
+      `)
+    }
+
     function pantallaPidiendoUbicacion() {
       render(`
         <div class="spinner"></div>
@@ -179,6 +187,64 @@
       }
     }
 
+    // Autenticación biométrica (WebAuthn), vía principal. Si el usuario cancela,
+    // no hay ninguna credencial en el teléfono, o el servidor no la reconoce, se
+    // muestra la pantalla de "activa tu huella primero" sin caer al flujo legacy
+    // — el fallback a token solo aplica cuando el navegador no soporta WebAuthn.
+    async function checadoWebAuthn(lat, lng) {
+      try {
+        const { startAuthentication } = await import('https://cdn.jsdelivr.net/npm/@simplewebauthn/browser@10/+esm')
+
+        const resGet = await fetch(`/api/webauthn/checado?tenant=${encodeURIComponent(TENANT)}`)
+        const dataGet = await resGet.json()
+
+        if (!dataGet.challenge_id || !dataGet.options) {
+          pantallaErrorGenerico('Intenta de nuevo en unos segundos.')
+          return
+        }
+
+        let assertionResponse
+        try {
+          assertionResponse = await startAuthentication(dataGet.options)
+        } catch (err) {
+          pantallaSinHuella()
+          return
+        }
+
+        const resPost = await fetch('/api/webauthn/checado', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tenant: TENANT,
+            challenge_id: dataGet.challenge_id,
+            assertionResponse,
+            lat,
+            lng
+          })
+        })
+        const dataPost = await resPost.json()
+
+        if (dataPost.error === 'credencial_no_reconocida') {
+          pantallaSinHuella()
+          return
+        }
+
+        if (dataPost.error === 'geocerca_no_configurada') {
+          pantallaErrorGenerico('Este negocio todavía no tiene su ubicación configurada. Avisa a tu administrador.')
+          return
+        }
+
+        if (dataPost.id_registro) {
+          pantallaExito(dataPost)
+          return
+        }
+
+        pantallaErrorGenerico('Intenta de nuevo en unos segundos.')
+      } catch (err) {
+        pantallaErrorGenerico('Intenta de nuevo en unos segundos.')
+      }
+    }
+
     async function solicitarUbicacion() {
       pantallaPidiendoUbicacion()
 
@@ -188,7 +254,13 @@
       }
 
       navigator.geolocation.getCurrentPosition(
-        (pos) => llamarChecarAsistencia(pos.coords.latitude, pos.coords.longitude, false),
+        (pos) => {
+          if (window.PublicKeyCredential) {
+            checadoWebAuthn(pos.coords.latitude, pos.coords.longitude)
+          } else {
+            llamarChecarAsistencia(pos.coords.latitude, pos.coords.longitude, false)
+          }
+        },
         (err) => {
           if (err.code === err.PERMISSION_DENIED) {
             pantallaPermisoRechazado()
@@ -210,6 +282,11 @@
           <h1>Enlace no válido</h1>
           <p>Falta información en el enlace. Pide el código QR correcto.</p>
         `)
+        return
+      }
+
+      if (window.PublicKeyCredential) {
+        solicitarUbicacion()
         return
       }
 

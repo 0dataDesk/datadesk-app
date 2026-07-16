@@ -58,25 +58,16 @@
       document.getElementById('card').classList.add('error')
     }
 
-    function mostrarExito(nombre) {
+    function mostrarExito(nombre, huella) {
       document.getElementById('card').innerHTML = `
         <div class="icono">✅</div>
         <h1>Listo, ${nombre}.</h1>
-        <p>Este teléfono ya quedó registrado.</p>
+        <p>${huella ? 'Tu huella ya quedó activada en este teléfono.' : 'Este teléfono ya quedó registrado.'}</p>
       `
       document.getElementById('card').classList.add('ok')
     }
 
-    async function iniciar() {
-      const params = new URLSearchParams(window.location.search)
-      const id     = params.get('id')
-      const tenant = params.get('tenant')
-
-      if (!id || !tenant) {
-        mostrarError('Falta información en el enlace. Pide que te compartan uno nuevo.')
-        return
-      }
-
+    async function iniciarLegacy(id, tenant) {
       try {
         const { data, error } = await window._db.rpc('fn_alta_dispositivo', {
           p_id_empleado: id,
@@ -92,7 +83,7 @@
 
         if (data && data.token) {
           localStorage.setItem(`${tenant}_dispositivo_token`, data.token)
-          mostrarExito(data.nombre || '')
+          mostrarExito(data.nombre || '', false)
           return
         }
 
@@ -100,6 +91,66 @@
       } catch (err) {
         mostrarError('No se pudo completar el registro. Intenta de nuevo o pide un enlace nuevo.')
       }
+    }
+
+    async function iniciarWebAuthn(id, tenant) {
+      try {
+        const { startRegistration } = await import('https://cdn.jsdelivr.net/npm/@simplewebauthn/browser@10/+esm')
+
+        const resGet = await fetch(`/api/webauthn/registro?tenant=${encodeURIComponent(tenant)}&id_empleado=${encodeURIComponent(id)}`)
+        const dataGet = await resGet.json()
+
+        if (dataGet.error === 'empleado_no_encontrado') {
+          mostrarError('No encontramos a este empleado. Pide que te compartan un enlace nuevo.')
+          return
+        }
+
+        if (!dataGet.challenge_id || !dataGet.options) {
+          mostrarError('No se pudo completar el registro. Pide que te compartan un enlace nuevo.')
+          return
+        }
+
+        const attestationResponse = await startRegistration(dataGet.options)
+
+        const resPost = await fetch('/api/webauthn/registro', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tenant,
+            id_empleado: id,
+            challenge_id: dataGet.challenge_id,
+            attestationResponse
+          })
+        })
+        const dataPost = await resPost.json()
+
+        if (dataPost.ok) {
+          mostrarExito(dataPost.nombre || '', true)
+          return
+        }
+
+        mostrarError('No se pudo completar el registro. Intenta de nuevo o pide un enlace nuevo.')
+      } catch (err) {
+        mostrarError('No se pudo completar el registro. Intenta de nuevo o pide un enlace nuevo.')
+      }
+    }
+
+    async function iniciar() {
+      const params = new URLSearchParams(window.location.search)
+      const id     = params.get('id')
+      const tenant = params.get('tenant')
+
+      if (!id || !tenant) {
+        mostrarError('Falta información en el enlace. Pide que te compartan uno nuevo.')
+        return
+      }
+
+      if (window.PublicKeyCredential) {
+        await iniciarWebAuthn(id, tenant)
+        return
+      }
+
+      await iniciarLegacy(id, tenant)
     }
 
     iniciar()
