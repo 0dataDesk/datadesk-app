@@ -390,85 +390,147 @@ async function _recCalcularCostosPromedio(tenant_id, idsProducto) {
   return resultado
 }
 
-async function _recBuscarIdReceta(tenant_id, idProducto, nombreProducto) {
-  // 1) misma id (convención correcta: subreceta vive como receta y producto con el mismo id)
-  const { data: directa } = await window._db
-    .from('catalogo_recetas').select('id_receta')
-    .eq('tenant_id', tenant_id).eq('activo', true).eq('id_receta', idProducto).limit(1)
-  if (directa && directa.length) return directa[0].id_receta
-
-  // 2) contraparte RSA-/RSR- con el mismo número (ej. RSR-006 <-> RSA-006)
-  const m = idProducto.match(/^(RSR|RSA)-(\d+)$/)
-  if (m) {
-    const otroPrefijo = m[1] === 'RSR' ? 'RSA' : 'RSR'
-    const candidato = otroPrefijo + '-' + m[2]
-    const { data: porNumero } = await window._db
-      .from('catalogo_recetas').select('id_receta')
-      .eq('tenant_id', tenant_id).eq('activo', true).eq('id_receta', candidato).limit(1)
-    if (porNumero && porNumero.length) return porNumero[0].id_receta
-  }
-
-  // 3) por nombre exacto (ej. "House Ranch" receta <-> "house ranch" producto)
-  if (nombreProducto) {
-    const { data: porNombre } = await window._db
-      .from('catalogo_recetas').select('id_receta')
-      .eq('tenant_id', tenant_id).eq('activo', true).ilike('nombre_platillo', nombreProducto).limit(1)
-    if (porNombre && porNombre.length) return porNombre[0].id_receta
-  }
-
-  return null
-}
-
-async function _recResolverCostoUnitario(tenant_id, idProducto, nombreProducto, visitados, cache) {
-  if (cache[idProducto] !== undefined) return cache[idProducto]
-  if (visitados.has(idProducto)) { cache[idProducto] = null; return null } // ciclo, no seguir
-
-  visitados.add(idProducto)
-
-  // Costo real por compras (recepciones), siempre tiene prioridad si existe
-  const costosDirectos = await _recCalcularCostosPromedio(tenant_id, [idProducto])
-  if (costosDirectos[idProducto]) {
-    const r = { promedio: costosDirectos[idProducto].promedio, derivado: false }
-    cache[idProducto] = r
-    return r
-  }
-
-  // Sin compras: ¿es una subreceta con receta propia? (mismo id, RSA/RSR, o por nombre)
-  const idReceta = await _recBuscarIdReceta(tenant_id, idProducto, nombreProducto)
-  if (!idReceta) { cache[idProducto] = null; return null }
-
-  const { data: subIngredientes } = await window._db
-    .from('receta_ingredientes')
-    .select('id_producto, producto, cantidad')
-    .eq('tenant_id', tenant_id)
-    .eq('id_receta', idReceta)
-    .neq('activo', false)
-
-  if (!subIngredientes || !subIngredientes.length) { cache[idProducto] = null; return null }
-
-  let sumaCosto = 0, sumaCantidad = 0, completo = true
-  for (const sub of subIngredientes) {
-    const cant = Number(sub.cantidad) || 0
-    sumaCantidad += cant
-    if (!sub.id_producto) { completo = false; continue }
-    const c = await _recResolverCostoUnitario(tenant_id, sub.id_producto, sub.producto, visitados, cache)
-    if (c) sumaCosto += cant * c.promedio
-    else   completo = false
-  }
-
-  const resultado = (completo && sumaCantidad > 0) ? { promedio: sumaCosto / sumaCantidad, derivado: true } : null
-  cache[idProducto] = resultado
-  return resultado
-}
-
+// Resuelve el costo de TODO el árbol de ingredientes (incluyendo subrecetas anidadas)
+// en lote por nivel de profundidad (breadth-first) en vez de un round-trip por
+// ingrediente. Misma prioridad (compra real > subreceta), mismo criterio de
+// "completo" y mismo manejo de ciclos que la versión secuencial anterior — solo
+// cambia cómo se obtienen los datos (lote por nivel en vez de uno por uno).
 async function _recResolverCostosIngredientes(tenant_id, ingredientes) {
   const cache = {}
-  const resultado = {}
-  for (const ing of ingredientes) {
-    if (!ing.id_producto) continue
-    const c = await _recResolverCostoUnitario(tenant_id, ing.id_producto, ing.producto, new Set(), cache)
-    if (c) resultado[ing.id_producto] = c
+  const nivel0 = [...new Set((ingredientes || []).filter(i => i.id_producto).map(i => i.id_producto))]
+  if (!nivel0.length) return {}
+
+  // Nombre de cada producto (para la resolución por nombre, paso 3), se va
+  // completando conforme se descubren nuevos ingredientes en niveles más profundos.
+  const nombrePorProducto = {}
+  ;(ingredientes || []).forEach(i => {
+    if (i.id_producto && nombrePorProducto[i.id_producto] === undefined) nombrePorProducto[i.id_producto] = i.producto
+  })
+
+  // Catálogo completo del tenant, una sola vez — reemplaza las 3 consultas
+  // secuenciales por ingrediente de la versión anterior por comparación en memoria.
+  const { data: catalogo } = await window._db
+    .from('catalogo_recetas')
+    .select('id_receta, nombre_platillo')
+    .eq('tenant_id', tenant_id)
+    .eq('activo', true)
+
+  const idRecetaSet = new Set((catalogo || []).map(c => c.id_receta))
+  const nombreAIdReceta = {}
+  ;(catalogo || []).forEach(c => {
+    const key = (c.nombre_platillo || '').toLowerCase()
+    if (key && nombreAIdReceta[key] === undefined) nombreAIdReceta[key] = c.id_receta
+  })
+
+  // Misma prioridad y orden que _recBuscarIdReceta: 1) misma id, 2) contraparte
+  // RSA-/RSR- con el mismo número, 3) por nombre exacto (case-insensitive).
+  function resolverIdRecetaEnMemoria(idProducto, nombreProducto) {
+    if (idRecetaSet.has(idProducto)) return idProducto
+    const m = idProducto.match(/^(RSR|RSA)-(\d+)$/)
+    if (m) {
+      const candidato = (m[1] === 'RSR' ? 'RSA' : 'RSR') + '-' + m[2]
+      if (idRecetaSet.has(candidato)) return candidato
+    }
+    if (nombreProducto) {
+      const idPorNombre = nombreAIdReceta[nombreProducto.toLowerCase()]
+      if (idPorNombre) return idPorNombre
+    }
+    return null
   }
+
+  // ── Resolución por niveles (breadth-first) ──────────────────────────────
+  const directCosts = {}    // id_producto -> { promedio, variacion } (costo por compra)
+  const hijosDe = {}        // id_producto -> ingredientes de su subreceta (o [] si no aplica)
+  const visitadosGlobal = new Set(nivel0) // evita re-consultar el mismo producto en dos niveles (mismo propósito que `visitados`)
+
+  let nivelActual = nivel0
+  while (nivelActual.length) {
+    // (a) costo real por compras, en lote para todo el nivel — siempre tiene prioridad
+    const costosDirectos = await _recCalcularCostosPromedio(tenant_id, nivelActual)
+    Object.assign(directCosts, costosDirectos)
+
+    // (b) sin compra directa: resolver su id_receta contra el catálogo ya cargado
+    const sinCostoDirecto = nivelActual.filter(id => !costosDirectos[id])
+    const idRecetaDeEsteProducto = {}
+    const idRecetasDelNivel = new Set()
+    sinCostoDirecto.forEach(id => {
+      const idReceta = resolverIdRecetaEnMemoria(id, nombrePorProducto[id])
+      idRecetaDeEsteProducto[id] = idReceta
+      if (idReceta) idRecetasDelNivel.add(idReceta)
+    })
+
+    // (c) ingredientes de TODAS las subrecetas de este nivel, en una sola consulta
+    const ingredientesPorReceta = {}
+    if (idRecetasDelNivel.size) {
+      const { data: subIngs } = await window._db
+        .from('receta_ingredientes')
+        .select('id_receta, id_producto, producto, cantidad')
+        .eq('tenant_id', tenant_id)
+        .in('id_receta', [...idRecetasDelNivel])
+        .neq('activo', false)
+
+      ;(subIngs || []).forEach(s => {
+        if (!ingredientesPorReceta[s.id_receta]) ingredientesPorReceta[s.id_receta] = []
+        ingredientesPorReceta[s.id_receta].push(s)
+      })
+    }
+
+    // (d) los ingredientes recién descubiertos (no vistos aún) forman el siguiente nivel
+    const siguienteNivel = new Set()
+    sinCostoDirecto.forEach(id => {
+      const idReceta = idRecetaDeEsteProducto[id]
+      const hijos = idReceta ? (ingredientesPorReceta[idReceta] || []) : []
+      hijosDe[id] = hijos
+      hijos.forEach(h => {
+        if (h.id_producto && !visitadosGlobal.has(h.id_producto)) {
+          visitadosGlobal.add(h.id_producto)
+          siguienteNivel.add(h.id_producto)
+          if (nombrePorProducto[h.id_producto] === undefined) nombrePorProducto[h.id_producto] = h.producto
+        }
+      })
+    })
+
+    nivelActual = [...siguienteNivel]
+  }
+
+  // ── Agregación bottom-up: misma recursión/memoización/manejo de ciclos que
+  //    antes, ahora resuelta en memoria (sin más consultas) contra lo ya cargado. ──
+  function resolverCostoEnMemoria(idProducto, visitados) {
+    if (cache[idProducto] !== undefined) return cache[idProducto]
+    if (visitados.has(idProducto)) { cache[idProducto] = null; return null } // ciclo, no seguir
+
+    visitados.add(idProducto)
+
+    if (directCosts[idProducto]) {
+      const r = { promedio: directCosts[idProducto].promedio, derivado: false }
+      cache[idProducto] = r
+      return r
+    }
+
+    const hijos = hijosDe[idProducto]
+    if (!hijos || !hijos.length) { cache[idProducto] = null; return null }
+
+    let sumaCosto = 0, sumaCantidad = 0, completo = true
+    for (const sub of hijos) {
+      const cant = Number(sub.cantidad) || 0
+      sumaCantidad += cant
+      if (!sub.id_producto) { completo = false; continue }
+      const c = resolverCostoEnMemoria(sub.id_producto, visitados)
+      if (c) sumaCosto += cant * c.promedio
+      else   completo = false
+    }
+
+    const resultado = (completo && sumaCantidad > 0) ? { promedio: sumaCosto / sumaCantidad, derivado: true } : null
+    cache[idProducto] = resultado
+    return resultado
+  }
+
+  const resultado = {}
+  ;(ingredientes || []).forEach(ing => {
+    if (!ing.id_producto) return
+    const c = resolverCostoEnMemoria(ing.id_producto, new Set())
+    if (c) resultado[ing.id_producto] = c
+  })
   return resultado
 }
 
