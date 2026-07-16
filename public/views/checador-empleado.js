@@ -2,7 +2,7 @@
 // Reusa _getLunesPersAsis / _personalFechasDesdeLunes / PERSONAL_DIAS_SEMANA
 // de views/personal.js (mismo patrón de semana Lun-Dom que la pestaña Horarios).
 
-async function mostrarChecadorEmpleado(tenant_id) {
+async function mostrarChecadorEmpleado(tenant_id, contenedorId = 'app') {
   const { data: { user } } = await window._db.auth.getUser()
   const { data: miEmpleado } = await window._db.from('empleados')
     .select('id, nombre')
@@ -11,7 +11,7 @@ async function mostrarChecadorEmpleado(tenant_id) {
     .maybeSingle()
 
   if (!miEmpleado) {
-    _renderChecadorEmpleadoSinVinculo()
+    _renderChecadorEmpleadoSinVinculo(contenedorId)
     return
   }
 
@@ -45,7 +45,7 @@ async function mostrarChecadorEmpleado(tenant_id) {
       </div>`
   }).join('')
 
-  document.getElementById('app').innerHTML = `
+  document.getElementById(contenedorId).innerHTML = `
     <div class="login-wrapper">
       <div class="receta-detalle-card" style="width:100%;max-width:420px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
@@ -78,8 +78,8 @@ async function mostrarChecadorEmpleado(tenant_id) {
   document.getElementById('checador-emp-btn-registrar').addEventListener('click', _registrarAsistenciaEmpleado)
 }
 
-function _renderChecadorEmpleadoSinVinculo() {
-  document.getElementById('app').innerHTML = `
+function _renderChecadorEmpleadoSinVinculo(contenedorId = 'app') {
+  document.getElementById(contenedorId).innerHTML = `
     <div class="login-wrapper">
       <div class="receta-detalle-card" style="width:100%;max-width:380px;text-align:center;">
         <div style="font-size:44px;margin-bottom:16px;">⚠️</div>

@@ -110,7 +110,8 @@ function renderPersonalTabs() {
   const tabs = [
     { id: 'empleados', label: 'Empleados' },
     { id: 'horarios',  label: 'Horarios' },
-    { id: 'registros', label: 'Registros de asistencia' }
+    { id: 'registros', label: 'Registros de asistencia' },
+    { id: 'checador',  label: 'Checador' }
   ]
   cont.innerHTML = tabs.map(t => `
     <button class="btn-periodo${window._personalTab === t.id ? ' active' : ''}" onclick="setPersonalTab('${t.id}')">${t.label}</button>`).join('')
@@ -127,6 +128,7 @@ async function renderPersonalTabContent() {
   if (window._personalTab === 'empleados') await renderPersonalEmpleados()
   if (window._personalTab === 'horarios')  await renderPersonalHorarios()
   if (window._personalTab === 'registros') await renderPersonalRegistros()
+  if (window._personalTab === 'checador')  await mostrarChecadorEmpleado(window._personalTenant, 'personal-tab-content')
 }
 
 // ══════════════════════════════════════════════════════════════════════════
