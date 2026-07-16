@@ -140,7 +140,7 @@ async function renderPersonalEmpleados() {
   const [{ data: empleados, error }, { data: dispositivos }] = await Promise.all([
     window._db
       .from('empleados')
-      .select('id, nombre, puesto, activo')
+      .select('id, nombre, puesto, activo, auth_user_id')
       .eq('tenant_id', tenant_id)
       .order('activo', { ascending: false })
       .order('nombre'),
@@ -168,6 +168,7 @@ async function renderPersonalEmpleados() {
     </div>
     <div id="personal-form-empleado-wrap"></div>
     <div id="personal-link-wrap"></div>
+    <div id="personal-cuenta-wrap"></div>
     <div class="tabla-wrapper card-surface">
       <table class="tabla">
         <thead>
@@ -198,6 +199,9 @@ async function renderPersonalEmpleados() {
                     <button class="btn-accion" style="border:1px solid var(--color-border);font-size:11px;padding:4px 10px" onclick="mostrarFormEmpleado('${e.id}')">Editar</button>
                     ${e.activo
                       ? `<button class="btn-accion" style="border:1px solid var(--color-border);font-size:11px;padding:4px 10px" onclick="mostrarLinkAlta('${e.id}', '${e.nombre.replace(/'/g, "\\'")}')">Generar link de alta</button>
+                         ${e.auth_user_id
+                           ? `<span style="font-size:11px;font-weight:600;color:#3A8C3E;white-space:nowrap;padding:4px 6px">✓ Cuenta activa</span>`
+                           : `<button class="btn-accion" style="border:1px solid var(--color-border);font-size:11px;padding:4px 10px" onclick="mostrarCrearCuentaEmpleado('${e.id}', '${e.nombre.replace(/'/g, "\\'")}')">Crear cuenta de checador</button>`}
                          <button class="btn-accion btn-archivar" style="font-size:11px;padding:4px 10px" onclick="darDeBajaEmpleado('${e.id}')">Dar de baja</button>`
                       : `<button class="btn-accion btn-aprobar" style="font-size:11px;padding:4px 10px" onclick="reactivarEmpleado('${e.id}')">Reactivar</button>`}
                   </div>
@@ -304,6 +308,92 @@ function _personalCopiarLink(url, btn) {
     btn.textContent = 'Copiado ✓'
     setTimeout(() => { btn.textContent = original }, 1500)
   }).catch(() => alert('No se pudo copiar. Copia el link manualmente.'))
+}
+
+function mostrarCrearCuentaEmpleado(id, nombre) {
+  const wrap = document.getElementById('personal-cuenta-wrap')
+  if (!wrap) return
+
+  wrap.innerHTML = `
+    <div class="receta-detalle-card" style="margin-bottom:20px;max-width:380px">
+      <h3 style="margin-bottom:4px">Crear cuenta de checador — ${nombre}</h3>
+      <p style="font-size:12px;color:var(--color-text-muted);margin-bottom:16px">Correo y contraseña reales para que ${nombre} entre desde su celular.</p>
+      <div class="filtros-cascada">
+        <div class="filtro-cascada-item">
+          <label class="filtro-label">Correo</label>
+          <input type="email" id="pca-email" class="filtro-select" placeholder="nombre@gmail.com">
+        </div>
+        <div class="filtro-cascada-item">
+          <label class="filtro-label">Contraseña</label>
+          <div style="display:flex;gap:8px">
+            <input type="text" id="pca-password" class="filtro-select" placeholder="Contraseña" style="flex:1">
+            <button class="btn-accion" style="border:1px solid var(--color-border);font-size:12px;white-space:nowrap" onclick="_personalGenerarPassword()">Generar</button>
+          </div>
+        </div>
+      </div>
+      <div id="personal-cuenta-error" style="color:var(--color-highlight);font-size:13px;margin-top:10px"></div>
+      <div style="display:flex;gap:10px;margin-top:20px">
+        <button class="btn-accion btn-aprobar" onclick="crearCuentaEmpleado('${id}')">Crear cuenta</button>
+        <button class="btn-accion" style="border:1px solid var(--color-border)" onclick="document.getElementById('personal-cuenta-wrap').innerHTML=''">Cancelar</button>
+      </div>
+    </div>
+  `
+  wrap.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+function _personalGenerarPassword() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
+  let pass = ''
+  for (let i = 0; i < 10; i++) pass += chars[Math.floor(Math.random() * chars.length)]
+  const input = document.getElementById('pca-password')
+  if (input) input.value = pass
+}
+
+async function crearCuentaEmpleado(id) {
+  const email = document.getElementById('pca-email')?.value?.trim()
+  const password = document.getElementById('pca-password')?.value
+  const errEl = document.getElementById('personal-cuenta-error')
+  if (errEl) errEl.textContent = ''
+
+  if (!email || !password) {
+    if (errEl) errEl.textContent = 'Correo y contraseña son obligatorios.'
+    return
+  }
+
+  const { data: { session } } = await window._db.auth.getSession()
+  if (!session) {
+    if (errEl) errEl.textContent = 'Sesión inválida, recarga la página.'
+    return
+  }
+
+  try {
+    const resp = await fetch('/api/admin/crear-empleado-auth', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`
+      },
+      body: JSON.stringify({ tenant: window._personalTenant, id_empleado: id, email, password })
+    })
+    const data = await resp.json()
+
+    if (!resp.ok || data.error) {
+      const mensajes = {
+        ya_tiene_cuenta: 'Este empleado ya tiene una cuenta.',
+        no_autorizado: 'No tienes permiso para crear cuentas.',
+        empleado_no_encontrado: 'No se encontró el empleado.',
+        no_se_pudo_crear_cuenta: `No se pudo crear la cuenta: ${data.detalle || ''}`
+      }
+      if (errEl) errEl.textContent = mensajes[data.error] || 'No se pudo crear la cuenta.'
+      return
+    }
+
+    document.getElementById('personal-cuenta-wrap').innerHTML = ''
+    alert(`Cuenta creada.\n\nCorreo: ${data.email}\nContraseña: ${password}\n\nCopia estos datos ahora — no se van a volver a mostrar.`)
+    await renderPersonalEmpleados()
+  } catch (err) {
+    if (errEl) errEl.textContent = 'No se pudo crear la cuenta. Intenta de nuevo.'
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════════════

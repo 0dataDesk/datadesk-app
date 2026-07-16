@@ -153,6 +153,11 @@ async function mostrarApp(rol, email, tenant_id = null) {
   window._rol   = rol || 'operador'
   window._email = email || null
 
+  if (window._rol === 'empleado') {
+    await mostrarChecadorEmpleado(tenant_id)
+    return
+  }
+
   const esMultitenant = !!(await getTenants())
 
   document.getElementById('app').innerHTML = `
