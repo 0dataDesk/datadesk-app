@@ -864,22 +864,45 @@ async function guardarPersonalHorarios() {
     })
   })
 
-  const idsEmpleados = empleados.map(e => e.id)
+  // Celdas que SÍ tenían turno asignado antes y ahora quedaron en "—" — el
+  // upsert de `rows` no las toca (ya no están ahí), así que hay que borrarlas
+  // aparte, una por una: si alguna ya tiene un registro de asistencia real
+  // ligado (foreign key), que falle solo esa y no tumbe el resto del guardado.
+  const original = JSON.parse(window._personalHorariosValoresOriginal || '{}')
+  const celdasQuitadas = []
+  empleados.forEach(e => {
+    const diasOriginal = original[e.id] || {}
+    const diasActual = valores[e.id] || {}
+    fechas.forEach(f => {
+      if (diasOriginal[f] && !diasActual[f]) celdasQuitadas.push({ id_empleado: e.id, fecha: f })
+    })
+  })
 
   try {
-    const { error: errDel } = await window._db.from('horarios')
-      .delete()
-      .eq('tenant_id', tenant_id)
-      .in('id_empleado', idsEmpleados)
-      .in('fecha', fechas)
-    if (errDel) throw errDel
-
     if (rows.length > 0) {
-      const { error: errIns } = await window._db.from('horarios').insert(rows)
-      if (errIns) throw errIns
+      const { error: errUp } = await window._db.from('horarios')
+        .upsert(rows, { onConflict: 'id_empleado,fecha' })
+      if (errUp) throw errUp
+    }
+
+    const erroresBorrado = []
+    for (const { id_empleado, fecha } of celdasQuitadas) {
+      const { error } = await window._db.from('horarios').delete()
+        .eq('id_empleado', id_empleado).eq('fecha', fecha)
+      if (error) erroresBorrado.push({ id_empleado, fecha })
     }
 
     if (ignoradosGerente > 0) alert(`Se ignoraron ${ignoradosGerente} asignaciones inválidas de turno Gerente.`)
+
+    if (erroresBorrado.length > 0) {
+      const nombrePorId = {}
+      empleados.forEach(e => { nombrePorId[e.id] = e.nombre })
+      const mensajes = erroresBorrado.map(({ id_empleado, fecha }) =>
+        `No se pudo quitar el horario de ${nombrePorId[id_empleado] || 'un empleado'} el ${fecha} porque ya tiene un registro de asistencia ese día.`
+      )
+      alert(mensajes.join('\n'))
+    }
+
     alert('Horarios guardados.')
     await renderPersonalHorarios(fechas)
   } catch (err) {
