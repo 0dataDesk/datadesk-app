@@ -36,7 +36,12 @@ async function mostrarChecadorEmpleado(tenant_id, contenedorId = 'app') {
   window._checadorEmpId = miEmpleado.id
 
   const hoyLocal = new Date().toLocaleDateString('en-CA')
-  const lunesStr = _getLunesPersAsis(hoyLocal)
+  const lunesRealStr = _getLunesPersAsis(hoyLocal)
+  // El piso solo limita qué semana de horarios se consulta y muestra en
+  // pantalla — esLunes y la semana que se confirma siguen usando el lunes
+  // real (lunesRealStr), nunca el clampeado.
+  let lunesStr = lunesRealStr
+  if (lunesStr < PERSONAL_HORARIOS_PISO) lunesStr = PERSONAL_HORARIOS_PISO
   const fechas = _personalFechasDesdeLunes(lunesStr)
   const esLunes = new Date(hoyLocal + 'T12:00:00').getDay() === 1
 
@@ -55,7 +60,7 @@ async function mostrarChecadorEmpleado(tenant_id, contenedorId = 'app') {
     const { data: confirmacion } = await window._db.from('confirmaciones_horario')
       .select('id')
       .eq('id_empleado', miEmpleado.id)
-      .eq('lunes_semana', lunesStr)
+      .eq('lunes_semana', lunesRealStr)
       .maybeSingle()
     horarioConfirmado = !!confirmacion
   }
