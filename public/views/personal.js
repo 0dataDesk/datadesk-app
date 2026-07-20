@@ -5,14 +5,15 @@
 // el mismo scope global).
 
 const PERSONAL_TURNOS = {
-  apertura:     { label: 'Apertura',      inicio: '11:00:00', fin: '19:00:00', color: '#FDE8D7' },
-  intermedio_1: { label: 'Intermedio 1',  inicio: '12:00:00', fin: '20:00:00', color: '#FFF3C4' },
-  intermedio_2: { label: 'Intermedio 2',  inicio: '13:00:00', fin: '21:00:00', color: '#FDEBC8' },
-  cierre:       { label: 'Cierre',        inicio: '14:00:00', fin: '22:00:00', color: '#E3D5F0' },
-  gerente:      { label: 'Gerente',       inicio: '12:00:00', fin: '22:00:00', color: '#D8E8F5' },
-  descanso:     { label: 'Descanso',      inicio: null,       fin: null,       color: '#E8E8E8' },
+  apertura:     { label: 'Apertura',      inicio: '11:00:00', fin: '19:00:00', color: '#CFE8F3' },
+  intermedio_1: { label: 'Intermedio 1',  inicio: '12:00:00', fin: '20:00:00', color: '#FBEEC1' },
+  intermedio_2: { label: 'Intermedio 2',  inicio: '13:00:00', fin: '21:00:00', color: '#F5D0A9' },
+  cierre:       { label: 'Cierre',        inicio: '14:00:00', fin: '22:00:00', color: '#AEC6E8' },
+  gerente:      { label: 'Gerente',       inicio: '12:00:00', fin: '22:00:00', color: '#DADADA' },
+  descanso:     { label: 'Descanso',      inicio: null,       fin: null,       color: '#CFE8CF' },
   apoyo:        { label: 'Apoyo',         inicio: null,       fin: null,       color: '#F0E0D0' }
 }
+const PERSONAL_HORARIOS_PISO = '2026-07-20' // lunes de la primera semana real — tope fijo, no depende de "hoy"
 const PERSONAL_DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
 
 const PERSASIS_MESES_NOMBRES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
@@ -546,13 +547,13 @@ function _personalFechasDesdeLunes(lunesStr) {
 }
 
 // Mueve la semana mostrada 7 días atrás/adelante desde la que está en pantalla.
-// No permite ir antes de la semana actual (ya no hay nada que mostrar ahí).
+// No permite ir antes de PERSONAL_HORARIOS_PISO (tope fijo, no depende de "hoy").
 async function _personalCambiarSemanaHorarios(deltaDias) {
   const actual = window._personalHorariosFechas || _personalSemanaActual()
   const lunesActual = new Date(actual[0] + 'T12:00:00')
   lunesActual.setDate(lunesActual.getDate() + deltaDias)
   const lunesResultante = _fechaLocalISO(lunesActual)
-  if (deltaDias < 0 && lunesResultante < _personalSemanaActual()[0]) return
+  if (deltaDias < 0 && lunesResultante < PERSONAL_HORARIOS_PISO) return
   await renderPersonalHorarios(_personalFechasDesdeLunes(lunesResultante))
 }
 
@@ -584,7 +585,7 @@ async function renderPersonalHorarios(fechasOverride) {
   const lunes = fechas[0], domingo = fechas[6]
   const lunLabel = new Date(lunes + 'T12:00:00')
   const domLabel = new Date(domingo + 'T12:00:00')
-  const esSemanaActual = lunes === _personalSemanaActual()[0]
+  const esSemanaActual = lunes === PERSONAL_HORARIOS_PISO
 
   cont.innerHTML = `
     <div class="vista-header" style="margin-bottom:16px;flex-wrap:wrap;gap:12px">
