@@ -58,28 +58,6 @@ function _persAsisMesLabelDe(mes, soloUnAño) {
   return soloUnAño ? PERSASIS_MESES_NOMBRES[Number(month) - 1] : `${PERSASIS_MESES_NOMBRES[Number(month) - 1]} ${year}`
 }
 
-// ── Carga diferida de librería QR (solo cuando se necesita, no en cada carga de la app) ──
-// Vendorizada en public/vendor/qrcode.min.js — el checador tiene que funcionar sí o sí en
-// producción, no puede depender de que un CDN externo esté disponible en ese momento.
-function _personalCargarQRLib() {
-  return new Promise((resolve, reject) => {
-    if (window.qrcode) { resolve(); return }
-    const s = document.createElement('script')
-    s.src = 'vendor/qrcode.min.js'
-    s.onload = () => resolve()
-    s.onerror = () => reject(new Error('No se pudo cargar la librería de QR'))
-    document.head.appendChild(s)
-  })
-}
-
-// Genera el HTML de un <img> con el QR de `texto` (usa la API de qrcode-generator).
-function _personalRenderQR(texto, cellSize) {
-  const qr = qrcode(0, 'M')
-  qr.addData(texto)
-  qr.make()
-  return qr.createImgTag(cellSize || 4)
-}
-
 // ── Entrada de la vista ──────────────────────────────────────────────────────
 async function vistaPersonal() {
   const content = document.getElementById('content')
@@ -128,7 +106,77 @@ async function renderPersonalTabContent() {
   if (window._personalTab === 'empleados') await renderPersonalEmpleados()
   if (window._personalTab === 'horarios')  await renderPersonalHorarios()
   if (window._personalTab === 'registros') await renderPersonalRegistros()
-  if (window._personalTab === 'checador')  await mostrarChecadorEmpleado(window._personalTenant, 'personal-tab-content')
+  if (window._personalTab === 'checador') {
+    await mostrarChecadorEmpleado(window._personalTenant, 'personal-tab-content')
+    _renderBotonPersonalPush()
+  }
+}
+
+// ── Notificaciones push (Android) para gerentes: se agrega debajo del checador ──
+function _renderBotonPersonalPush() {
+  const cont = document.getElementById('personal-tab-content')
+  if (!cont) return
+  const activo = typeof Notification !== 'undefined' && Notification.permission === 'granted'
+
+  const div = document.createElement('div')
+  div.style.cssText = 'max-width:420px;margin:20px auto 0;text-align:center'
+  div.innerHTML = activo
+    ? `<span style="font-size:13px;font-weight:600;color:#3A8C3E">✓ Notificaciones activas</span>`
+    : `<button class="btn-accion" style="border:1px solid var(--color-border)" onclick="_personalActivarPush()">Activar notificaciones en este celular</button>`
+  cont.appendChild(div)
+}
+
+async function _personalActivarPush() {
+  try {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      alert('Este navegador no soporta notificaciones push.')
+      return
+    }
+
+    const reg = await navigator.serviceWorker.register('/sw.js')
+    const permiso = await Notification.requestPermission()
+    if (permiso !== 'granted') {
+      alert('No se concedió el permiso de notificaciones.')
+      return
+    }
+
+    const resp = await fetch('/api/push/vapid-public-key')
+    const { publicKey } = await resp.json()
+
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: _personalVapidKeyABuffer(publicKey)
+    })
+    const keys = sub.toJSON().keys
+
+    const { data: { session } } = await window._db.auth.getSession()
+    await fetch('/api/push/suscribir', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`
+      },
+      body: JSON.stringify({
+        tenant: window._personalTenant,
+        endpoint: sub.endpoint,
+        p256dh: keys.p256dh,
+        auth_key: keys.auth
+      })
+    })
+
+    await renderPersonalTabContent()
+  } catch (err) {
+    alert('No se pudo activar las notificaciones. Intenta de nuevo.')
+  }
+}
+
+function _personalVapidKeyABuffer(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4)
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
+  const rawData = atob(base64)
+  const outputArray = new Uint8Array(rawData.length)
+  for (let i = 0; i < rawData.length; i++) outputArray[i] = rawData.charCodeAt(i)
+  return outputArray
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -139,19 +187,12 @@ async function renderPersonalEmpleados() {
   const cont = document.getElementById('personal-tab-content')
   const tenant_id = window._personalTenant
 
-  const [{ data: empleados, error }, { data: dispositivos }] = await Promise.all([
-    window._db
-      .from('empleados')
-      .select('id, nombre, puesto, activo, auth_user_id')
-      .eq('tenant_id', tenant_id)
-      .order('activo', { ascending: false })
-      .order('nombre'),
-    window._db
-      .from('dispositivos_empleado')
-      .select('id_empleado')
-      .eq('tenant_id', tenant_id)
-      .eq('activo', true)
-  ])
+  const { data: empleados, error } = await window._db
+    .from('empleados')
+    .select('id, nombre, puesto, activo, auth_user_id')
+    .eq('tenant_id', tenant_id)
+    .order('activo', { ascending: false })
+    .order('nombre')
 
   if (error) {
     cont.innerHTML = `<p style="color:var(--color-highlight)">Error: ${error.message}</p>`
@@ -159,9 +200,6 @@ async function renderPersonalEmpleados() {
   }
 
   window._personalEmpleados = empleados || []
-  // No importa si un empleado tiene más de un dispositivo activo (puede pasar,
-  // ej. re-escaneó el link de alta) — no es error, el indicador es el mismo.
-  const conDispositivo = new Set((dispositivos || []).map(d => d.id_empleado))
 
   cont.innerHTML = `
     <div class="vista-header" style="margin-bottom:16px">
@@ -169,56 +207,57 @@ async function renderPersonalEmpleados() {
       <button class="btn-accion btn-aprobar" onclick="mostrarFormEmpleado()">+ Nuevo empleado</button>
     </div>
     <div id="personal-form-empleado-wrap"></div>
-    <div id="personal-link-wrap"></div>
-    <div id="personal-cuenta-wrap"></div>
-    <div class="tabla-wrapper card-surface">
-      <table class="tabla">
-        <thead>
-          <tr>
-            <th>Nombre</th>
-            <th>Puesto</th>
-            <th>Estado</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          ${!empleados || !empleados.length
-            ? `<tr><td colspan="4" style="text-align:center;color:var(--color-text-muted)">Sin empleados registrados.</td></tr>`
-            : empleados.map(e => `
-              <tr>
-                <td style="font-weight:600">
-                  ${e.nombre}
-                  ${conDispositivo.has(e.id) ? `<span style="margin-left:8px;font-size:11px;font-weight:600;color:#3A8C3E;white-space:nowrap">📱 Dispositivo registrado</span>` : ''}
-                </td>
-                <td>${e.puesto}</td>
-                <td>
-                  <span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;${e.activo ? 'background:rgba(76,153,80,0.12);color:#3A8C3E' : 'background:rgba(184,92,42,0.1);color:var(--color-highlight)'}">
-                    ${e.activo ? 'Activo' : 'Baja'}
-                  </span>
-                </td>
-                <td style="text-align:right">
-                  <div class="acciones-fila">
+    <div id="personal-empleados-tabla-wrap">
+      <div class="tabla-wrapper card-surface">
+        <table class="tabla">
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Puesto</th>
+              <th>Estado</th>
+              <th>Estatus</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${!empleados || !empleados.length
+              ? `<tr><td colspan="5" style="text-align:center;color:var(--color-text-muted)">Sin empleados registrados.</td></tr>`
+              : empleados.map(e => `
+                <tr>
+                  <td style="font-weight:600">${e.nombre}</td>
+                  <td>${e.puesto}</td>
+                  <td>
+                    <span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;${e.activo ? 'background:rgba(76,153,80,0.12);color:#3A8C3E' : 'background:rgba(184,92,42,0.1);color:var(--color-highlight)'}">
+                      ${e.activo ? 'Activo' : 'Baja'}
+                    </span>
+                  </td>
+                  <td style="font-size:12px;white-space:nowrap;${e.auth_user_id ? 'color:#3A8C3E;font-weight:600' : 'color:var(--color-text-muted)'}">
+                    ${e.auth_user_id ? '✓ Cuenta activa' : '— Sin cuenta'}
+                  </td>
+                  <td style="text-align:right">
                     <button class="btn-accion" style="border:1px solid var(--color-border);font-size:11px;padding:4px 10px" onclick="mostrarFormEmpleado('${e.id}')">Editar</button>
-                    ${e.activo
-                      ? `<button class="btn-accion" style="border:1px solid var(--color-border);font-size:11px;padding:4px 10px" onclick="mostrarLinkAlta('${e.id}', '${e.nombre.replace(/'/g, "\\'")}')">Generar link de alta</button>
-                         ${e.auth_user_id
-                           ? `<span style="font-size:11px;font-weight:600;color:#3A8C3E;white-space:nowrap;padding:4px 6px">✓ Cuenta activa</span>`
-                           : `<button class="btn-accion" style="border:1px solid var(--color-border);font-size:11px;padding:4px 10px" onclick="mostrarCrearCuentaEmpleado('${e.id}', '${e.nombre.replace(/'/g, "\\'")}')">Crear cuenta de checador</button>`}
-                         <button class="btn-accion btn-archivar" style="font-size:11px;padding:4px 10px" onclick="darDeBajaEmpleado('${e.id}')">Dar de baja</button>`
-                      : `<button class="btn-accion btn-aprobar" style="font-size:11px;padding:4px 10px" onclick="reactivarEmpleado('${e.id}')">Reactivar</button>`}
-                  </div>
-                </td>
-              </tr>`).join('')}
-        </tbody>
-      </table>
+                  </td>
+                </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
     </div>
   `
 }
 
+function cerrarFormEmpleado() {
+  const wrap = document.getElementById('personal-form-empleado-wrap')
+  if (wrap) wrap.innerHTML = ''
+  const tablaWrap = document.getElementById('personal-empleados-tabla-wrap')
+  if (tablaWrap) tablaWrap.style.display = ''
+}
+
 function mostrarFormEmpleado(id = null) {
   const wrap = document.getElementById('personal-form-empleado-wrap')
+  const tablaWrap = document.getElementById('personal-empleados-tabla-wrap')
   if (!wrap) return
   const empleado = id ? (window._personalEmpleados || []).find(e => e.id === id) : null
+  if (tablaWrap) tablaWrap.style.display = 'none'
 
   wrap.innerHTML = `
     <div class="receta-detalle-card" style="margin-bottom:20px">
@@ -235,11 +274,24 @@ function mostrarFormEmpleado(id = null) {
       </div>
       <div style="display:flex;gap:10px;margin-top:20px">
         <button class="btn-accion btn-aprobar" onclick="guardarEmpleado(${empleado ? `'${empleado.id}'` : 'null'})">Guardar</button>
-        <button class="btn-accion" style="border:1px solid var(--color-border)" onclick="document.getElementById('personal-form-empleado-wrap').innerHTML=''">Cancelar</button>
+        <button class="btn-accion" style="border:1px solid var(--color-border)" onclick="cerrarFormEmpleado()">Cancelar</button>
       </div>
+      ${empleado ? `
+      <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--color-border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+        <div id="personal-cuenta-inline-wrap" style="flex:1;min-width:200px">${_htmlSeccionCuentaEmpleado(empleado)}</div>
+        ${empleado.activo
+          ? `<button class="btn-accion btn-archivar" style="font-size:11px;padding:4px 10px" onclick="darDeBajaEmpleado('${empleado.id}')">Dar de baja</button>`
+          : `<button class="btn-accion btn-aprobar" style="font-size:11px;padding:4px 10px" onclick="reactivarEmpleado('${empleado.id}')">Reactivar</button>`}
+      </div>` : ''}
     </div>
   `
   wrap.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+function _htmlSeccionCuentaEmpleado(empleado) {
+  return empleado.auth_user_id
+    ? `<span style="font-size:13px;font-weight:600;color:#3A8C3E">✓ Cuenta activa</span>`
+    : `<button class="btn-accion" style="border:1px solid var(--color-border);font-size:12px;padding:6px 12px" onclick="mostrarCrearCuentaEmpleado('${empleado.id}', '${empleado.nombre.replace(/'/g, "\\'")}')">Crear cuenta de checador</button>`
 }
 
 async function guardarEmpleado(id) {
@@ -272,54 +324,13 @@ async function reactivarEmpleado(id) {
   await renderPersonalEmpleados()
 }
 
-async function mostrarLinkAlta(id, nombre) {
-  const wrap = document.getElementById('personal-link-wrap')
-  if (!wrap) return
-  const url = `${window.location.origin}/alta-dispositivo.html?id=${id}&tenant=${window._personalTenant}`
-
-  wrap.innerHTML = `
-    <div class="receta-detalle-card" style="margin-bottom:20px;text-align:center;max-width:340px">
-      <h3 style="margin-bottom:4px">Link de alta — ${nombre}</h3>
-      <p style="font-size:12px;color:var(--color-text-muted);margin-bottom:16px">Que ${nombre} escanee este código desde su celular.</p>
-      <div id="personal-qr-canvas-wrap" style="display:flex;justify-content:center;margin-bottom:16px">
-        <p style="color:var(--color-text-muted);font-size:13px">Generando QR...</p>
-      </div>
-      <p style="font-size:12px;color:var(--color-text-muted);word-break:break-all;background:var(--color-bg);border:1px solid var(--color-border);border-radius:6px;padding:8px">${url}</p>
-      <div style="display:flex;gap:10px;margin-top:16px;justify-content:center">
-        <button class="btn-accion btn-aprobar" onclick="_personalCopiarLink('${url}', this)">Copiar link</button>
-        <button class="btn-accion" style="border:1px solid var(--color-border)" onclick="document.getElementById('personal-link-wrap').innerHTML=''">Cerrar</button>
-      </div>
-    </div>
-  `
-  wrap.scrollIntoView({ behavior: 'smooth', block: 'start' })
-
-  try {
-    await _personalCargarQRLib()
-    const canvasWrap = document.getElementById('personal-qr-canvas-wrap')
-    if (!canvasWrap) return
-    canvasWrap.innerHTML = _personalRenderQR(url, 5)
-  } catch (e) {
-    const canvasWrap = document.getElementById('personal-qr-canvas-wrap')
-    if (canvasWrap) canvasWrap.innerHTML = `<p style="color:var(--color-highlight);font-size:13px">No se pudo generar el QR.</p>`
-  }
-}
-
-function _personalCopiarLink(url, btn) {
-  navigator.clipboard.writeText(url).then(() => {
-    const original = btn.textContent
-    btn.textContent = 'Copiado ✓'
-    setTimeout(() => { btn.textContent = original }, 1500)
-  }).catch(() => alert('No se pudo copiar. Copia el link manualmente.'))
-}
-
 function mostrarCrearCuentaEmpleado(id, nombre) {
-  const wrap = document.getElementById('personal-cuenta-wrap')
+  const wrap = document.getElementById('personal-cuenta-inline-wrap')
   if (!wrap) return
 
   wrap.innerHTML = `
-    <div class="receta-detalle-card" style="margin-bottom:20px;max-width:380px">
-      <h3 style="margin-bottom:4px">Crear cuenta de checador — ${nombre}</h3>
-      <p style="font-size:12px;color:var(--color-text-muted);margin-bottom:16px">Correo y contraseña reales para que ${nombre} entre desde su celular.</p>
+    <div>
+      <p style="font-size:12px;color:var(--color-text-muted);margin-bottom:12px">Correo y contraseña reales para que ${nombre} entre desde su celular.</p>
       <div class="filtros-cascada">
         <div class="filtro-cascada-item">
           <label class="filtro-label">Correo</label>
@@ -334,13 +345,12 @@ function mostrarCrearCuentaEmpleado(id, nombre) {
         </div>
       </div>
       <div id="personal-cuenta-error" style="color:var(--color-highlight);font-size:13px;margin-top:10px"></div>
-      <div style="display:flex;gap:10px;margin-top:20px">
+      <div style="display:flex;gap:10px;margin-top:16px">
         <button class="btn-accion btn-aprobar" onclick="crearCuentaEmpleado('${id}')">Crear cuenta</button>
-        <button class="btn-accion" style="border:1px solid var(--color-border)" onclick="document.getElementById('personal-cuenta-wrap').innerHTML=''">Cancelar</button>
+        <button class="btn-accion" style="border:1px solid var(--color-border)" onclick="mostrarFormEmpleado('${id}')">Cancelar</button>
       </div>
     </div>
   `
-  wrap.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 function _personalGenerarPassword() {
@@ -390,7 +400,6 @@ async function crearCuentaEmpleado(id) {
       return
     }
 
-    document.getElementById('personal-cuenta-wrap').innerHTML = ''
     alert(`Cuenta creada.\n\nCorreo: ${data.email}\nContraseña: ${password}\n\nCopia estos datos ahora — no se van a volver a mostrar.`)
     await renderPersonalEmpleados()
   } catch (err) {
@@ -402,17 +411,15 @@ async function crearCuentaEmpleado(id) {
 // ── TAB: HORARIOS ────────────────────────────────────────────────────────────
 // ══════════════════════════════════════════════════════════════════════════
 
-// Default al abrir la vista: la próxima semana (lunes a domingo entrante),
-// pensado para cargarse los viernes de la semana en curso. La navegación
-// manual (‹ Semana anterior / Siguiente semana ›) parte de acá pero puede
-// moverse a cualquier otra semana, incluida la actual.
-function _personalProximaSemana() {
+// Default al abrir la vista: la semana actual (lunes a domingo que contiene
+// hoy). La navegación manual (‹ Semana anterior / Siguiente semana ›) parte
+// de acá pero puede moverse a cualquier otra semana.
+function _personalSemanaActual() {
   const hoy = new Date()
   const day = hoy.getDay() || 7 // Lunes=1 ... Domingo=7
-  const diasHastaProximoLunes = 8 - day
-  const proximoLunes = new Date(hoy)
-  proximoLunes.setDate(hoy.getDate() + diasHastaProximoLunes)
-  return _personalFechasDesdeLunes(proximoLunes.toISOString().split('T')[0])
+  const lunesActual = new Date(hoy)
+  lunesActual.setDate(hoy.getDate() - (day - 1))
+  return _personalFechasDesdeLunes(lunesActual.toISOString().split('T')[0])
 }
 
 // Construye las 7 fechas (lunes a domingo) a partir de un lunes dado.
@@ -429,7 +436,7 @@ function _personalFechasDesdeLunes(lunesStr) {
 
 // Mueve la semana mostrada 7 días atrás/adelante desde la que está en pantalla.
 async function _personalCambiarSemanaHorarios(deltaDias) {
-  const actual = window._personalHorariosFechas || _personalProximaSemana()
+  const actual = window._personalHorariosFechas || _personalSemanaActual()
   const lunesActual = new Date(actual[0] + 'T12:00:00')
   lunesActual.setDate(lunesActual.getDate() + deltaDias)
   await renderPersonalHorarios(_personalFechasDesdeLunes(lunesActual.toISOString().split('T')[0]))
@@ -438,7 +445,7 @@ async function _personalCambiarSemanaHorarios(deltaDias) {
 async function renderPersonalHorarios(fechasOverride) {
   const cont = document.getElementById('personal-tab-content')
   const tenant_id = window._personalTenant
-  const fechas = fechasOverride || _personalProximaSemana()
+  const fechas = fechasOverride || _personalSemanaActual()
   window._personalHorariosFechas = fechas
 
   const [{ data: empleados, error: errE }, { data: horarios, error: errH }] = await Promise.all([
@@ -490,7 +497,10 @@ async function renderPersonalHorarios(fechasOverride) {
             ? `<tr><td colspan="8" style="text-align:center;color:var(--color-text-muted)">No hay empleados activos.</td></tr>`
             : empleados.map(e => `
               <tr>
-                <td style="font-weight:600;white-space:nowrap">${e.nombre}</td>
+                <td style="font-weight:600;white-space:nowrap">
+                  ${e.nombre}
+                  <span id="foco-sin-descanso-${e.id}" style="display:none;font-size:10px;margin-left:6px" title="Sin día de descanso asignado esta semana">🔴</span>
+                </td>
                 ${fechas.map(f => `
                   <td>
                     <select class="edit-select" style="max-width:none;width:100%" onchange="onChangePersonalTurno('${e.id}', '${f}', this.value)">
@@ -515,30 +525,33 @@ function onChangePersonalTurno(idEmpleado, fecha, valor) {
   renderPersonalAvisosDescanso()
 }
 
+// Un empleado se marca "sin descanso" si ninguno de sus turnos asignados es
+// 'descanso' — salvo que todos sus días asignados sean 'apoyo' (empleados de
+// apoyo a otro negocio, sin horario esperado en este, no aplica la regla).
+function _personalEmpleadoSinDescanso(idEmpleado) {
+  const valores = window._personalHorariosValores || {}
+  const dias = Object.values(valores[idEmpleado] || {})
+  const tieneDescanso = dias.includes('descanso')
+  const todosApoyo = dias.length > 0 && dias.every(v => v === 'apoyo')
+  return !tieneDescanso && !todosApoyo
+}
+
 function renderPersonalAvisosDescanso() {
   const cont = document.getElementById('personal-horarios-avisos')
   if (!cont) return
   const empleados = window._personalEmpleadosActivos || []
-  const valores = window._personalHorariosValores || {}
 
-  const problemas = []
+  let algunoSinDescanso = false
   empleados.forEach(e => {
-    const dias = valores[e.id] || {}
-    const descansos = Object.values(dias).filter(v => v === 'descanso').length
-    if (descansos === 0) problemas.push(`${e.nombre}: sin día de descanso asignado`)
-    else if (descansos > 1) problemas.push(`${e.nombre}: tiene ${descansos} días de descanso (debería ser 1)`)
+    const sinDescanso = _personalEmpleadoSinDescanso(e.id)
+    if (sinDescanso) algunoSinDescanso = true
+    const foco = document.getElementById(`foco-sin-descanso-${e.id}`)
+    if (foco) foco.style.display = sinDescanso ? 'inline' : 'none'
   })
 
-  if (!problemas.length) { cont.innerHTML = ''; return }
-
-  cont.innerHTML = `
-    <div class="banner-aviso" style="margin-bottom:16px">
-      ⚠ Antes de guardar, revisa:
-      <ul style="margin:6px 0 0 18px">
-        ${problemas.map(p => `<li>${p}</li>`).join('')}
-      </ul>
-    </div>
-  `
+  cont.innerHTML = algunoSinDescanso
+    ? `<div class="banner-aviso" style="margin-bottom:16px">⚠ Hay empleados sin día de descanso asignado esta semana</div>`
+    : ''
 }
 
 async function guardarPersonalHorarios() {
@@ -620,37 +633,13 @@ async function renderPersonalRegistros() {
   window._persAsisMesSel     = null
   window._persAsisSemanaSel  = null
 
-  const checadorUrl = `${window.location.origin}/checador.html?tenant=${tenant_id}`
-
   cont.innerHTML = `
-    <div class="card-surface" style="padding:20px;margin-bottom:20px;display:flex;gap:20px;flex-wrap:wrap;align-items:center">
-      <div id="personal-checador-qr" style="display:flex;justify-content:center">
-        <p style="color:var(--color-text-muted);font-size:13px">Generando QR...</p>
-      </div>
-      <div style="flex:1;min-width:220px">
-        <h3 style="margin-bottom:4px">QR fijo del checador</h3>
-        <p style="font-size:12px;color:var(--color-text-muted);margin-bottom:10px">El mismo para todos los empleados — imprímelo y pégalo en el negocio.</p>
-        <p style="font-size:12px;color:var(--color-text-muted);word-break:break-all;background:var(--color-bg);border:1px solid var(--color-border);border-radius:6px;padding:8px;margin-bottom:10px">${checadorUrl}</p>
-        <button class="btn-accion" style="border:1px solid var(--color-border)" onclick="window.print()">Imprimir</button>
-      </div>
-    </div>
-
     <div id="persasis-filtro" style="margin-bottom:16px"></div>
     <div id="persasis-lista-wrap"></div>
   `
 
   renderPersAsisFiltro()
   renderPersAsisVista()
-
-  try {
-    await _personalCargarQRLib()
-    const qrWrap = document.getElementById('personal-checador-qr')
-    if (!qrWrap) return
-    qrWrap.innerHTML = _personalRenderQR(checadorUrl, 4)
-  } catch (e) {
-    const qrWrap = document.getElementById('personal-checador-qr')
-    if (qrWrap) qrWrap.innerHTML = `<p style="color:var(--color-highlight);font-size:13px">No se pudo generar el QR.</p>`
-  }
 }
 
 function _filtrarPersAsisPorPeriodo() {
