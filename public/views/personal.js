@@ -16,6 +16,29 @@ const PERSONAL_TURNOS = {
 const PERSONAL_HORARIOS_PISO = '2026-07-20' // lunes de la primera semana real — tope fijo, no depende de "hoy"
 const PERSONAL_DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
 
+// Secciones de la tabla de Horarios, en este orden fijo — un puesto que no
+// matchee ninguna cae en 'Otros' (ej. Jorge RH / Sistemas, cuenta de
+// pruebas, no un turno real).
+const PERSONAL_SECCIONES = [
+  { label: 'Cocina',         puestos: ['Chef', 'Cocinero A', 'Auxiliar de Cocina'] },
+  { label: 'Servicio',       puestos: ['Cajero Multifuncional'] },
+  { label: 'Administración', puestos: ['Gerente', 'Subgerente'] }
+]
+const PERSONAL_SECCION_ORDEN = ['Cocina', 'Servicio', 'Administración', 'Otros']
+
+function _personalSeccionDe(puesto) {
+  const sec = PERSONAL_SECCIONES.find(s => s.puestos.includes(puesto))
+  return sec ? sec.label : 'Otros'
+}
+
+// Un 'Gerente' solo puede elegir gerente/descanso; cualquier otro puesto
+// puede elegir cualquier turno operativo menos 'gerente'.
+function _personalTurnosPermitidos(puesto) {
+  return puesto === 'Gerente'
+    ? ['gerente', 'descanso']
+    : ['apertura', 'intermedio_1', 'intermedio_2', 'cierre', 'descanso', 'apoyo']
+}
+
 const PERSASIS_MESES_NOMBRES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const PERSASIS_MESES_CORTOS  = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
 
@@ -117,6 +140,8 @@ async function setPersonalTab(tab) {
 }
 
 async function renderPersonalTabContent() {
+  _personalCerrarPopoverTurno()
+  _personalQuitarBotonGuardarFlotante()
   if (window._personalTab === 'empleados') await renderPersonalEmpleados()
   if (window._personalTab === 'horarios')  await renderPersonalHorarios()
   if (window._personalTab === 'registros') await renderPersonalRegistros()
@@ -564,7 +589,7 @@ async function renderPersonalHorarios(fechasOverride) {
   window._personalHorariosFechas = fechas
 
   const [{ data: empleados, error: errE }, { data: horarios, error: errH }] = await Promise.all([
-    window._db.from('empleados').select('id, nombre').eq('tenant_id', tenant_id).eq('activo', true).order('nombre'),
+    window._db.from('empleados').select('id, nombre, puesto').eq('tenant_id', tenant_id).eq('activo', true).order('nombre'),
     window._db.from('horarios').select('id_empleado, fecha, tipo_turno').eq('tenant_id', tenant_id).in('fecha', fechas)
   ])
 
@@ -581,11 +606,59 @@ async function renderPersonalHorarios(fechasOverride) {
     valores[h.id_empleado][h.fecha] = h.tipo_turno
   })
   window._personalHorariosValores = valores
+  window._personalHorariosValoresOriginal = JSON.stringify(valores)
 
   const lunes = fechas[0], domingo = fechas[6]
   const lunLabel = new Date(lunes + 'T12:00:00')
   const domLabel = new Date(domingo + 'T12:00:00')
   const esSemanaActual = lunes === PERSONAL_HORARIOS_PISO
+
+  // Agrupa a los empleados activos por sección, en el orden fijo de
+  // PERSONAL_SECCION_ORDEN — una sección sin empleados no se muestra.
+  const porSeccion = {}
+  ;(empleados || []).forEach(e => {
+    const sec = _personalSeccionDe(e.puesto)
+    if (!porSeccion[sec]) porSeccion[sec] = []
+    porSeccion[sec].push(e)
+  })
+
+  function celdaTurno(e, f) {
+    const valor = valores[e.id]?.[f]
+    const t = PERSONAL_TURNOS[valor]
+    return `
+      <td style="padding:0">
+        <div class="turno-celda" data-empleado="${e.id}" data-fecha="${f}"
+          style="width:100%;min-height:44px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;text-align:center;padding:12px 6px;cursor:pointer;font-size:12px;font-weight:600;color:var(--color-text);background:${t ? t.color : 'var(--color-border)'};user-select:none"
+          onclick="_personalAbrirPopoverTurno(this, '${e.id}', '${f}', '${e.puesto}')">
+          ${t ? t.label : '—'}
+        </div>
+      </td>`
+  }
+
+  function filaEmpleado(e) {
+    return `
+      <tr>
+        <td style="font-weight:600;white-space:nowrap">
+          ${e.nombre}
+          <span id="foco-sin-descanso-${e.id}" style="display:none;font-size:10px;margin-left:6px" title="Sin día de descanso asignado esta semana">🔴</span>
+        </td>
+        ${fechas.map(f => celdaTurno(e, f)).join('')}
+      </tr>`
+  }
+
+  function filaSeccion(label) {
+    return `
+      <tr>
+        <td colspan="8" style="background:var(--color-secondary);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--color-text-muted)">${label}</td>
+      </tr>`
+  }
+
+  const filasTabla = !empleados || !empleados.length
+    ? `<tr><td colspan="8" style="text-align:center;color:var(--color-text-muted)">No hay empleados activos.</td></tr>`
+    : PERSONAL_SECCION_ORDEN
+        .filter(sec => (porSeccion[sec] || []).length > 0)
+        .map(sec => filaSeccion(sec) + porSeccion[sec].map(filaEmpleado).join(''))
+        .join('')
 
   cont.innerHTML = `
     <div class="vista-header" style="margin-bottom:16px;flex-wrap:wrap;gap:12px">
@@ -594,7 +667,6 @@ async function renderPersonalHorarios(fechasOverride) {
         <h3 style="font-family:var(--font-brand);font-size:18px;margin:0">Semana del ${lunLabel.getDate()} al ${domLabel.getDate()} de ${PERSASIS_MESES_NOMBRES[domLabel.getMonth()]} ${domLabel.getFullYear()}</h3>
         <button class="btn-accion" style="border:1px solid var(--color-border)" onclick="_personalCambiarSemanaHorarios(7)">Siguiente semana ›</button>
       </div>
-      <button class="btn-accion btn-aprobar" onclick="guardarPersonalHorarios()">Guardar horarios</button>
     </div>
     <div id="personal-horarios-avisos"></div>
     <div class="tabla-wrapper card-surface">
@@ -609,37 +681,107 @@ async function renderPersonalHorarios(fechasOverride) {
           </tr>
         </thead>
         <tbody>
-          ${!empleados || !empleados.length
-            ? `<tr><td colspan="8" style="text-align:center;color:var(--color-text-muted)">No hay empleados activos.</td></tr>`
-            : empleados.map(e => `
-              <tr>
-                <td style="font-weight:600;white-space:nowrap">
-                  ${e.nombre}
-                  <span id="foco-sin-descanso-${e.id}" style="display:none;font-size:10px;margin-left:6px" title="Sin día de descanso asignado esta semana">🔴</span>
-                </td>
-                ${fechas.map(f => `
-                  <td>
-                    <select class="edit-select" style="max-width:none;width:100%;background:${PERSONAL_TURNOS[valores[e.id]?.[f]]?.color || ''}" onchange="onChangePersonalTurno('${e.id}', '${f}', this.value, this)">
-                      <option value="">—</option>
-                      ${Object.entries(PERSONAL_TURNOS).map(([key, t]) => `
-                        <option value="${key}" ${valores[e.id]?.[f] === key ? 'selected' : ''}>${t.label}</option>`).join('')}
-                    </select>
-                  </td>`).join('')}
-              </tr>`).join('')}
+          ${filasTabla}
         </tbody>
       </table>
     </div>
   `
 
   renderPersonalAvisosDescanso()
+  _personalRenderBotonGuardarFlotante()
 }
 
-function onChangePersonalTurno(idEmpleado, fecha, valor, selectEl) {
+function onChangePersonalTurno(idEmpleado, fecha, valor) {
   if (!window._personalHorariosValores[idEmpleado]) window._personalHorariosValores[idEmpleado] = {}
   if (valor) window._personalHorariosValores[idEmpleado][fecha] = valor
   else delete window._personalHorariosValores[idEmpleado][fecha]
-  if (selectEl) selectEl.style.background = PERSONAL_TURNOS[valor]?.color || ''
   renderPersonalAvisosDescanso()
+  _personalActualizarEstadoGuardar()
+}
+
+// ── Celda de color + popover de selección de turno ──────────────────────────
+function _personalAbrirPopoverTurno(celdaEl, idEmpleado, fecha, puesto) {
+  _personalCerrarPopoverTurno()
+
+  const permitidos = _personalTurnosPermitidos(puesto)
+  const pop = document.createElement('div')
+  pop.id = 'personal-turno-popover'
+  pop.style.cssText = 'position:absolute;z-index:2000;background:var(--color-bg);border:1px solid var(--color-border);border-radius:var(--radius);box-shadow:0 8px 24px rgba(0,0,0,0.18);padding:6px;min-width:170px'
+
+  const opcionHtml = (key, label, color) => `
+    <button type="button" style="display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:8px 10px;border:none;background:transparent;border-radius:6px;cursor:pointer;font-family:var(--font-main);font-size:13px;color:var(--color-text)"
+      onmouseover="this.style.background='var(--color-secondary)'" onmouseout="this.style.background='transparent'"
+      onclick="_personalElegirTurno('${idEmpleado}', '${fecha}', '${key}')">
+      ${color ? `<span style="width:14px;height:14px;border-radius:4px;background:${color};display:inline-block;flex-shrink:0;border:1px solid var(--color-border)"></span>` : `<span style="width:14px;height:14px;flex-shrink:0"></span>`}
+      ${label}
+    </button>`
+
+  pop.innerHTML = opcionHtml('', 'Sin asignar', null) +
+    permitidos.map(key => opcionHtml(key, PERSONAL_TURNOS[key].label, PERSONAL_TURNOS[key].color)).join('')
+
+  document.body.appendChild(pop)
+
+  const rect = celdaEl.getBoundingClientRect()
+  pop.style.left = `${rect.left + window.scrollX}px`
+  pop.style.top = `${rect.bottom + window.scrollY + 4}px`
+
+  setTimeout(() => document.addEventListener('click', _personalCerrarPopoverTurnoListener), 0)
+}
+
+function _personalCerrarPopoverTurnoListener(ev) {
+  const pop = document.getElementById('personal-turno-popover')
+  if (pop && !pop.contains(ev.target)) _personalCerrarPopoverTurno()
+}
+
+function _personalCerrarPopoverTurno() {
+  const pop = document.getElementById('personal-turno-popover')
+  if (pop) pop.remove()
+  document.removeEventListener('click', _personalCerrarPopoverTurnoListener)
+}
+
+function _personalElegirTurno(idEmpleado, fecha, valor) {
+  _personalCerrarPopoverTurno()
+  onChangePersonalTurno(idEmpleado, fecha, valor)
+  const celda = document.querySelector(`.turno-celda[data-empleado="${idEmpleado}"][data-fecha="${fecha}"]`)
+  if (!celda) return
+  const t = PERSONAL_TURNOS[valor]
+  celda.style.background = t ? t.color : 'var(--color-border)'
+  celda.textContent = t ? t.label : '—'
+}
+
+// ── Botón flotante "Guardar horarios" — solo se habilita si hay cambios ──────
+function _personalRenderBotonGuardarFlotante() {
+  let wrap = document.getElementById('personal-guardar-flotante-wrap')
+  if (!wrap) {
+    wrap = document.createElement('div')
+    wrap.id = 'personal-guardar-flotante-wrap'
+    wrap.style.cssText = 'position:fixed;right:24px;bottom:24px;z-index:1500'
+    document.body.appendChild(wrap)
+  }
+  wrap.innerHTML = `
+    <button id="btn-guardar-horarios-flotante" class="btn-accion btn-aprobar" disabled
+      style="position:relative;box-shadow:0 4px 16px rgba(0,0,0,0.2);padding:14px 22px;font-size:14px;opacity:0.4;cursor:not-allowed"
+      onclick="guardarPersonalHorarios()">
+      Guardar horarios
+      <span id="btn-guardar-horarios-badge" style="display:none;position:absolute;top:-3px;right:-3px;width:9px;height:9px;border-radius:50%;background:var(--color-highlight);border:2px solid var(--color-bg)"></span>
+    </button>
+  `
+}
+
+function _personalQuitarBotonGuardarFlotante() {
+  const wrap = document.getElementById('personal-guardar-flotante-wrap')
+  if (wrap) wrap.remove()
+}
+
+function _personalActualizarEstadoGuardar() {
+  const btn = document.getElementById('btn-guardar-horarios-flotante')
+  if (!btn) return
+  const hayCambios = JSON.stringify(window._personalHorariosValores) !== window._personalHorariosValoresOriginal
+  btn.disabled = !hayCambios
+  btn.style.opacity = hayCambios ? '1' : '0.4'
+  btn.style.cursor = hayCambios ? 'pointer' : 'not-allowed'
+  const badge = document.getElementById('btn-guardar-horarios-badge')
+  if (badge) badge.style.display = hayCambios ? '' : 'none'
 }
 
 // Un empleado se marca "sin descanso" si ninguno de sus turnos asignados es
@@ -679,12 +821,21 @@ async function guardarPersonalHorarios() {
 
   if (!empleados.length) return
 
+  // Defensa adicional: aunque el popover ya restringe las opciones por
+  // puesto, si de alguna forma llega un tipo_turno fuera de lo permitido
+  // (ej. manipulación del DOM) se ignora esa celda en vez de guardarla.
   const rows = []
+  let ignoradosGerente = 0
   empleados.forEach(e => {
     const dias = valores[e.id] || {}
+    const permitidos = _personalTurnosPermitidos(e.puesto)
     fechas.forEach(f => {
       const tipo = dias[f]
       if (!tipo) return
+      if (!permitidos.includes(tipo)) {
+        if (tipo === 'gerente') ignoradosGerente++
+        return
+      }
       const turno = PERSONAL_TURNOS[tipo]
       rows.push({
         tenant_id,
@@ -713,6 +864,7 @@ async function guardarPersonalHorarios() {
       if (errIns) throw errIns
     }
 
+    if (ignoradosGerente > 0) alert(`Se ignoraron ${ignoradosGerente} asignaciones inválidas de turno Gerente.`)
     alert('Horarios guardados.')
     await renderPersonalHorarios(fechas)
   } catch (err) {
