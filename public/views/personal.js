@@ -42,7 +42,8 @@ function _personalTurnosPermitidos(puesto) {
 // HTML de una .turno-celda ya asignada: label + horario en una segunda
 // línea más chica (turnos sin horario, como descanso/apoyo, solo label).
 function _personalHtmlCeldaTurno(t) {
-  return `${t.label}${t.inicio ? `<br><span style="font-size:10px;opacity:.75">${t.inicio.slice(0, 5)}–${t.fin.slice(0, 5)}</span>` : ''}`
+  return `<div style="font-weight:700">${t.label}</div>` +
+    (t.inicio ? `<div style="font-weight:400;font-size:10px;opacity:.7;margin-top:2px">${t.inicio.slice(0, 5)}–${t.fin.slice(0, 5)}</div>` : '')
 }
 
 const PERSASIS_MESES_NOMBRES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
@@ -636,7 +637,7 @@ async function renderPersonalHorarios(fechasOverride) {
     return `
       <td style="padding:0">
         <div class="turno-celda" data-empleado="${e.id}" data-fecha="${f}"
-          style="width:100%;min-height:44px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;text-align:center;padding:12px 6px;cursor:pointer;font-size:12px;font-weight:600;color:var(--color-text);background:${t ? t.color : 'var(--color-border)'};user-select:none"
+          style="width:100%;min-height:44px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;text-align:center;padding:12px 6px;cursor:pointer;font-size:12px;font-weight:600;color:var(--color-text);background:${t ? t.color : 'var(--color-border)'};user-select:none"
           onclick="_personalAbrirPopoverTurno(this, '${e.id}', '${f}', '${e.puesto}')">
           ${t ? _personalHtmlCeldaTurno(t) : '—'}
         </div>
@@ -775,7 +776,7 @@ function _personalRenderBotonGuardarFlotante() {
       style="position:relative;box-shadow:0 4px 16px rgba(0,0,0,0.2);padding:14px 22px;font-size:14px;opacity:0.4;cursor:not-allowed"
       onclick="guardarPersonalHorarios()">
       Guardar horarios
-      <span id="btn-guardar-horarios-badge" style="display:none;position:absolute;top:-3px;right:-3px;width:9px;height:9px;border-radius:50%;background:var(--color-highlight);border:2px solid var(--color-bg)"></span>
+      <span id="btn-guardar-horarios-badge" style="display:none;position:absolute;top:-6px;right:-6px;width:16px;height:16px;border-radius:50%;background:var(--color-highlight);border:3px solid var(--color-bg);box-shadow:0 0 0 4px rgba(184,92,42,0.25)"></span>
     </button>
   `
 }
@@ -792,6 +793,8 @@ function _personalActualizarEstadoGuardar() {
   btn.disabled = !hayCambios
   btn.style.opacity = hayCambios ? '1' : '0.4'
   btn.style.cursor = hayCambios ? 'pointer' : 'not-allowed'
+  btn.style.background = hayCambios ? 'var(--color-highlight)' : ''
+  btn.style.color = hayCambios ? '#fff' : ''
   const badge = document.getElementById('btn-guardar-horarios-badge')
   if (badge) badge.style.display = hayCambios ? '' : 'none'
 }
