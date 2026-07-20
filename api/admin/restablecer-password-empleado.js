@@ -25,9 +25,9 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'no_autorizado' })
   }
 
-  const { tenant, id_empleado, email, password } = req.body || {}
+  const { tenant, id_empleado, password } = req.body || {}
 
-  if (!tenant || !id_empleado || !email || !password) {
+  if (!tenant || !id_empleado || !password) {
     return res.status(400).json({ error: 'faltan_parametros' })
   }
 
@@ -36,37 +36,17 @@ export default async function handler(req, res) {
     .select('id, auth_user_id')
     .eq('id', id_empleado)
     .eq('tenant_id', tenant)
-    .eq('activo', true)
     .maybeSingle()
 
-  if (empError || !empleado) {
-    return res.status(200).json({ error: 'empleado_no_encontrado' })
+  if (empError || !empleado || !empleado.auth_user_id) {
+    return res.status(200).json({ error: 'sin_cuenta' })
   }
 
-  if (empleado.auth_user_id) {
-    return res.status(200).json({ error: 'ya_tiene_cuenta' })
-  }
-
-  const { data, error } = await supabase.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-    user_metadata: { rol: 'empleado', tenant_id: tenant }
-  })
+  const { error } = await supabase.auth.admin.updateUserById(empleado.auth_user_id, { password })
 
   if (error) {
-    return res.status(200).json({ error: 'no_se_pudo_crear_cuenta', detalle: error.message })
+    return res.status(200).json({ error: 'no_se_pudo_restablecer', detalle: error.message })
   }
 
-  const { error: updateError } = await supabase
-    .from('empleados')
-    .update({ auth_user_id: data.user.id, email })
-    .eq('id', id_empleado)
-    .eq('tenant_id', tenant)
-
-  if (updateError) {
-    return res.status(200).json({ error: 'no_se_pudo_vincular', detalle: updateError.message })
-  }
-
-  return res.status(200).json({ ok: true, auth_user_id: data.user.id, email })
+  return res.status(200).json({ ok: true })
 }

@@ -114,22 +114,29 @@ async function mostrarChecadorEmpleado(tenant_id, contenedorId = 'app') {
 }
 
 function _renderChecadorEmpleadoSinVinculo(contenedorId = 'app') {
+  // contenedorId !== 'app' significa que esto se está mostrando como vista previa
+  // dentro de Personal → Checador (superadmin/gerente), no como la pantalla real
+  // de un empleado logueado — ahí no debe poder cerrar su propia sesión de gerente.
+  const esVistaReal = contenedorId === 'app'
   document.getElementById(contenedorId).innerHTML = `
     <div class="login-wrapper">
       <div class="receta-detalle-card" style="width:100%;max-width:380px;text-align:center;">
         <div style="font-size:44px;margin-bottom:16px;">⚠️</div>
         <p style="margin-bottom:24px;color:var(--color-text);">Tu cuenta no está vinculada a un empleado. Avisa a tu administrador.</p>
+        ${esVistaReal ? `
         <button id="checador-emp-logout-btn-sinvinculo"
           style="width:100%;padding:13px;background:var(--color-primary);color:#FAF7F2;border:none;border-radius:var(--radius);font-size:14px;font-weight:600;cursor:pointer;font-family:var(--font-main);">
           Cerrar sesión
-        </button>
+        </button>` : ''}
       </div>
     </div>
   `
-  document.getElementById('checador-emp-logout-btn-sinvinculo').addEventListener('click', async () => {
-    try { await logout() } catch {}
-    window.location.reload()
-  })
+  if (esVistaReal) {
+    document.getElementById('checador-emp-logout-btn-sinvinculo').addEventListener('click', async () => {
+      try { await logout() } catch {}
+      window.location.reload()
+    })
+  }
 }
 
 // ── Botón principal: alterna entre "Confirmar horario" (lunes sin confirmar) y "Registrar asistencia" ──

@@ -5,21 +5,34 @@
 // el mismo scope global).
 
 const PERSONAL_TURNOS = {
-  apertura:   { label: 'Apertura',   inicio: '11:00:00', fin: '19:00:00' },
-  intermedio: { label: 'Intermedio', inicio: '11:00:00', fin: '20:00:00' },
-  cierre:     { label: 'Cierre',     inicio: '14:00:00', fin: '22:00:00' },
-  descanso:   { label: 'Descanso',   inicio: null,        fin: null }
+  apertura:     { label: 'Apertura',      inicio: '11:00:00', fin: '19:00:00', color: '#FDE8D7' },
+  intermedio_1: { label: 'Intermedio 1',  inicio: '12:00:00', fin: '20:00:00', color: '#FFF3C4' },
+  intermedio_2: { label: 'Intermedio 2',  inicio: '13:00:00', fin: '21:00:00', color: '#FDEBC8' },
+  cierre:       { label: 'Cierre',        inicio: '14:00:00', fin: '22:00:00', color: '#E3D5F0' },
+  gerente:      { label: 'Gerente',       inicio: '12:00:00', fin: '22:00:00', color: '#D8E8F5' },
+  descanso:     { label: 'Descanso',      inicio: null,       fin: null,       color: '#E8E8E8' },
+  apoyo:        { label: 'Apoyo',         inicio: null,       fin: null,       color: '#F0E0D0' }
 }
 const PERSONAL_DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
 
 const PERSASIS_MESES_NOMBRES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const PERSASIS_MESES_CORTOS  = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
 
+// Convierte un Date a 'YYYY-MM-DD' en la zona horaria LOCAL del navegador, a
+// diferencia de .toISOString() que pasa por UTC — usar toISOString() para
+// esto descuadra el día cuando se ejecuta de tarde/noche en México (UTC-6):
+// la hora local, al pasar a UTC, salta al día siguiente.
+function _fechaLocalISO(d) {
+  const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'),
+        day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 function _getLunesPersAsis(fechaStr) {
   const d = new Date(fechaStr + 'T12:00:00')
   const day = d.getDay() || 7
   d.setDate(d.getDate() - (day - 1))
-  return d.toISOString().split('T')[0]
+  return _fechaLocalISO(d)
 }
 
 function _semLabelPersAsis(lunesStr) {
@@ -189,7 +202,7 @@ async function renderPersonalEmpleados() {
 
   const { data: empleados, error } = await window._db
     .from('empleados')
-    .select('id, nombre, puesto, activo, auth_user_id')
+    .select('id, nombre, puesto, activo, auth_user_id, email')
     .eq('tenant_id', tenant_id)
     .order('activo', { ascending: false })
     .order('nombre')
@@ -204,7 +217,7 @@ async function renderPersonalEmpleados() {
   cont.innerHTML = `
     <div class="vista-header" style="margin-bottom:16px">
       <div></div>
-      <button class="btn-accion btn-aprobar" onclick="mostrarFormEmpleado()">+ Nuevo empleado</button>
+      <button id="btn-nuevo-empleado" class="btn-accion btn-aprobar" onclick="mostrarFormEmpleado()">+ Nuevo empleado</button>
     </div>
     <div id="personal-form-empleado-wrap"></div>
     <div id="personal-empleados-tabla-wrap">
@@ -250,14 +263,18 @@ function cerrarFormEmpleado() {
   if (wrap) wrap.innerHTML = ''
   const tablaWrap = document.getElementById('personal-empleados-tabla-wrap')
   if (tablaWrap) tablaWrap.style.display = ''
+  const btnNuevo = document.getElementById('btn-nuevo-empleado')
+  if (btnNuevo) btnNuevo.style.display = ''
 }
 
 function mostrarFormEmpleado(id = null) {
   const wrap = document.getElementById('personal-form-empleado-wrap')
   const tablaWrap = document.getElementById('personal-empleados-tabla-wrap')
+  const btnNuevo = document.getElementById('btn-nuevo-empleado')
   if (!wrap) return
   const empleado = id ? (window._personalEmpleados || []).find(e => e.id === id) : null
   if (tablaWrap) tablaWrap.style.display = 'none'
+  if (btnNuevo) btnNuevo.style.display = 'none'
 
   wrap.innerHTML = `
     <div class="receta-detalle-card" style="margin-bottom:20px">
@@ -272,26 +289,50 @@ function mostrarFormEmpleado(id = null) {
           <input type="text" id="pe-puesto" class="filtro-select" value="${empleado ? empleado.puesto.replace(/"/g, '&quot;') : ''}">
         </div>
       </div>
-      <div style="display:flex;gap:10px;margin-top:20px">
+      ${empleado ? `
+      <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--color-border)">
+        <div id="personal-cuenta-inline-wrap">${_htmlSeccionCuentaEmpleado(empleado)}</div>
+      </div>
+      <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--color-border)">
+        ${_htmlSeccionEstadoEmpleado(empleado)}
+      </div>` : ''}
+      <div style="display:flex;gap:10px;margin-top:24px;padding-top:20px;border-top:1px solid var(--color-border)">
         <button class="btn-accion btn-aprobar" onclick="guardarEmpleado(${empleado ? `'${empleado.id}'` : 'null'})">Guardar</button>
         <button class="btn-accion" style="border:1px solid var(--color-border)" onclick="cerrarFormEmpleado()">Cancelar</button>
       </div>
-      ${empleado ? `
-      <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--color-border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
-        <div id="personal-cuenta-inline-wrap" style="flex:1;min-width:200px">${_htmlSeccionCuentaEmpleado(empleado)}</div>
-        ${empleado.activo
-          ? `<button class="btn-accion btn-archivar" style="font-size:11px;padding:4px 10px" onclick="darDeBajaEmpleado('${empleado.id}')">Dar de baja</button>`
-          : `<button class="btn-accion btn-aprobar" style="font-size:11px;padding:4px 10px" onclick="reactivarEmpleado('${empleado.id}')">Reactivar</button>`}
-      </div>` : ''}
     </div>
   `
   wrap.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 function _htmlSeccionCuentaEmpleado(empleado) {
-  return empleado.auth_user_id
-    ? `<span style="font-size:13px;font-weight:600;color:#3A8C3E">✓ Cuenta activa</span>`
-    : `<button class="btn-accion" style="border:1px solid var(--color-border);font-size:12px;padding:6px 12px" onclick="mostrarCrearCuentaEmpleado('${empleado.id}', '${empleado.nombre.replace(/'/g, "\\'")}')">Crear cuenta de checador</button>`
+  const titulo = `<div style="font-size:11px;font-weight:600;color:var(--color-accent);text-transform:uppercase;margin-bottom:8px">Cuenta de checador</div>`
+  if (empleado.auth_user_id) {
+    return `
+      <div>
+        ${titulo}
+        <div style="font-size:13px;color:var(--color-text);margin-bottom:10px">✓ ${empleado.email || 'Cuenta activa'}</div>
+        <button class="btn-accion" style="border:1px solid var(--color-border);font-size:12px;padding:6px 12px" onclick="mostrarRestablecerPassword('${empleado.id}', '${(empleado.email || empleado.nombre).replace(/'/g, "\\'")}')">Restablecer contraseña</button>
+      </div>`
+  }
+  return `
+    <div>
+      ${titulo}
+      <button class="btn-accion" style="border:1px solid var(--color-border);font-size:12px;padding:6px 12px" onclick="mostrarCrearCuentaEmpleado('${empleado.id}', '${empleado.nombre.replace(/'/g, "\\'")}')">Crear cuenta de checador</button>
+    </div>`
+}
+
+function _htmlSeccionEstadoEmpleado(empleado) {
+  return `
+    <div>
+      <div style="font-size:11px;font-weight:600;color:var(--color-accent);text-transform:uppercase;margin-bottom:8px">Estado del empleado</div>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <span style="font-size:13px;font-weight:600;${empleado.activo ? 'color:#3A8C3E' : 'color:var(--color-highlight)'}">Estado: ● ${empleado.activo ? 'Activo' : 'Inactivo'}</span>
+        ${empleado.activo
+          ? `<button class="btn-accion btn-archivar" style="font-size:11px;padding:4px 10px" onclick="darDeBajaEmpleado('${empleado.id}')">Dar de baja</button>`
+          : `<button class="btn-accion btn-aprobar" style="font-size:11px;padding:4px 10px" onclick="reactivarEmpleado('${empleado.id}')">Reactivar empleado</button>`}
+      </div>
+    </div>`
 }
 
 async function guardarEmpleado(id) {
@@ -353,12 +394,82 @@ function mostrarCrearCuentaEmpleado(id, nombre) {
   `
 }
 
-function _personalGenerarPassword() {
+function _personalGenerarPassword(inputId = 'pca-password') {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
   let pass = ''
   for (let i = 0; i < 10; i++) pass += chars[Math.floor(Math.random() * chars.length)]
-  const input = document.getElementById('pca-password')
+  const input = document.getElementById(inputId)
   if (input) input.value = pass
+}
+
+function mostrarRestablecerPassword(id, label) {
+  const wrap = document.getElementById('personal-cuenta-inline-wrap')
+  if (!wrap) return
+
+  wrap.innerHTML = `
+    <div>
+      <div style="font-size:11px;font-weight:600;color:var(--color-accent);text-transform:uppercase;margin-bottom:8px">Cuenta de checador</div>
+      <p style="font-size:12px;color:var(--color-text-muted);margin-bottom:12px">Nueva contraseña para ${label}.</p>
+      <div class="filtros-cascada">
+        <div class="filtro-cascada-item">
+          <label class="filtro-label">Contraseña nueva</label>
+          <div style="display:flex;gap:8px">
+            <input type="text" id="prp-password" class="filtro-select" placeholder="Contraseña" style="flex:1">
+            <button class="btn-accion" style="border:1px solid var(--color-border);font-size:12px;white-space:nowrap" onclick="_personalGenerarPassword('prp-password')">Generar</button>
+          </div>
+        </div>
+      </div>
+      <div id="personal-reset-error" style="color:var(--color-highlight);font-size:13px;margin-top:10px"></div>
+      <div style="display:flex;gap:10px;margin-top:16px">
+        <button class="btn-accion btn-aprobar" onclick="restablecerPasswordEmpleado('${id}')">Restablecer</button>
+        <button class="btn-accion" style="border:1px solid var(--color-border)" onclick="mostrarFormEmpleado('${id}')">Cancelar</button>
+      </div>
+    </div>
+  `
+}
+
+async function restablecerPasswordEmpleado(id) {
+  const password = document.getElementById('prp-password')?.value
+  const errEl = document.getElementById('personal-reset-error')
+  if (errEl) errEl.textContent = ''
+
+  if (!password) {
+    if (errEl) errEl.textContent = 'Captura una contraseña.'
+    return
+  }
+
+  const { data: { session } } = await window._db.auth.getSession()
+  if (!session) {
+    if (errEl) errEl.textContent = 'Sesión inválida, recarga la página.'
+    return
+  }
+
+  try {
+    const resp = await fetch('/api/admin/restablecer-password-empleado', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`
+      },
+      body: JSON.stringify({ tenant: window._personalTenant, id_empleado: id, password })
+    })
+    const data = await resp.json()
+
+    if (!resp.ok || data.error) {
+      const mensajes = {
+        no_autorizado: 'No tienes permiso para restablecer contraseñas.',
+        sin_cuenta: 'Este empleado no tiene cuenta de checador.',
+        no_se_pudo_restablecer: `No se pudo restablecer: ${data.detalle || ''}`
+      }
+      if (errEl) errEl.textContent = mensajes[data.error] || 'No se pudo restablecer la contraseña.'
+      return
+    }
+
+    alert(`Contraseña restablecida.\n\nContraseña nueva: ${password}\n\nCopia este dato ahora — no se va a volver a mostrar.`)
+    await renderPersonalEmpleados()
+  } catch (err) {
+    if (errEl) errEl.textContent = 'No se pudo restablecer la contraseña. Intenta de nuevo.'
+  }
 }
 
 async function crearCuentaEmpleado(id) {
@@ -419,7 +530,7 @@ function _personalSemanaActual() {
   const day = hoy.getDay() || 7 // Lunes=1 ... Domingo=7
   const lunesActual = new Date(hoy)
   lunesActual.setDate(hoy.getDate() - (day - 1))
-  return _personalFechasDesdeLunes(lunesActual.toISOString().split('T')[0])
+  return _personalFechasDesdeLunes(_fechaLocalISO(lunesActual))
 }
 
 // Construye las 7 fechas (lunes a domingo) a partir de un lunes dado.
@@ -429,17 +540,20 @@ function _personalFechasDesdeLunes(lunesStr) {
   for (let i = 0; i < 7; i++) {
     const d = new Date(lunes)
     d.setDate(lunes.getDate() + i)
-    fechas.push(d.toISOString().split('T')[0])
+    fechas.push(_fechaLocalISO(d))
   }
   return fechas
 }
 
 // Mueve la semana mostrada 7 días atrás/adelante desde la que está en pantalla.
+// No permite ir antes de la semana actual (ya no hay nada que mostrar ahí).
 async function _personalCambiarSemanaHorarios(deltaDias) {
   const actual = window._personalHorariosFechas || _personalSemanaActual()
   const lunesActual = new Date(actual[0] + 'T12:00:00')
   lunesActual.setDate(lunesActual.getDate() + deltaDias)
-  await renderPersonalHorarios(_personalFechasDesdeLunes(lunesActual.toISOString().split('T')[0]))
+  const lunesResultante = _fechaLocalISO(lunesActual)
+  if (deltaDias < 0 && lunesResultante < _personalSemanaActual()[0]) return
+  await renderPersonalHorarios(_personalFechasDesdeLunes(lunesResultante))
 }
 
 async function renderPersonalHorarios(fechasOverride) {
@@ -470,11 +584,12 @@ async function renderPersonalHorarios(fechasOverride) {
   const lunes = fechas[0], domingo = fechas[6]
   const lunLabel = new Date(lunes + 'T12:00:00')
   const domLabel = new Date(domingo + 'T12:00:00')
+  const esSemanaActual = lunes === _personalSemanaActual()[0]
 
   cont.innerHTML = `
     <div class="vista-header" style="margin-bottom:16px;flex-wrap:wrap;gap:12px">
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-        <button class="btn-accion" style="border:1px solid var(--color-border)" onclick="_personalCambiarSemanaHorarios(-7)">‹ Semana anterior</button>
+        <button class="btn-accion" style="border:1px solid var(--color-border);${esSemanaActual ? 'opacity:0.4;cursor:not-allowed' : ''}" ${esSemanaActual ? 'disabled' : ''} onclick="_personalCambiarSemanaHorarios(-7)">‹ Semana anterior</button>
         <h3 style="font-family:var(--font-brand);font-size:18px;margin:0">Semana del ${lunLabel.getDate()} al ${domLabel.getDate()} de ${PERSASIS_MESES_NOMBRES[domLabel.getMonth()]} ${domLabel.getFullYear()}</h3>
         <button class="btn-accion" style="border:1px solid var(--color-border)" onclick="_personalCambiarSemanaHorarios(7)">Siguiente semana ›</button>
       </div>
@@ -488,7 +603,7 @@ async function renderPersonalHorarios(fechasOverride) {
             <th>Empleado</th>
             ${fechas.map(f => {
               const d = new Date(f + 'T12:00:00')
-              return `<th>${PERSONAL_DIAS_SEMANA[d.getDay() === 0 ? 6 : d.getDay() - 1]}<br><span style="font-weight:400;text-transform:none">${d.getDate()}</span></th>`
+              return `<th style="text-align:center">${PERSONAL_DIAS_SEMANA[d.getDay() === 0 ? 6 : d.getDay() - 1]}<br><span style="font-weight:400;text-transform:none">${d.getDate()}</span></th>`
             }).join('')}
           </tr>
         </thead>
@@ -503,7 +618,7 @@ async function renderPersonalHorarios(fechasOverride) {
                 </td>
                 ${fechas.map(f => `
                   <td>
-                    <select class="edit-select" style="max-width:none;width:100%" onchange="onChangePersonalTurno('${e.id}', '${f}', this.value)">
+                    <select class="edit-select" style="max-width:none;width:100%;background:${PERSONAL_TURNOS[valores[e.id]?.[f]]?.color || ''}" onchange="onChangePersonalTurno('${e.id}', '${f}', this.value, this)">
                       <option value="">—</option>
                       ${Object.entries(PERSONAL_TURNOS).map(([key, t]) => `
                         <option value="${key}" ${valores[e.id]?.[f] === key ? 'selected' : ''}>${t.label}</option>`).join('')}
@@ -518,10 +633,11 @@ async function renderPersonalHorarios(fechasOverride) {
   renderPersonalAvisosDescanso()
 }
 
-function onChangePersonalTurno(idEmpleado, fecha, valor) {
+function onChangePersonalTurno(idEmpleado, fecha, valor, selectEl) {
   if (!window._personalHorariosValores[idEmpleado]) window._personalHorariosValores[idEmpleado] = {}
   if (valor) window._personalHorariosValores[idEmpleado][fecha] = valor
   else delete window._personalHorariosValores[idEmpleado][fecha]
+  if (selectEl) selectEl.style.background = PERSONAL_TURNOS[valor]?.color || ''
   renderPersonalAvisosDescanso()
 }
 
