@@ -17,18 +17,18 @@ const PERSONAL_HORARIOS_PISO = '2026-07-20' // lunes de la primera semana real �
 const PERSONAL_DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
 
 // Secciones de la tabla de Horarios, en este orden fijo — un puesto que no
-// matchee ninguna cae en 'Otros' (ej. Jorge RH / Sistemas, cuenta de
+// matchee ninguna cae en 'Externo' (ej. Jorge RH / Sistemas, cuenta de
 // pruebas, no un turno real).
 const PERSONAL_SECCIONES = [
   { label: 'Cocina',         puestos: ['Chef', 'Cocinero A', 'Auxiliar de Cocina'] },
   { label: 'Servicio',       puestos: ['Cajero Multifuncional'] },
   { label: 'Administración', puestos: ['Gerente', 'Subgerente'] }
 ]
-const PERSONAL_SECCION_ORDEN = ['Cocina', 'Servicio', 'Administración', 'Otros']
+const PERSONAL_SECCION_ORDEN = ['Cocina', 'Servicio', 'Administración', 'Externo']
 
 function _personalSeccionDe(puesto) {
   const sec = PERSONAL_SECCIONES.find(s => s.puestos.includes(puesto))
-  return sec ? sec.label : 'Otros'
+  return sec ? sec.label : 'Externo'
 }
 
 // Un 'Gerente' solo puede elegir gerente/descanso; cualquier otro puesto
@@ -37,6 +37,12 @@ function _personalTurnosPermitidos(puesto) {
   return puesto === 'Gerente'
     ? ['gerente', 'descanso']
     : ['apertura', 'intermedio_1', 'intermedio_2', 'cierre', 'descanso', 'apoyo']
+}
+
+// HTML de una .turno-celda ya asignada: label + horario en una segunda
+// línea más chica (turnos sin horario, como descanso/apoyo, solo label).
+function _personalHtmlCeldaTurno(t) {
+  return `${t.label}${t.inicio ? `<br><span style="font-size:10px;opacity:.75">${t.inicio.slice(0, 5)}–${t.fin.slice(0, 5)}</span>` : ''}`
 }
 
 const PERSASIS_MESES_NOMBRES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
@@ -556,7 +562,9 @@ function _personalSemanaActual() {
   const day = hoy.getDay() || 7 // Lunes=1 ... Domingo=7
   const lunesActual = new Date(hoy)
   lunesActual.setDate(hoy.getDate() - (day - 1))
-  return _personalFechasDesdeLunes(_fechaLocalISO(lunesActual))
+  let lunesStr = _fechaLocalISO(lunesActual)
+  if (lunesStr < PERSONAL_HORARIOS_PISO) lunesStr = PERSONAL_HORARIOS_PISO
+  return _personalFechasDesdeLunes(lunesStr)
 }
 
 // Construye las 7 fechas (lunes a domingo) a partir de un lunes dado.
@@ -630,7 +638,7 @@ async function renderPersonalHorarios(fechasOverride) {
         <div class="turno-celda" data-empleado="${e.id}" data-fecha="${f}"
           style="width:100%;min-height:44px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;text-align:center;padding:12px 6px;cursor:pointer;font-size:12px;font-weight:600;color:var(--color-text);background:${t ? t.color : 'var(--color-border)'};user-select:none"
           onclick="_personalAbrirPopoverTurno(this, '${e.id}', '${f}', '${e.puesto}')">
-          ${t ? t.label : '—'}
+          ${t ? _personalHtmlCeldaTurno(t) : '—'}
         </div>
       </td>`
   }
@@ -649,7 +657,7 @@ async function renderPersonalHorarios(fechasOverride) {
   function filaSeccion(label) {
     return `
       <tr>
-        <td colspan="8" style="background:var(--color-secondary);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--color-text-muted)">${label}</td>
+        <td colspan="8" style="background:var(--color-highlight);font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:#fff;padding:8px 16px">${label}</td>
       </tr>`
   }
 
@@ -673,7 +681,7 @@ async function renderPersonalHorarios(fechasOverride) {
       <table class="tabla" id="personal-horarios-tabla">
         <thead>
           <tr>
-            <th>Empleado</th>
+            <th>Nombre</th>
             ${fechas.map(f => {
               const d = new Date(f + 'T12:00:00')
               return `<th style="text-align:center">${PERSONAL_DIAS_SEMANA[d.getDay() === 0 ? 6 : d.getDay() - 1]}<br><span style="font-weight:400;text-transform:none">${d.getDate()}</span></th>`
@@ -717,7 +725,11 @@ function _personalAbrirPopoverTurno(celdaEl, idEmpleado, fecha, puesto) {
     </button>`
 
   pop.innerHTML = opcionHtml('', 'Sin asignar', null) +
-    permitidos.map(key => opcionHtml(key, PERSONAL_TURNOS[key].label, PERSONAL_TURNOS[key].color)).join('')
+    permitidos.map(key => {
+      const t = PERSONAL_TURNOS[key]
+      const label = t.inicio ? `${t.label} · ${t.inicio.slice(0, 5)}–${t.fin.slice(0, 5)}` : t.label
+      return opcionHtml(key, label, t.color)
+    }).join('')
 
   document.body.appendChild(pop)
 
@@ -746,7 +758,7 @@ function _personalElegirTurno(idEmpleado, fecha, valor) {
   if (!celda) return
   const t = PERSONAL_TURNOS[valor]
   celda.style.background = t ? t.color : 'var(--color-border)'
-  celda.textContent = t ? t.label : '—'
+  celda.innerHTML = t ? _personalHtmlCeldaTurno(t) : '—'
 }
 
 // ── Botón flotante "Guardar horarios" — solo se habilita si hay cambios ──────
