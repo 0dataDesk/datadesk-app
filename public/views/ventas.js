@@ -336,6 +336,8 @@ async function mostrarCierreCaja(tenantId) {
   panelDiv.innerHTML = `
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px">
       <button class="btn-accion" style="border:1px solid var(--color-border);background:var(--color-secondary)" onclick="cerrarPanelCierre()">← Volver</button>
+      <button class="btn-accion" id="cierre-elegir-otro-btn" style="display:none;border:1px solid var(--color-border);background:var(--color-secondary)"
+        onclick="_renderListaDiasPendientesCierre('${tenantId}')">← Elegir otro día</button>
       <h3 id="cierre-fecha-titulo" style="margin:0;font-size:16px"></h3>
       <button class="btn-accion" id="cierre-cerrar-btn" style="display:none;background:var(--color-primary);color:#fff;border:none;margin-left:auto"
         onclick="confirmarCierreDia(window._cierreFecha, '${tenantId}')">Cerrar día</button>
@@ -353,30 +355,73 @@ async function mostrarCierreCaja(tenantId) {
   const cabeceroMetricas = document.getElementById('ventas-cabecero-metricas')
   if (cabeceroMetricas) cabeceroMetricas.style.display = 'none'
 
+  await _renderListaDiasPendientesCierre(tenantId)
+}
+
+// Trae TODOS los días pendientes de cierre (ventas cerradas sin id_cierre),
+// agrupados por fecha LOCAL México, y los muestra como tarjetas para elegir
+// cuál cerrar — ya no se detecta/abre solo el más antiguo automáticamente.
+async function _renderListaDiasPendientesCierre(tenantId) {
   const resultado = document.getElementById('cierre-resultado')
+  const tituloEl = document.getElementById('cierre-fecha-titulo')
+  const elegirOtroBtn = document.getElementById('cierre-elegir-otro-btn')
+  const cerrarBtn = document.getElementById('cierre-cerrar-btn')
+  if (tituloEl) tituloEl.textContent = ''
+  if (elegirOtroBtn) elegirOtroBtn.style.display = 'none'
+  if (cerrarBtn) cerrarBtn.style.display = 'none'
+  window._cierreFecha = null
+
   resultado.innerHTML = `<p style="color:var(--color-text-muted)">Buscando ventas pendientes de cierre...</p>`
 
-  // La fecha ya no se elige a mano: se detecta sola (el día más antiguo con ventas
-  // cerradas sin cierre). Esto evita cerrar un día equivocado por accidente.
-  const { data: pendiente, error: errP } = await window._db
+  const { data: pendientes, error: errP } = await window._db
     .from('ventas')
-    .select('created_at')
+    .select('created_at, total')
     .eq('tenant_id', tenantId)
     .eq('estado', 'cerrada')
     .is('id_cierre', null)
-    .order('created_at', { ascending: true })
-    .limit(1)
 
   if (errP) { resultado.innerHTML = `<p style="color:var(--color-highlight)">Error: ${errP.message}</p>`; return }
-  if (!pendiente || !pendiente.length) {
+  if (!pendientes || !pendientes.length) {
     resultado.innerHTML = `<p style="color:var(--color-text-muted)">No hay ventas cerradas pendientes de cierre.</p>`
     return
   }
 
-  // Fecha local (México, UTC-6) del primer pendiente
-  const fechaLocalMs = new Date(pendiente[0].created_at).getTime() - 6 * 3600 * 1000
-  const fecha = new Date(fechaLocalMs).toISOString().split('T')[0]
+  // Fecha local (México, UTC-6) de cada venta pendiente, agrupada por día.
+  const porDia = {}
+  pendientes.forEach(v => {
+    const fechaLocalMs = new Date(v.created_at).getTime() - 6 * 3600 * 1000
+    const fecha = new Date(fechaLocalMs).toISOString().split('T')[0]
+    if (!porDia[fecha]) porDia[fecha] = { fecha, cantidad: 0, total: 0 }
+    porDia[fecha].cantidad += 1
+    porDia[fecha].total += Number(v.total) || 0
+  })
+  const dias = Object.values(porDia).sort((a, b) => a.fecha.localeCompare(b.fecha))
+
+  resultado.innerHTML = `
+    <p style="color:var(--color-text-muted);font-size:13px;margin-bottom:14px">Elige el día que quieres cerrar:</p>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      ${dias.map(d => {
+        const fechaLabel = `${d.fecha.slice(8,10)}/${d.fecha.slice(5,7)}/${d.fecha.slice(0,4)}`
+        return `
+        <button class="btn-accion" style="text-align:left;border:1px solid var(--color-border);background:var(--color-bg);display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 16px;width:100%"
+          onclick="_cargarDetalleCierreDia('${d.fecha}', '${tenantId}')">
+          <span style="font-weight:600;font-size:15px">${fechaLabel}</span>
+          <span style="font-size:13px;color:var(--color-text-muted)">${d.cantidad} ticket${d.cantidad === 1 ? '' : 's'}</span>
+          <span style="font-weight:700;font-size:15px;color:var(--color-primary)">$${formatNum(d.total)}</span>
+        </button>`
+      }).join('')}
+    </div>
+  `
+}
+
+// Carga y pinta el detalle de un día específico (mismo cálculo/HTML de
+// siempre) — se ejecuta al elegir una tarjeta de la lista de días pendientes.
+async function _cargarDetalleCierreDia(fecha, tenantId) {
   window._cierreFecha = fecha
+  const resultado = document.getElementById('cierre-resultado')
+  const elegirOtroBtn = document.getElementById('cierre-elegir-otro-btn')
+  if (elegirOtroBtn) elegirOtroBtn.style.display = ''
+  resultado.innerHTML = `<p style="color:var(--color-text-muted)">Cargando ventas del día...</p>`
 
   const tituloEl = document.getElementById('cierre-fecha-titulo')
   if (tituloEl) tituloEl.textContent = `${fecha.slice(8,10)}/${fecha.slice(5,7)}/${fecha.slice(0,4)}`
